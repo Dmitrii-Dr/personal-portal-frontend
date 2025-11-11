@@ -1,0 +1,22 @@
+version: '3.9'
+
+services:
+  frontend:
+    container_name: personal-portal-fe
+    build: .
+    networks:
+      - personal-portal-network
+
+  reverse-proxy:
+    image: nginx:1.27-alpine
+    container_name: personal-portal-proxy
+    ports:
+      - "8080:8080"
+    networks:
+      - personal-portal-network
+    volumes:
+      - ./docker/nginx/dev.conf:/etc/nginx/conf.d/default.conf:ro
+
+networks:
+     personal-portal-network:
+       external: true

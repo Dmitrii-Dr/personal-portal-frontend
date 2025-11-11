@@ -1,0 +1,70 @@
+#Java
+target/
+# macOS
+.DS_Store
+# Thumbnails
+Thumbs.db
+
+# Node
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# Build outputs
+dist/
+build/
+out/
+.next/
+.nuxt/
+.parcel-cache/
+/.cache/
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+env/
+venv/
+.venv/
+pip-wheel-metadata/
+pycache/
+.pytest_cache/
+coverage.xml
+coverage/
+htmlcov/
+
+# Environment and secrets
+.env
+.env.local
+.env.*.local
+secrets.json
+
+# IDEs and editors
+.vscode/
+.idea/
+*.sublime-workspace
+*.sublime-project
+
+# Logs
+*.log
+
+# macOS Finder attributes
+.AppleDouble
+.LSOverride
+
+# Thrown away by the build system or system files
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+
+# Lockfiles (do not ignore package manager lockfiles in general, but ignore these common temp ones)
+npm-debug.log*
+
+# Misc
+*.swp
+*.swo
+*.tmp
+*.bak
+.DS_Store?
