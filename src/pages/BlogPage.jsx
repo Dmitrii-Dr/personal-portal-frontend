@@ -1,41 +1,42 @@
 import React, { useState, useEffect } from 'react';
-import { Link } from 'react-router-dom';
-import axios from 'axios';
+import apiClient from '../utils/api';
 import {
-  Grid,
   Card,
-  CardMedia,
   CardContent,
-  CardActions,
   Typography,
-  Button,
   Alert,
   Box,
   Skeleton,
+  Accordion,
+  AccordionSummary,
+  AccordionDetails,
+  Divider,
 } from '@mui/material';
+import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 
 const BlogPage = () => {
-  const [posts, setPosts] = useState([]);
+  const [articles, setArticles] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [expandedArticle, setExpandedArticle] = useState(null);
 
   useEffect(() => {
     let isMounted = true;
     const controller = new AbortController();
 
-    const fetchPosts = async () => {
+    const fetchArticles = async () => {
       try {
         setLoading(true);
         setError(null);
         
         // Add timeout and signal to cancel request if component unmounts
-        const response = await axios.get('/api/posts', {
+        const response = await apiClient.get('/api/v1/public/articles', {
           signal: controller.signal,
           timeout: 10000, // 10 second timeout
         });
         
         if (isMounted) {
-          setPosts(Array.isArray(response.data) ? response.data : []);
+          setArticles(Array.isArray(response.data) ? response.data : []);
           setLoading(false);
         }
       } catch (err) {
@@ -44,9 +45,9 @@ const BlogPage = () => {
           return;
         }
         
-        console.error('Error fetching posts:', err);
+        console.error('Error fetching articles:', err);
         if (isMounted) {
-          let errorMessage = 'Failed to load blog posts. Please try again later.';
+          let errorMessage = 'Failed to load articles. Please try again later.';
           
           if (err.code === 'ECONNABORTED') {
             errorMessage = 'Request timed out. Please try again.';
@@ -67,7 +68,7 @@ const BlogPage = () => {
       }
     };
 
-    fetchPosts();
+    fetchArticles();
 
     return () => {
       isMounted = false;
@@ -75,35 +76,32 @@ const BlogPage = () => {
     };
   }, []);
 
+  const handleAccordionChange = (articleId) => (event, isExpanded) => {
+    setExpandedArticle(isExpanded ? articleId : null);
+  };
+
   // Loading skeleton component
   const LoadingSkeleton = () => (
-    <Card>
-      <Skeleton variant="rectangular" height={200} />
+    <Card sx={{ mb: 2 }}>
       <CardContent>
         <Skeleton variant="text" width="80%" height={40} />
-        <Skeleton variant="text" width="100%" />
-        <Skeleton variant="text" width="90%" />
-        <Skeleton variant="text" width="60%" />
+        <Skeleton variant="text" width="60%" height={24} />
       </CardContent>
-      <CardActions>
-        <Skeleton variant="rectangular" width={120} height={36} />
-      </CardActions>
     </Card>
   );
 
-  // Error state
-  if (error && !loading) {
-    return (
-      <Box>
-        <Typography variant="h4" component="h1" gutterBottom>
-          Blog
-        </Typography>
-        <Alert severity="error" sx={{ mt: 2 }}>
-          {error}
-        </Alert>
-      </Box>
-    );
-  }
+  const formatDate = (dateString) => {
+    if (!dateString) return null;
+    try {
+      return new Date(dateString).toLocaleDateString('en-US', {
+        year: 'numeric',
+        month: 'long',
+        day: 'numeric',
+      });
+    } catch {
+      return null;
+    }
+  };
 
   return (
     <Box>
@@ -112,82 +110,90 @@ const BlogPage = () => {
       </Typography>
 
       {loading ? (
-        <Grid container spacing={3} sx={{ mt: 1 }}>
+        <Box sx={{ mt: 2 }}>
           {[1, 2, 3, 4].map((index) => (
-            <Grid item xs={12} sm={6} md={4} key={index}>
-              <LoadingSkeleton />
-            </Grid>
+            <LoadingSkeleton key={index} />
           ))}
-        </Grid>
-      ) : posts.length > 0 ? (
-        <Grid container spacing={3} sx={{ mt: 1 }}>
-          {posts.map((post) => (
-            <Grid item xs={12} sm={6} md={4} key={post.id}>
-              <Card
+        </Box>
+      ) : error ? (
+        <Alert severity="error" sx={{ mt: 2 }}>
+          {error}
+        </Alert>
+      ) : articles.length > 0 ? (
+        <Box sx={{ mt: 2 }}>
+          {articles.map((article) => (
+            <Accordion
+              key={article.articleId}
+              expanded={expandedArticle === article.articleId}
+              onChange={handleAccordionChange(article.articleId)}
+              sx={{
+                mb: 2,
+                '&:before': {
+                  display: 'none',
+                },
+                boxShadow: 2,
+                '&:hover': {
+                  boxShadow: 4,
+                },
+              }}
+            >
+              <AccordionSummary
+                expandIcon={<ExpandMoreIcon />}
                 sx={{
-                  height: '100%',
-                  display: 'flex',
-                  flexDirection: 'column',
-                  transition: 'transform 0.2s ease-in-out, box-shadow 0.2s ease-in-out',
                   '&:hover': {
-                    transform: 'translateY(-4px)',
-                    boxShadow: 4,
+                    backgroundColor: 'action.hover',
                   },
                 }}
               >
-                {post.imageUrl && (
-                  <CardMedia
-                    component="img"
-                    height="200"
-                    image={post.imageUrl}
-                    alt={post.title || 'Blog post image'}
-                    sx={{
-                      objectFit: 'cover',
-                    }}
-                  />
-                )}
-                <CardContent sx={{ flexGrow: 1 }}>
-                  <Typography variant="h5" component="h2" gutterBottom>
-                    {post.title || 'Untitled'}
+                <Typography variant="h6" component="h2" sx={{ flexGrow: 1 }}>
+                  {article.title || 'Untitled'}
+                </Typography>
+                {article.publishedAt && (
+                  <Typography
+                    variant="body2"
+                    color="text.secondary"
+                    sx={{ ml: 2, mr: 1 }}
+                  >
+                    {formatDate(article.publishedAt)}
                   </Typography>
-                  {(post.authorName || post.publishDate) && (
-                    <Typography
-                      variant="body2"
-                      color="text.secondary"
-                      sx={{ mb: 1 }}
-                    >
-                      {post.authorName && `By ${post.authorName}`}
-                      {post.authorName && post.publishDate && ' • '}
-                      {post.publishDate &&
-                        new Date(post.publishDate).toLocaleDateString()}
-                    </Typography>
-                  )}
-                  {post.excerpt && (
-                    <Typography variant="body2" color="text.secondary">
-                      {post.excerpt}
-                    </Typography>
-                  )}
-                </CardContent>
-                {post.slug && (
-                  <CardActions>
-                    <Button
-                      component={Link}
-                      to={`/blog/${post.slug}`}
-                      size="small"
-                      color="primary"
-                      sx={{ textTransform: 'none' }}
-                    >
-                      Read More
-                    </Button>
-                  </CardActions>
                 )}
-              </Card>
-            </Grid>
+              </AccordionSummary>
+              <Divider />
+              <AccordionDetails>
+                <Box>
+                  {article.excerpt && (
+                    <Typography
+                      variant="body1"
+                      color="text.secondary"
+                      sx={{ mb: 2, fontStyle: 'italic' }}
+                    >
+                      {article.excerpt}
+                    </Typography>
+                  )}
+                  {article.content && (
+                    <Typography
+                      variant="body1"
+                      sx={{
+                        whiteSpace: 'pre-wrap',
+                        wordBreak: 'break-word',
+                      }}
+                    >
+                      {article.content}
+                    </Typography>
+                  )}
+                  {!article.content && (
+                    <Typography variant="body2" color="text.secondary">
+                      No content available.
+                    </Typography>
+                  )}
+                </Box>
+              </AccordionDetails>
+            </Accordion>
           ))}
-        </Grid>
+        </Box>
       ) : (
         <Alert severity="info" sx={{ mt: 2 }}>
-          No blog posts available at the moment.
+          No articles available at the moment.
         </Alert>
       )}
     </Box>

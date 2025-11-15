@@ -1,11 +1,36 @@
 import React, { useState } from 'react';
-import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route, useNavigate } from 'react-router-dom';
 import AppLayout from './components/AppLayout';
 import BlogPage from './pages/BlogPage';
 import BookingPage from './pages/BookingPage';
+import SignUpPage from './pages/SignUpPage';
+import AdminPage from './pages/AdminPage';
+import AdminDashboard from './pages/AdminDashboard';
+import AdminBlogPage from './pages/AdminBlogPage';
+import AdminRoute from './components/AdminRoute';
+import AdminRedirect from './components/AdminRedirect';
 import ErrorBoundary from './components/ErrorBoundary';
 import { ThemeProvider, createTheme } from '@mui/material/styles';
 import CssBaseline from '@mui/material/CssBaseline';
+import {
+  Box,
+  Typography,
+  Grid,
+  Card,
+  CardContent,
+  CardActions,
+  Button,
+  List,
+  ListItem,
+  ListItemText,
+  Chip,
+  Link as MuiLink,
+  TextField,
+  Alert,
+  CircularProgress,
+} from '@mui/material';
+import { Link } from 'react-router-dom';
+import { setToken, fetchWithAuth, hasAdminRole, getRolesFromToken } from './utils/api';
 
 const theme = createTheme({
   palette: {
@@ -18,6 +43,48 @@ const HomePage = () => {
   const [healthStatus, setHealthStatus] = useState('');
   const [healthError, setHealthError] = useState('');
   const [checking, setChecking] = useState(false);
+  const [accessStatus, setAccessStatus] = useState('');
+  const [accessError, setAccessError] = useState('');
+  const [checkingAccess, setCheckingAccess] = useState(false);
+
+  // Stub data for prices and services - TODO: Replace with API call
+  const services = [
+    {
+      id: '1',
+      name: 'Consultation',
+      description: 'Initial consultation to discuss your needs and goals',
+      price: 150,
+      duration: '60 min',
+      features: ['One-on-one session', 'Personalized assessment', 'Action plan'],
+    },
+    {
+      id: '2',
+      name: 'Monthly Package',
+      description: 'Ongoing support with regular check-ins',
+      price: 500,
+      duration: 'Monthly',
+      features: [
+        '4 sessions per month',
+        'Email support',
+        'Progress tracking',
+        'Customized approach',
+      ],
+    },
+    {
+      id: '3',
+      name: 'Premium Package',
+      description: 'Comprehensive support with priority access',
+      price: 1200,
+      duration: 'Monthly',
+      features: [
+        'Unlimited sessions',
+        '24/7 priority support',
+        'Detailed reports',
+        'Custom solutions',
+        'Quarterly review',
+      ],
+    },
+  ];
 
   const handleCheckHealth = async () => {
     setChecking(true);
@@ -25,7 +92,7 @@ const HomePage = () => {
     setHealthError('');
 
     try {
-      const response = await fetch(`api/v1/health`);
+      const response = await fetchWithAuth(`api/v1/health`);
       if (!response.ok) {
         throw new Error(`Request failed with status ${response.status}`);
       }
@@ -39,29 +106,384 @@ const HomePage = () => {
     }
   };
 
+  const handleCheckAccess = async () => {
+    setCheckingAccess(true);
+    setAccessStatus('');
+    setAccessError('');
+
+    try {
+      const response = await fetchWithAuth(`api/v1/health/access`);
+      if (!response.ok) {
+        throw new Error(`Request failed with status ${response.status}`);
+      }
+
+      const text = await response.text();
+      setAccessStatus(text || 'OK');
+    } catch (error) {
+      setAccessError(error.message || 'Unable to reach backend');
+    } finally {
+      setCheckingAccess(false);
+    }
+  };
+
   return (
-    <div>
-      <h1>Home Page</h1>
-      <p>Welcome to the home page2!</p>
-      <button type="button" onClick={handleCheckHealth} disabled={checking}>
-        {checking ? 'Checking…' : 'Check Backend Health'}
-      </button>
-      {healthStatus && (
-        <p style={{ color: 'green' }}>Backend response: {healthStatus}</p>
-      )}
-      {healthError && (
-        <p style={{ color: 'red' }}>Backend error: {healthError}</p>
-      )}
-    </div>
+    <Box>
+      <Typography variant="h4" component="h1" gutterBottom>
+        Home Page
+      </Typography>
+      <Typography variant="body1" paragraph>
+        Welcome to the home page!
+      </Typography>
+
+      {/* Health Check Section */}
+      <Box sx={{ mb: 4 }}>
+        <Box sx={{ display: 'flex', gap: 2, mb: 2 }}>
+          <Button
+            variant="outlined"
+            onClick={handleCheckHealth}
+            disabled={checking}
+          >
+            {checking ? 'Checking…' : 'Check Backend Health'}
+          </Button>
+          <Button
+            variant="outlined"
+            onClick={handleCheckAccess}
+            disabled={checkingAccess}
+          >
+            {checkingAccess ? 'Checking…' : 'Check Access'}
+          </Button>
+        </Box>
+        {healthStatus && (
+          <Typography variant="body2" color="success.main" sx={{ mb: 1 }}>
+            Backend response: {healthStatus}
+          </Typography>
+        )}
+        {healthError && (
+          <Typography variant="body2" color="error.main" sx={{ mb: 1 }}>
+            Backend error: {healthError}
+          </Typography>
+        )}
+        {accessStatus && (
+          <Typography variant="body2" color="success.main" sx={{ mb: 1 }}>
+            Access response: {accessStatus}
+          </Typography>
+        )}
+        {accessError && (
+          <Typography variant="body2" color="error.main" sx={{ mb: 1 }}>
+            Access error: {accessError}
+          </Typography>
+        )}
+      </Box>
+
+      {/* Prices and Services Section */}
+      <Box sx={{ mt: 6 }}>
+        <Typography variant="h4" component="h2" gutterBottom>
+          Services & Pricing
+        </Typography>
+        <Typography variant="body1" color="text.secondary" paragraph>
+          Choose the service package that best fits your needs
+        </Typography>
+
+        <Grid container spacing={3} sx={{ mt: 2 }}>
+          {services.map((service) => (
+            <Grid item xs={12} md={4} key={service.id}>
+              <Card
+                sx={{
+                  height: '100%',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  transition: 'transform 0.2s ease-in-out, box-shadow 0.2s ease-in-out',
+                  '&:hover': {
+                    transform: 'translateY(-4px)',
+                    boxShadow: 4,
+                  },
+                }}
+              >
+                <CardContent sx={{ flexGrow: 1 }}>
+                  <Box
+                    sx={{
+                      display: 'flex',
+                      justifyContent: 'space-between',
+                      alignItems: 'flex-start',
+                      mb: 2,
+                    }}
+                  >
+                    <Typography variant="h5" component="h3">
+                      {service.name}
+                    </Typography>
+                    <Chip
+                      label={service.duration}
+                      size="small"
+                      color="primary"
+                      variant="outlined"
+                    />
+                  </Box>
+                  <Typography
+                    variant="body2"
+                    color="text.secondary"
+                    paragraph
+                    sx={{ mb: 2 }}
+                  >
+                    {service.description}
+                  </Typography>
+                  <Box sx={{ mb: 2 }}>
+                    <Typography variant="h4" component="span" color="primary">
+                      ${service.price}
+                    </Typography>
+                    {service.duration === 'Monthly' && (
+                      <Typography variant="body2" color="text.secondary" component="span">
+                        /month
+                      </Typography>
+                    )}
+                  </Box>
+                  <List dense>
+                    {service.features.map((feature, index) => (
+                      <ListItem key={index} disablePadding>
+                        <ListItemText
+                          primary={feature}
+                          primaryTypographyProps={{
+                            variant: 'body2',
+                          }}
+                        />
+                      </ListItem>
+                    ))}
+                  </List>
+                </CardContent>
+                <CardActions sx={{ p: 2, pt: 0 }}>
+                  <Button
+                    variant="contained"
+                    fullWidth
+                    color="primary"
+                    sx={{ textTransform: 'none' }}
+                  >
+                    Book Now
+                  </Button>
+                </CardActions>
+              </Card>
+            </Grid>
+          ))}
+        </Grid>
+      </Box>
+    </Box>
   );
 };
 
-const LoginPage = () => (
-  <div>
-    <h1>Login</h1>
-    <p>Login page content.</p>
-  </div>
-);
+const LoginPage = () => {
+  const navigate = useNavigate();
+  const [formData, setFormData] = useState({
+    email: '',
+    password: '',
+  });
+  const [errors, setErrors] = useState({
+    email: '',
+    password: '',
+  });
+  const [loading, setLoading] = useState(false);
+  const [submitError, setSubmitError] = useState('');
+
+  const validateEmail = (email) => {
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    return emailRegex.test(email);
+  };
+
+  const handleChange = (e) => {
+    const { name, value } = e.target;
+    setFormData((prev) => ({
+      ...prev,
+      [name]: value,
+    }));
+    // Clear error when user starts typing
+    if (errors[name]) {
+      setErrors((prev) => ({
+        ...prev,
+        [name]: '',
+      }));
+    }
+    setSubmitError('');
+  };
+
+  const validateForm = () => {
+    const newErrors = {
+      email: '',
+      password: '',
+    };
+    let isValid = true;
+
+    if (!formData.email.trim()) {
+      newErrors.email = 'Email is required';
+      isValid = false;
+    } else if (!validateEmail(formData.email)) {
+      newErrors.email = 'Email must be valid';
+      isValid = false;
+    }
+
+    if (!formData.password.trim()) {
+      newErrors.password = 'Password is required';
+      isValid = false;
+    }
+
+    setErrors(newErrors);
+    return isValid;
+  };
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setSubmitError('');
+
+    if (!validateForm()) {
+      return;
+    }
+
+    setLoading(true);
+
+    try {
+      const response = await fetch('/api/v1/auth/login', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          email: formData.email.trim(),
+          password: formData.password,
+        }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(
+          errorData.message ||
+            `Login failed: ${response.status} ${response.statusText}`
+        );
+      }
+
+      const data = await response.json();
+      
+      // Save token to sessionStorage
+      if (data.token) {
+        setToken(data.token);
+        // Dispatch custom event to notify AppLayout of auth change
+        window.dispatchEvent(new Event('auth-changed'));
+        
+        // Check if user has admin role - check both response roles and token
+        const responseRoles = data.roles || [];
+        const tokenRoles = getRolesFromToken(data.token);
+        const allRoles = [...new Set([...responseRoles, ...tokenRoles])]; // Combine and deduplicate
+        const isAdmin = allRoles.includes('ROLE_ADMIN') || allRoles.includes('ADMIN_ROLE');
+        
+        console.log('Response roles:', responseRoles);
+        console.log('Token roles:', tokenRoles);
+        console.log('All roles:', allRoles);
+        console.log('Is admin?', isAdmin);
+        
+        if (isAdmin) {
+          // Admin user - redirect to admin dashboard
+          console.log('Redirecting to /admin/dashboard');
+          navigate('/admin/dashboard');
+        } else {
+          // Regular user - redirect to home page
+          console.log('Redirecting to /');
+          navigate('/');
+        }
+      } else {
+        throw new Error('No token received from server');
+      }
+    } catch (error) {
+      console.error('Error logging in:', error);
+      setSubmitError(error.message || 'Failed to login. Please try again.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <Box
+      sx={{
+        display: 'flex',
+        justifyContent: 'center',
+        alignItems: 'center',
+        minHeight: '60vh',
+      }}
+    >
+      <Card sx={{ maxWidth: 500, width: '100%' }}>
+        <CardContent sx={{ p: 4 }}>
+          <Typography variant="h4" component="h1" gutterBottom align="center">
+            Login
+          </Typography>
+          <Typography variant="body2" color="text.secondary" align="center" sx={{ mb: 3 }}>
+            Sign in to your account
+          </Typography>
+
+          {submitError && (
+            <Alert severity="error" sx={{ mb: 2 }}>
+              {submitError}
+            </Alert>
+          )}
+
+          <Box component="form" onSubmit={handleSubmit} noValidate>
+            <TextField
+              fullWidth
+              id="email"
+              name="email"
+              label="Email"
+              type="email"
+              value={formData.email}
+              onChange={handleChange}
+              error={!!errors.email}
+              helperText={errors.email}
+              margin="normal"
+              required
+              autoComplete="email"
+              disabled={loading}
+            />
+
+            <TextField
+              fullWidth
+              id="password"
+              name="password"
+              label="Password"
+              type="password"
+              value={formData.password}
+              onChange={handleChange}
+              error={!!errors.password}
+              helperText={errors.password}
+              margin="normal"
+              required
+              autoComplete="current-password"
+              disabled={loading}
+            />
+
+            <Button
+              type="submit"
+              fullWidth
+              variant="contained"
+              color="primary"
+              sx={{ mt: 3, mb: 2 }}
+              disabled={loading}
+            >
+              {loading ? (
+                <>
+                  <CircularProgress size={20} sx={{ mr: 1 }} />
+                  Logging in...
+                </>
+              ) : (
+                'Login'
+              )}
+            </Button>
+
+            <Box sx={{ textAlign: 'center' }}>
+              <Typography variant="body2">
+                Don't have an account?{' '}
+                <MuiLink component={Link} to="/signup">
+                  Sign up
+                </MuiLink>
+              </Typography>
+            </Box>
+          </Box>
+        </CardContent>
+      </Card>
+    </Box>
+  );
+};
 
 const AccountPage = () => (
   <div>
@@ -76,15 +498,32 @@ function App() {
       <CssBaseline />
       <ErrorBoundary>
         <Router>
-          <AppLayout>
-            <Routes>
-              <Route path="/" element={<HomePage />} />
-              <Route path="/blog" element={<BlogPage />} />
-              <Route path="/booking" element={<BookingPage />} />
-              <Route path="/login" element={<LoginPage />} />
-              <Route path="/account" element={<AccountPage />} />
-            </Routes>
-          </AppLayout>
+          <AdminRedirect>
+            <AppLayout>
+              <Routes>
+                <Route path="/" element={<HomePage />} />
+                <Route path="/blog" element={<BlogPage />} />
+                <Route path="/booking" element={<BookingPage />} />
+                <Route path="/login" element={<LoginPage />} />
+                <Route path="/signup" element={<SignUpPage />} />
+                <Route path="/account" element={<AccountPage />} />
+                <Route path="/admin" element={<AdminPage />} />
+                {/* All /admin/* routes except /admin itself are protected by AdminRoute */}
+                <Route
+                  path="/admin/*"
+                  element={
+                    <AdminRoute>
+                      <Routes>
+                        <Route path="dashboard" element={<AdminDashboard />} />
+                        <Route path="blog" element={<AdminBlogPage />} />
+                        {/* Add more admin routes here as needed */}
+                      </Routes>
+                    </AdminRoute>
+                  }
+                />
+              </Routes>
+            </AppLayout>
+          </AdminRedirect>
         </Router>
       </ErrorBoundary>
     </ThemeProvider>

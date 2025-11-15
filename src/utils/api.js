@@ -1,0 +1,152 @@
+import axios from 'axios';
+
+const TOKEN_KEY = 'auth_token';
+
+// Get token from sessionStorage
+export const getToken = () => {
+  return sessionStorage.getItem(TOKEN_KEY);
+};
+
+// Save token to sessionStorage
+export const setToken = (token) => {
+  if (token) {
+    sessionStorage.setItem(TOKEN_KEY, token);
+  } else {
+    sessionStorage.removeItem(TOKEN_KEY);
+  }
+};
+
+// Remove token from sessionStorage
+export const removeToken = () => {
+  sessionStorage.removeItem(TOKEN_KEY);
+};
+
+// Decode JWT token to get payload
+export const decodeToken = (token) => {
+  try {
+    if (!token) return null;
+    const parts = token.split('.');
+    if (parts.length !== 3) return null;
+    const payload = parts[1];
+    
+    // Base64URL decode - add padding if needed
+    let base64 = payload.replace(/-/g, '+').replace(/_/g, '/');
+    const padding = base64.length % 4;
+    if (padding) {
+      base64 += '='.repeat(4 - padding);
+    }
+    
+    const decoded = JSON.parse(atob(base64));
+    return decoded;
+  } catch (error) {
+    console.error('Error decoding token:', error);
+    return null;
+  }
+};
+
+// Get roles from token
+export const getRolesFromToken = (token) => {
+  const decoded = decodeToken(token);
+  if (!decoded) {
+    console.warn('Token could not be decoded');
+    return [];
+  }
+  
+  // Debug: log decoded token to help diagnose issues
+  console.log('Decoded token:', decoded);
+  
+  // Handle different possible role field names
+  if (decoded.roles) {
+    let roles = Array.isArray(decoded.roles) ? decoded.roles : [decoded.roles];
+    // Handle Spring Security format where roles might be objects with 'authority' field
+    roles = roles.map(role => typeof role === 'object' && role.authority ? role.authority : role);
+    console.log('Found roles:', roles);
+    return roles;
+  }
+  if (decoded.role) {
+    let roles = Array.isArray(decoded.role) ? decoded.role : [decoded.role];
+    roles = roles.map(role => typeof role === 'object' && role.authority ? role.authority : role);
+    console.log('Found role:', roles);
+    return roles;
+  }
+  if (decoded.authorities) {
+    let roles = Array.isArray(decoded.authorities) ? decoded.authorities : [decoded.authorities];
+    // Handle Spring Security format where authorities might be objects with 'authority' field
+    roles = roles.map(role => typeof role === 'object' && role.authority ? role.authority : role);
+    console.log('Found authorities:', roles);
+    return roles;
+  }
+  if (decoded.scope) {
+    const roles = Array.isArray(decoded.scope) ? decoded.scope : decoded.scope.split(' ');
+    console.log('Found scope:', roles);
+    return roles;
+  }
+  
+  console.warn('No roles found in token. Available keys:', Object.keys(decoded));
+  return [];
+};
+
+// Check if user has ROLE_ADMIN
+export const hasAdminRole = (token) => {
+  const roles = getRolesFromToken(token);
+  return roles.includes('ROLE_ADMIN') || roles.includes('ADMIN_ROLE');
+};
+
+// Create axios instance with default config
+const apiClient = axios.create({
+  baseURL: '/',
+  headers: {
+    'Content-Type': 'application/json',
+  },
+});
+
+// Request interceptor to add Authorization header
+apiClient.interceptors.request.use(
+  (config) => {
+    const token = getToken();
+    if (token) {
+      config.headers.Authorization = `Bearer ${token}`;
+    } else {
+      // Ensure Authorization header is not set if no token
+      delete config.headers.Authorization;
+    }
+    return config;
+  },
+  (error) => {
+    return Promise.reject(error);
+  }
+);
+
+// Response interceptor for error handling (optional, can be extended later)
+apiClient.interceptors.response.use(
+  (response) => response,
+  (error) => {
+    // Handle 401 unauthorized errors - could clear token here if needed
+    if (error.response?.status === 401) {
+      // Optionally clear token on 401
+      // removeToken();
+    }
+    return Promise.reject(error);
+  }
+);
+
+// Helper function to add Authorization header to fetch requests
+export const fetchWithAuth = async (url, options = {}) => {
+  const token = getToken();
+  const headers = {
+    ...options.headers,
+  };
+
+  if (token) {
+    headers.Authorization = `Bearer ${token}`;
+  }
+
+  return fetch(url, {
+    ...options,
+    headers,
+  });
+};
+
+// Export configured axios instance
+export default apiClient;
+
