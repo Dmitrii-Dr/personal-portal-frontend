@@ -19,8 +19,12 @@ import {
   FormControl,
   InputLabel,
   Grid,
+  Chip,
+  Stack,
 } from '@mui/material';
+import apiClient from '../utils/api';
 import { fetchWithAuth } from '../utils/api';
+import CreateTagForm from '../components/CreateTagForm';
 
 const AdminDashboard = () => {
   const navigate = useNavigate();
@@ -37,6 +41,14 @@ const AdminDashboard = () => {
     excerpt: '',
     status: 'DRAFT',
   });
+  const [availableUsers, setAvailableUsers] = useState([]);
+  const [loadingUsers, setLoadingUsers] = useState(false);
+  const [usersError, setUsersError] = useState('');
+  const [selectedUserIds, setSelectedUserIds] = useState([]);
+  const [availableTags, setAvailableTags] = useState([]);
+  const [loadingTags, setLoadingTags] = useState(false);
+  const [selectedTagIds, setSelectedTagIds] = useState([]);
+  const [showCreateTagForm, setShowCreateTagForm] = useState(false);
 
   const fetchDashboard = async () => {
     setLoading(true);
@@ -74,6 +86,12 @@ const AdminDashboard = () => {
       status: 'DRAFT',
     });
     setSubmitError('');
+    setSelectedUserIds([]);
+    setSelectedTagIds([]);
+    setShowCreateTagForm(false);
+    // Preload users and tags for selection
+    fetchUsers();
+    fetchTags();
   };
 
   const handleAddPostClose = () => {
@@ -86,6 +104,10 @@ const AdminDashboard = () => {
       status: 'DRAFT',
     });
     setSubmitError('');
+    setSelectedUserIds([]);
+    setUsersError('');
+    setSelectedTagIds([]);
+    setShowCreateTagForm(false);
   };
 
   const handleFieldChange = (field) => (e) => {
@@ -94,6 +116,55 @@ const AdminDashboard = () => {
       [field]: e.target.value,
     }));
     setSubmitError('');
+  };
+
+  const fetchUsers = async () => {
+    setLoadingUsers(true);
+    setUsersError('');
+    try {
+      const response = await fetchWithAuth('/api/v1/admin/users');
+      if (!response.ok) {
+        throw new Error(`Failed to load users: ${response.status} ${response.statusText}`);
+      }
+      const users = await response.json();
+      // Ensure array and normalize fields we need
+      const list = Array.isArray(users) ? users : [];
+      setAvailableUsers(list);
+    } catch (err) {
+      console.error('Error fetching users:', err);
+      setUsersError(err.message || 'Failed to load users');
+      setAvailableUsers([]);
+    } finally {
+      setLoadingUsers(false);
+    }
+  };
+
+  const userFullName = (user) => {
+    const first = user.firstName || '';
+    const last = user.lastName || '';
+    const name = `${last} ${first}`.trim();
+    return name || user.email || user.id;
+  };
+
+  const handleUsersChange = (e) => {
+    const value = e.target.value || [];
+    setSelectedUserIds(typeof value === 'string' ? value.split(',') : value);
+  };
+
+  const fetchTags = async () => {
+    setLoadingTags(true);
+    try {
+      const response = await apiClient.get('/api/v1/admin/tags', {
+        timeout: 10000,
+      });
+      const tags = Array.isArray(response.data) ? response.data : [];
+      setAvailableTags(tags);
+    } catch (err) {
+      console.error('Error fetching tags:', err);
+      setAvailableTags([]);
+    } finally {
+      setLoadingTags(false);
+    }
   };
 
   const validateForm = () => {
@@ -125,6 +196,7 @@ const AdminDashboard = () => {
     setSubmitError('');
 
     try {
+      const allowedUserIds = articleData.status === 'PUBLISHED' ? [] : (Array.isArray(selectedUserIds) ? selectedUserIds : []);
       const response = await fetchWithAuth('/api/v1/admin/articles', {
         method: 'POST',
         headers: {
@@ -136,6 +208,8 @@ const AdminDashboard = () => {
           content: articleData.content.trim(),
           excerpt: articleData.excerpt.trim() || null,
           status: articleData.status,
+          allowedUserIds: allowedUserIds,
+          tagIds: Array.isArray(selectedTagIds) ? selectedTagIds : [],
         }),
       });
 
@@ -236,6 +310,11 @@ const AdminDashboard = () => {
               {submitError}
             </Alert>
           )}
+          {articleData.status === 'PUBLISHED' && selectedUserIds.length > 0 && (
+            <Alert severity="warning" sx={{ mb: 2 }}>
+              Selected users will be erased when submitting a published article.
+            </Alert>
+          )}
           <Grid container spacing={2} sx={{ mt: 1 }}>
             <Grid item xs={12}>
               <TextField
@@ -302,6 +381,118 @@ const AdminDashboard = () => {
                   <MenuItem value="ARCHIVED">Archived</MenuItem>
                 </Select>
               </FormControl>
+            </Grid>
+            <Grid item xs={12}>
+              <FormControl fullWidth>
+                <InputLabel>Users (visible to)</InputLabel>
+                <Select
+                  multiple
+                  value={selectedUserIds}
+                  onChange={handleUsersChange}
+                  label="Users (visible to)"
+                  disabled={submitting || articleData.status === 'PUBLISHED' || loadingUsers}
+                  renderValue={(selected) => {
+                    if (!selected || selected.length === 0) return '';
+                    const names = selected
+                      .map((id) => {
+                        const u = availableUsers.find((au) => au.id === id);
+                        return u ? userFullName(u) : id;
+                      })
+                      .join(', ');
+                    return names;
+                  }}
+                >
+                  {loadingUsers && (
+                    <MenuItem disabled>
+                      <CircularProgress size={16} sx={{ mr: 1 }} /> Loading users...
+                    </MenuItem>
+                  )}
+                  {!loadingUsers &&
+                    availableUsers.map((user) => (
+                      <MenuItem key={user.id} value={user.id}>
+                        {userFullName(user)}
+                      </MenuItem>
+                    ))}
+                </Select>
+              </FormControl>
+              {usersError && (
+                <Alert severity="error" sx={{ mt: 1 }}>
+                  {usersError}
+                </Alert>
+              )}
+            </Grid>
+            <Grid item xs={12}>
+              <FormControl fullWidth>
+                <InputLabel>Tags</InputLabel>
+                <Select
+                  multiple
+                  value={selectedTagIds}
+                  onChange={(e) => {
+                    const value = e.target.value || [];
+                    setSelectedTagIds(typeof value === 'string' ? value.split(',') : value);
+                  }}
+                  label="Tags"
+                  disabled={submitting || loadingTags}
+                  renderValue={(selected) => {
+                    if (!selected || selected.length === 0) return '';
+                    return selected
+                      .map((id) => {
+                        const tag = availableTags.find((t) => t.tagId === id);
+                        return tag ? tag.name : id;
+                      })
+                      .join(', ');
+                  }}
+                >
+                  {loadingTags && (
+                    <MenuItem disabled>
+                      <CircularProgress size={16} sx={{ mr: 1 }} /> Loading tags...
+                    </MenuItem>
+                  )}
+                  {!loadingTags &&
+                    availableTags.map((tag) => (
+                      <MenuItem key={tag.tagId} value={tag.tagId}>
+                        {tag.name}
+                      </MenuItem>
+                    ))}
+                  <MenuItem
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setShowCreateTagForm(true);
+                    }}
+                    sx={{ fontStyle: 'italic', color: 'primary.main' }}
+                  >
+                    + Create new tag
+                  </MenuItem>
+                </Select>
+              </FormControl>
+              {showCreateTagForm && (
+                <CreateTagForm
+                  onTagCreated={(tagId) => {
+                    setSelectedTagIds((prev) => [...prev, tagId]);
+                    setShowCreateTagForm(false);
+                  }}
+                  onCancel={() => setShowCreateTagForm(false)}
+                  availableTags={availableTags}
+                  setAvailableTags={setAvailableTags}
+                />
+              )}
+              {selectedTagIds.length > 0 && (
+                <Stack direction="row" spacing={1} sx={{ mt: 1, flexWrap: 'wrap', gap: 1 }}>
+                  {selectedTagIds.map((tagId) => {
+                    const tag = availableTags.find((t) => t.tagId === tagId);
+                    return tag ? (
+                      <Chip
+                        key={tagId}
+                        label={tag.name}
+                        size="small"
+                        onDelete={() => {
+                          setSelectedTagIds((prev) => prev.filter((id) => id !== tagId));
+                        }}
+                      />
+                    ) : null;
+                  })}
+                </Stack>
+              )}
             </Grid>
           </Grid>
         </DialogContent>

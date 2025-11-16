@@ -1,6 +1,6 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
-import { fetchWithAuth, getToken, removeToken } from '../utils/api';
+import { fetchWithAuth, getToken, removeToken, decodeToken } from '../utils/api';
 import {
   AppBar,
   Toolbar,
@@ -15,12 +15,19 @@ import {
   DialogContentText,
   CircularProgress,
   Alert,
+  IconButton,
+  Tooltip,
+  Chip,
 } from '@mui/material';
+import LogoutIcon from '@mui/icons-material/Logout';
+import AccountCircleIcon from '@mui/icons-material/AccountCircle';
 
 const AppLayout = ({ children }) => {
   const navigate = useNavigate();
   const location = useLocation();
   const [hasToken, setHasToken] = useState(false);
+  const [userProfile, setUserProfile] = useState(null);
+  const [profileLoading, setProfileLoading] = useState(false);
   const [aboutMeOpen, setAboutMeOpen] = useState(false);
   const [aboutMeData, setAboutMeData] = useState(null);
   const [aboutMeLoading, setAboutMeLoading] = useState(false);
@@ -29,10 +36,74 @@ const AppLayout = ({ children }) => {
   // Check if current route is an admin route
   const isAdminRoute = location.pathname.startsWith('/admin');
 
+  // Fetch user profile
+  const lastFetchedTokenRef = useRef(null);
+  const fetchUserProfile = useCallback(async () => {
+    const token = getToken();
+    if (!token) {
+      setUserProfile(null);
+      lastFetchedTokenRef.current = null;
+      return;
+    }
+
+    // Avoid refetching if we've already fetched for this token
+    if (lastFetchedTokenRef.current === token) {
+      return;
+    }
+
+    setProfileLoading(true);
+    try {
+      const response = await fetchWithAuth('/api/v1/user/profile');
+      if (!response.ok) {
+        throw new Error(`Failed to load profile: ${response.status}`);
+      }
+      const data = await response.json();
+      setUserProfile(data);
+      lastFetchedTokenRef.current = token;
+    } catch (error) {
+      console.error('Error fetching user profile:', error);
+      setUserProfile(null);
+      lastFetchedTokenRef.current = null;
+    } finally {
+      setProfileLoading(false);
+    }
+  }, []);
+
+  // Get display name from user profile
+  const getUserDisplayName = () => {
+    if (userProfile) {
+      const firstName = userProfile.firstName || '';
+      const lastName = userProfile.lastName || '';
+      const name = `${firstName} ${lastName}`.trim();
+      return name || userProfile.email || '';
+    }
+    // Fallback: try to derive from token if profile not loaded yet
+    const token = getToken();
+    const decoded = decodeToken(token);
+    if (decoded) {
+      const name =
+        [decoded.given_name, decoded.family_name].filter(Boolean).join(' ').trim() ||
+        decoded.name ||
+        decoded.preferred_username ||
+        decoded.username ||
+        decoded.user_name ||
+        decoded.email ||
+        decoded.sub;
+      if (name) return name;
+    }
+    return '';
+  };
+
   // Check token on mount and listen for storage changes
   useEffect(() => {
     const checkToken = () => {
-      setHasToken(!!getToken());
+      const tokenExists = !!getToken();
+      setHasToken(tokenExists);
+      if (tokenExists) {
+        fetchUserProfile();
+      } else {
+        setUserProfile(null);
+      }
     };
 
     // Check initially
@@ -51,24 +122,19 @@ const AppLayout = ({ children }) => {
     };
 
     // Check when window regains focus (user might have logged in in another tab)
-    const handleFocus = () => {
-      checkToken();
-    };
-
     window.addEventListener('storage', handleStorageChange);
-    window.addEventListener('focus', handleFocus);
     window.addEventListener('auth-changed', handleLogin);
 
     return () => {
       window.removeEventListener('storage', handleStorageChange);
-      window.removeEventListener('focus', handleFocus);
       window.removeEventListener('auth-changed', handleLogin);
     };
-  }, []);
+  }, [fetchUserProfile]);
 
   const handleLogout = () => {
     removeToken();
     setHasToken(false);
+    setUserProfile(null);
     // Dispatch custom event to notify other components of auth change
     window.dispatchEvent(new Event('auth-changed'));
     navigate('/');
@@ -165,25 +231,47 @@ const AppLayout = ({ children }) => {
                 {hasToken && (
                   <Button
                     component={Link}
-                    to="/account"
+                    to="/profile"
                     color="inherit"
                     sx={{ textTransform: 'none' }}
                   >
-                    My Account
+                    My Profile
                   </Button>
                 )}
               </>
             )}
 
-            {/* Logout button - always show if has token, Login button if not */}
+            {/* User name and Logout button - always show if has token, Login button if not */}
             {hasToken ? (
-              <Button
-                onClick={handleLogout}
-                color="inherit"
-                sx={{ textTransform: 'none' }}
-              >
-                Logout
-              </Button>
+              <>
+                <Chip
+                  icon={<AccountCircleIcon />}
+                  label={getUserDisplayName() || 'My Profile'}
+                  color="primary"
+                  variant="outlined"
+                  sx={{
+                    mr: 1,
+                    fontWeight: 600,
+                    display: 'inline-flex',
+                    color: 'common.white',
+                    borderColor: 'common.white',
+                    '& .MuiChip-icon': { color: 'common.white' },
+                    '& .MuiChip-label': { color: 'common.white' },
+                  }}
+                  component={Link}
+                  to="/profile"
+                />
+                <Tooltip title="Logout">
+                  <IconButton
+                    onClick={handleLogout}
+                    color="inherit"
+                    size="large"
+                    aria-label="logout"
+                  >
+                    <LogoutIcon />
+                  </IconButton>
+                </Tooltip>
+              </>
             ) : !isAdminRoute ? (
               <Button
                 component={Link}

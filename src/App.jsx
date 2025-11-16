@@ -2,11 +2,13 @@ import React, { useState } from 'react';
 import { BrowserRouter as Router, Routes, Route, useNavigate } from 'react-router-dom';
 import AppLayout from './components/AppLayout';
 import BlogPage from './pages/BlogPage';
+import ProfilePage from './pages/ProfilePage';
 import BookingPage from './pages/BookingPage';
 import SignUpPage from './pages/SignUpPage';
 import AdminPage from './pages/AdminPage';
 import AdminDashboard from './pages/AdminDashboard';
 import AdminBlogPage from './pages/AdminBlogPage';
+import AdminProfilePage from './pages/AdminProfilePage';
 import AdminRoute from './components/AdminRoute';
 import AdminRedirect from './components/AdminRedirect';
 import ErrorBoundary from './components/ErrorBoundary';
@@ -506,7 +508,7 @@ function App() {
                 <Route path="/booking" element={<BookingPage />} />
                 <Route path="/login" element={<LoginPage />} />
                 <Route path="/signup" element={<SignUpPage />} />
-                <Route path="/account" element={<AccountPage />} />
+                <Route path="/profile" element={<ProfilePage />} />
                 <Route path="/admin" element={<AdminPage />} />
                 {/* All /admin/* routes except /admin itself are protected by AdminRoute */}
                 <Route
@@ -516,6 +518,7 @@ function App() {
                       <Routes>
                         <Route path="dashboard" element={<AdminDashboard />} />
                         <Route path="blog" element={<AdminBlogPage />} />
+                        <Route path="profile" element={<AdminProfilePage />} />
                         {/* Add more admin routes here as needed */}
                       </Routes>
                     </AdminRoute>

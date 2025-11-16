@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import apiClient from '../utils/api';
+import apiClient, { getToken } from '../utils/api';
 import {
   Card,
   CardContent,
@@ -11,6 +11,10 @@ import {
   AccordionSummary,
   AccordionDetails,
   Divider,
+  Tabs,
+  Tab,
+  Chip,
+  Stack,
 } from '@mui/material';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 
@@ -19,6 +23,34 @@ const BlogPage = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [expandedArticle, setExpandedArticle] = useState(null);
+  const [activeTab, setActiveTab] = useState(0);
+  const [hasToken, setHasToken] = useState(!!getToken());
+
+  // Keep track of auth state to show/hide Private tab
+  useEffect(() => {
+    const updateAuth = () => {
+      const tokenExists = !!getToken();
+      setHasToken(tokenExists);
+      if (!tokenExists && activeTab === 1) {
+        setActiveTab(0);
+      }
+    };
+    const handleStorage = (e) => {
+      if (e.key === 'auth_token' || e.key === null) updateAuth();
+    };
+    const handleFocus = () => updateAuth();
+    const handleAuthChanged = () => updateAuth();
+    window.addEventListener('storage', handleStorage);
+    window.addEventListener('focus', handleFocus);
+    window.addEventListener('auth-changed', handleAuthChanged);
+    // initial check
+    updateAuth();
+    return () => {
+      window.removeEventListener('storage', handleStorage);
+      window.removeEventListener('focus', handleFocus);
+      window.removeEventListener('auth-changed', handleAuthChanged);
+    };
+  }, [activeTab]);
 
   useEffect(() => {
     let isMounted = true;
@@ -29,8 +61,15 @@ const BlogPage = () => {
         setLoading(true);
         setError(null);
         
+        // Use different endpoint based on active tab
+        // Tab 0 = Public articles, Tab 1 = Private articles (only with auth)
+        const endpoint =
+          activeTab === 0 || !hasToken
+            ? '/api/v1/public/articles'
+            : '/api/v1/articles';
+        
         // Add timeout and signal to cancel request if component unmounts
-        const response = await apiClient.get('/api/v1/public/articles', {
+        const response = await apiClient.get(endpoint, {
           signal: controller.signal,
           timeout: 10000, // 10 second timeout
         });
@@ -74,10 +113,15 @@ const BlogPage = () => {
       isMounted = false;
       controller.abort();
     };
-  }, []);
+  }, [activeTab, hasToken]);
 
   const handleAccordionChange = (articleId) => (event, isExpanded) => {
     setExpandedArticle(isExpanded ? articleId : null);
+  };
+
+  const handleTabChange = (event, newValue) => {
+    setActiveTab(newValue);
+    setExpandedArticle(null); // Reset expanded article when switching tabs
   };
 
   // Loading skeleton component
@@ -105,9 +149,16 @@ const BlogPage = () => {
 
   return (
     <Box>
-      <Typography variant="h4" component="h1" gutterBottom>
-        Blog
-      </Typography>
+      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+        <Typography variant="h4" component="h1">
+          Blog
+        </Typography>
+      </Box>
+      
+      <Tabs value={activeTab} onChange={handleTabChange} sx={{ mb: 3 }}>
+        <Tab label="Public Articles" />
+        {hasToken && <Tab label="Private Articles" />}
+      </Tabs>
 
       {loading ? (
         <Box sx={{ mt: 2 }}>
@@ -161,6 +212,19 @@ const BlogPage = () => {
               <Divider />
               <AccordionDetails>
                 <Box>
+                  {article.tags && Array.isArray(article.tags) && article.tags.length > 0 && (
+                    <Stack direction="row" spacing={1} sx={{ mb: 2, flexWrap: 'wrap', gap: 1 }}>
+                      {article.tags.map((tag) => (
+                        <Chip
+                          key={tag.tagId}
+                          label={tag.name}
+                          size="small"
+                          variant="outlined"
+                          color="primary"
+                        />
+                      ))}
+                    </Stack>
+                  )}
                   {article.excerpt && (
                     <Typography
                       variant="body1"
