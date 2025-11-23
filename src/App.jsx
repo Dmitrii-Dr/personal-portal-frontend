@@ -5,6 +5,7 @@ import BlogPage from './pages/BlogPage';
 import ProfilePage from './pages/ProfilePage';
 import BookingPage from './pages/BookingPage';
 import SignUpPage from './pages/SignUpPage';
+import SettingsPage from './pages/SettingsPage';
 import AdminPage from './pages/AdminPage';
 import AdminDashboard from './pages/AdminDashboard';
 import AdminBlogPage from './pages/AdminBlogPage';
@@ -509,6 +510,7 @@ function App() {
                 <Route path="/login" element={<LoginPage />} />
                 <Route path="/signup" element={<SignUpPage />} />
                 <Route path="/profile" element={<ProfilePage />} />
+                <Route path="/settings" element={<SettingsPage />} />
                 <Route path="/admin" element={<AdminPage />} />
                 {/* All /admin/* routes except /admin itself are protected by AdminRoute */}
                 <Route

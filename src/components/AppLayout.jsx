@@ -229,14 +229,32 @@ const AppLayout = ({ children }) => {
 
                 {/* Conditional Links based on auth state */}
                 {hasToken && (
-                  <Button
-                    component={Link}
-                    to="/profile"
-                    color="inherit"
-                    sx={{ textTransform: 'none' }}
-                  >
-                    My Profile
-                  </Button>
+                  <>
+                    <Button
+                      component={Link}
+                      to="/profile"
+                      color="inherit"
+                      sx={{ textTransform: 'none' }}
+                    >
+                      My Profile
+                    </Button>
+                    <Button
+                      component={Link}
+                      to="/booking"
+                      color="inherit"
+                      sx={{ textTransform: 'none' }}
+                    >
+                      My Bookings
+                    </Button>
+                    <Button
+                      component={Link}
+                      to="/settings"
+                      color="inherit"
+                      sx={{ textTransform: 'none' }}
+                    >
+                      Settings
+                    </Button>
+                  </>
                 )}
               </>
             )}

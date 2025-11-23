@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
+import { fetchWithAuth } from '../utils/api';
 import {
   Box,
   Typography,
@@ -17,10 +18,16 @@ const SignUpPage = () => {
   const [formData, setFormData] = useState({
     email: '',
     password: '',
+    confirmPassword: '',
+    firstName: '',
+    lastName: '',
   });
   const [errors, setErrors] = useState({
     email: '',
     password: '',
+    confirmPassword: '',
+    firstName: '',
+    lastName: '',
   });
   const [loading, setLoading] = useState(false);
   const [submitError, setSubmitError] = useState('');
@@ -51,6 +58,9 @@ const SignUpPage = () => {
     const newErrors = {
       email: '',
       password: '',
+      confirmPassword: '',
+      firstName: '',
+      lastName: '',
     };
     let isValid = true;
 
@@ -67,6 +77,24 @@ const SignUpPage = () => {
       isValid = false;
     } else if (formData.password.length < 6) {
       newErrors.password = 'Password must be at least 6 characters';
+      isValid = false;
+    }
+
+    if (!formData.confirmPassword.trim()) {
+      newErrors.confirmPassword = 'Please confirm your password';
+      isValid = false;
+    } else if (formData.password !== formData.confirmPassword) {
+      newErrors.confirmPassword = 'Passwords do not match';
+      isValid = false;
+    }
+
+    if (formData.firstName && formData.firstName.length > 100) {
+      newErrors.firstName = 'First name must be at most 100 characters';
+      isValid = false;
+    }
+
+    if (formData.lastName && formData.lastName.length > 100) {
+      newErrors.lastName = 'Last name must be at most 100 characters';
       isValid = false;
     }
 
@@ -94,6 +122,8 @@ const SignUpPage = () => {
         body: JSON.stringify({
           email: formData.email.trim(),
           password: formData.password,
+          firstName: formData.firstName.trim() || null,
+          lastName: formData.lastName.trim() || null,
         }),
       });
 
@@ -103,6 +133,45 @@ const SignUpPage = () => {
           errorData.message ||
             `Sign up failed: ${response.status} ${response.statusText}`
         );
+      }
+
+      // Check if signup response includes a token
+      const responseData = await response.json().catch(() => ({}));
+      const signupToken = responseData.token || responseData.accessToken;
+
+      // After successful signup, detect timezone and send user settings
+      try {
+        // Detect browser timezone
+        const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+        const language = 'english';
+
+        // Prepare settings request
+        const settingsOptions = {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            timezone: timezone.substring(0, 50), // Ensure max 50 characters
+            language: language.substring(0, 10), // Ensure max 10 characters
+          }),
+        };
+
+        // Add token to headers if available from signup response
+        if (signupToken) {
+          settingsOptions.headers.Authorization = `Bearer ${signupToken}`;
+        }
+
+        // Send user settings request
+        const settingsResponse = await fetch('/api/v1/user/setting', settingsOptions);
+
+        if (!settingsResponse.ok) {
+          // Log error but don't fail signup if settings fail
+          console.warn('Failed to save user settings:', settingsResponse.status);
+        }
+      } catch (settingsError) {
+        // Log error but don't fail signup if settings fail
+        console.warn('Error saving user settings:', settingsError);
       }
 
       setSuccess(true);
@@ -179,6 +248,54 @@ const SignUpPage = () => {
               required
               autoComplete="new-password"
               disabled={loading || success}
+            />
+
+            <TextField
+              fullWidth
+              id="confirmPassword"
+              name="confirmPassword"
+              label="Confirm Password"
+              type="password"
+              value={formData.confirmPassword}
+              onChange={handleChange}
+              error={!!errors.confirmPassword}
+              helperText={errors.confirmPassword}
+              margin="normal"
+              required
+              autoComplete="new-password"
+              disabled={loading || success}
+            />
+
+            <TextField
+              fullWidth
+              id="firstName"
+              name="firstName"
+              label="First Name"
+              type="text"
+              value={formData.firstName}
+              onChange={handleChange}
+              error={!!errors.firstName}
+              helperText={errors.firstName || 'Optional'}
+              margin="normal"
+              autoComplete="given-name"
+              disabled={loading || success}
+              inputProps={{ maxLength: 100 }}
+            />
+
+            <TextField
+              fullWidth
+              id="lastName"
+              name="lastName"
+              label="Last Name"
+              type="text"
+              value={formData.lastName}
+              onChange={handleChange}
+              error={!!errors.lastName}
+              helperText={errors.lastName || 'Optional'}
+              margin="normal"
+              autoComplete="family-name"
+              disabled={loading || success}
+              inputProps={{ maxLength: 100 }}
             />
 
             <Button
