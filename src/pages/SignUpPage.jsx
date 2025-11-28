@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
-import { fetchWithAuth } from '../utils/api';
+import { Link, useNavigate, useLocation } from 'react-router-dom';
+import { fetchWithAuth, setToken } from '../utils/api';
 import {
   Box,
   Typography,
@@ -15,6 +15,7 @@ import {
 
 const SignUpPage = () => {
   const navigate = useNavigate();
+  const location = useLocation();
   const [formData, setFormData] = useState({
     email: '',
     password: '',
@@ -138,6 +139,13 @@ const SignUpPage = () => {
       // Check if signup response includes a token
       const responseData = await response.json().catch(() => ({}));
       const signupToken = responseData.token || responseData.accessToken;
+      
+      // Save token if available
+      if (signupToken) {
+        setToken(signupToken);
+        // Dispatch custom event to notify AppLayout of auth change
+        window.dispatchEvent(new Event('auth-changed'));
+      }
 
       // After successful signup, detect timezone and send user settings
       try {
@@ -175,9 +183,17 @@ const SignUpPage = () => {
       }
 
       setSuccess(true);
-      // Redirect to login page after 2 seconds
+      // Get return path from location state
+      const returnTo = location.state?.returnTo || '/booking';
+      // Redirect to login page (or returnTo if token is available) after 2 seconds
       setTimeout(() => {
-        navigate('/login');
+        if (signupToken) {
+          // If token is available, redirect to returnTo
+          navigate(returnTo);
+        } else {
+          // Otherwise redirect to login with returnTo state
+          navigate('/login', { state: { returnTo } });
+        }
       }, 2000);
     } catch (error) {
       console.error('Error signing up:', error);

@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import apiClient, { getToken } from '../utils/api';
+import ArticleContent from '../components/ArticleContent';
 import {
   Card,
   CardContent,
@@ -235,15 +236,7 @@ const BlogPage = () => {
                     </Typography>
                   )}
                   {article.content && (
-                    <Typography
-                      variant="body1"
-                      sx={{
-                        whiteSpace: 'pre-wrap',
-                        wordBreak: 'break-word',
-                      }}
-                    >
-                      {article.content}
-                    </Typography>
+                    <ArticleContent content={article.content} />
                   )}
                   {!article.content && (
                     <Typography variant="body2" color="text.secondary">

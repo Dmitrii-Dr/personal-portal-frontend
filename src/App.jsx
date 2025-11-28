@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { BrowserRouter as Router, Routes, Route, useNavigate } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route, useNavigate, useLocation } from 'react-router-dom';
 import AppLayout from './components/AppLayout';
 import BlogPage from './pages/BlogPage';
 import ProfilePage from './pages/ProfilePage';
@@ -34,6 +34,8 @@ import {
 } from '@mui/material';
 import { Link } from 'react-router-dom';
 import { setToken, fetchWithAuth, hasAdminRole, getRolesFromToken } from './utils/api';
+import axios from 'axios';
+import dayjs from 'dayjs';
 
 const theme = createTheme({
   palette: {
@@ -49,6 +51,9 @@ const HomePage = () => {
   const [accessStatus, setAccessStatus] = useState('');
   const [accessError, setAccessError] = useState('');
   const [checkingAccess, setCheckingAccess] = useState(false);
+  const [loadingSlots, setLoadingSlots] = useState(false);
+  const [slotsError, setSlotsError] = useState(null);
+  const navigate = useNavigate();
 
   // Stub data for prices and services - TODO: Replace with API call
   const services = [
@@ -129,14 +134,94 @@ const HomePage = () => {
     }
   };
 
+  const handleBookSession = async () => {
+    setLoadingSlots(true);
+    setSlotsError(null);
+
+    try {
+      // Format date to YYYY-MM-DD for API (use today's date)
+      const dateString = dayjs().format('YYYY-MM-DD');
+      const sessionTypeId = 1; // Default session type ID
+      
+      // Get timezone - use browser timezone or fallback to UTC
+      let timezone = 'UTC';
+      try {
+        timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+      } catch {
+        timezone = 'UTC'; // Final fallback
+      }
+      
+      // Call public endpoint with required parameters
+      const response = await axios.get('/api/v1/public/booking/available/slot', {
+        params: {
+          sessionTypeId,
+          suggestedDate: dateString,
+          timezone,
+        },
+        timeout: 10000,
+      });
+
+      if (response.data) {
+        // Navigate to booking page - the page will handle displaying the slots
+        navigate('/booking');
+      } else {
+        throw new Error('No data received from server');
+      }
+    } catch (error) {
+      console.error('Error fetching available slots:', error);
+      let errorMessage = 'Failed to load available slots. Please try again later.';
+      
+      if (error.code === 'ECONNABORTED') {
+        errorMessage = 'Request timed out. Please try again.';
+      } else if (error.response) {
+        errorMessage = error.response.data?.message || `Server error: ${error.response.status}`;
+      } else if (error.request) {
+        errorMessage = 'Unable to reach the server. Please check your connection.';
+      } else {
+        errorMessage = error.message || errorMessage;
+      }
+      
+      setSlotsError(errorMessage);
+    } finally {
+      setLoadingSlots(false);
+    }
+  };
+
   return (
     <Box>
-      <Typography variant="h4" component="h1" gutterBottom>
-        Home Page
-      </Typography>
-      <Typography variant="body1" paragraph>
-        Welcome to the home page!
-      </Typography>
+      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
+        <Box>
+          <Typography variant="h4" component="h1" gutterBottom>
+            Home Page
+          </Typography>
+          <Typography variant="body1" paragraph sx={{ mb: 0 }}>
+            Welcome to the home page!
+          </Typography>
+        </Box>
+        <Button
+          variant="contained"
+          color="primary"
+          size="large"
+          onClick={handleBookSession}
+          disabled={loadingSlots}
+          sx={{ textTransform: 'none' }}
+        >
+          {loadingSlots ? (
+            <>
+              <CircularProgress size={20} sx={{ mr: 1 }} />
+              Loading...
+            </>
+          ) : (
+            'Book a Session'
+          )}
+        </Button>
+      </Box>
+
+      {slotsError && (
+        <Alert severity="error" sx={{ mb: 2 }}>
+          {slotsError}
+        </Alert>
+      )}
 
       {/* Health Check Section */}
       <Box sx={{ mb: 4 }}>
@@ -273,6 +358,7 @@ const HomePage = () => {
 
 const LoginPage = () => {
   const navigate = useNavigate();
+  const location = useLocation();
   const [formData, setFormData] = useState({
     email: '',
     password: '',
@@ -283,6 +369,9 @@ const LoginPage = () => {
   });
   const [loading, setLoading] = useState(false);
   const [submitError, setSubmitError] = useState('');
+  
+  // Get return path from location state
+  const returnTo = location.state?.returnTo || '/';
 
   const validateEmail = (email) => {
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -383,9 +472,9 @@ const LoginPage = () => {
           console.log('Redirecting to /admin/dashboard');
           navigate('/admin/dashboard');
         } else {
-          // Regular user - redirect to home page
-          console.log('Redirecting to /');
-          navigate('/');
+          // Regular user - redirect to return path or home page
+          console.log('Redirecting to', returnTo);
+          navigate(returnTo);
         }
       } else {
         throw new Error('No token received from server');

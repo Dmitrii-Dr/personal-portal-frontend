@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
+import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import dayjs from 'dayjs';
-import apiClient, { fetchWithAuth } from '../utils/api';
+import apiClient, { fetchWithAuth, getToken } from '../utils/api';
 import {
   Grid,
   Typography,
@@ -45,14 +46,24 @@ const BookingPage = () => {
   const [cancelDialogOpen, setCancelDialogOpen] = useState(false);
   const [bookingToCancel, setBookingToCancel] = useState(null);
   const [cancelling, setCancelling] = useState(false);
+  const [showMyBookings, setShowMyBookings] = useState(false);
+  const [hasToken, setHasToken] = useState(false);
+  const [loginRequiredDialogOpen, setLoginRequiredDialogOpen] = useState(false);
+  const navigate = useNavigate();
+  
+  const PENDING_BOOKING_KEY = 'pending_booking';
 
   // Format date to YYYY-MM-DD for API
   const formatDateForAPI = (date) => {
     return dayjs(date).format('YYYY-MM-DD');
   };
 
-  // Fetch user settings to get timezone
+  // Fetch user settings to get timezone (only when user is logged in)
   const fetchUserSettings = async () => {
+    if (!hasToken) {
+      return;
+    }
+    
     try {
       const response = await fetchWithAuth('/api/v1/user/setting');
       if (response.ok) {
@@ -77,9 +88,11 @@ const BookingPage = () => {
       const dateString = formatDateForAPI(date);
       const sessionTypeId = 1; // Default session type ID
       
-      // Use user timezone from settings, fallback to browser timezone, then to default
-      let timezone = userTimezone;
-      if (!timezone) {
+      // Use user timezone from settings if available and user is logged in, otherwise use browser timezone
+      let timezone = 'UTC';
+      if (hasToken && userTimezone) {
+        timezone = userTimezone;
+      } else {
         try {
           timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
         } catch {
@@ -87,7 +100,7 @@ const BookingPage = () => {
         }
       }
       
-      const response = await apiClient.get('/api/v1/booking/available/slot', {
+      const response = await apiClient.get('/api/v1/public/booking/available/slot', {
         params: {
           sessionTypeId,
           suggestedDate: dateString,
@@ -159,15 +172,50 @@ const BookingPage = () => {
     }
   }, []);
 
-  // Fetch user settings on component mount
+  // Check if user is logged in on mount and when token changes
   useEffect(() => {
-    fetchUserSettings();
+    const checkToken = () => {
+      const tokenExists = !!getToken();
+      setHasToken(tokenExists);
+    };
+    
+    checkToken();
+    
+    // Listen for storage changes (e.g., when login happens in another tab)
+    const handleStorageChange = (e) => {
+      if (e.key === 'auth_token' || e.key === null) {
+        checkToken();
+      }
+    };
+    
+    // Listen for custom event when login happens in same tab
+    const handleAuthChanged = () => {
+      checkToken();
+    };
+    
+    window.addEventListener('storage', handleStorageChange);
+    window.addEventListener('auth-changed', handleAuthChanged);
+    
+    return () => {
+      window.removeEventListener('storage', handleStorageChange);
+      window.removeEventListener('auth-changed', handleAuthChanged);
+    };
   }, []);
 
-  // Fetch bookings on component mount
-  useEffect(() => {
-    fetchBookings();
-  }, [fetchBookings]);
+  // Fetch user settings and bookings only when user clicks "My Bookings" and is logged in
+  const handleShowMyBookings = async () => {
+    if (!hasToken) {
+      return;
+    }
+    
+    setShowMyBookings(true);
+    setLoadingBookings(true);
+    
+    // Fetch user settings first to get timezone
+    await fetchUserSettings();
+    // Then fetch bookings
+    await fetchBookings();
+  };
 
   // Fetch slots on component mount and when date changes
   // Track last fetched date to prevent duplicate calls
@@ -180,7 +228,7 @@ const BookingPage = () => {
       lastFetchedDateRef.current = dateString;
       fetchAvailableSlots(selectedDate);
     }
-  }, [selectedDate, userTimezone]);
+  }, [selectedDate, hasToken, userTimezone]);
 
   // Handle date selection
   const handleDateChange = (newDate) => {
@@ -241,7 +289,9 @@ const BookingPage = () => {
 
       // Success - close dialog and refresh bookings and slots
       handleCancelDialogClose();
-      await fetchBookings(); // Refresh bookings list
+      if (hasToken && showMyBookings) {
+        await fetchBookings(); // Refresh bookings list only if user is logged in and viewing bookings
+      }
       await fetchAvailableSlots(selectedDate); // Refresh available slots
     } catch (err) {
       console.error('Error cancelling booking:', err);
@@ -270,6 +320,30 @@ const BookingPage = () => {
       return;
     }
 
+    // Check if user is logged in - DO NOT call API without token
+    if (!hasToken || !getToken()) {
+      // Save booking data to sessionStorage
+      const pendingBooking = {
+        sessionTypeId: sessionTypeId,
+        startTimeInstant: selectedSlot.startTimeInstant,
+        clientMessage: clientMessage.trim() || null,
+        selectedDate: formatDateForAPI(selectedDate),
+      };
+      sessionStorage.setItem(PENDING_BOOKING_KEY, JSON.stringify(pendingBooking));
+      
+      // Show login/signup dialog
+      setLoginRequiredDialogOpen(true);
+      return;
+    }
+
+    // User is logged in, proceed with booking - verify token exists before API call
+    const token = getToken();
+    if (!token) {
+      setBookingError('You must be logged in to book a session.');
+      setLoginRequiredDialogOpen(true);
+      return;
+    }
+
     setSubmittingBooking(true);
     setBookingError(null);
 
@@ -290,7 +364,9 @@ const BookingPage = () => {
 
       // Success - close dialog and refresh bookings and slots
       handleDialogClose();
-      await fetchBookings(); // Refresh bookings list
+      if (hasToken && showMyBookings) {
+        await fetchBookings(); // Refresh bookings list only if user is logged in and viewing bookings
+      }
       await fetchAvailableSlots(selectedDate); // Refresh available slots
     } catch (err) {
       console.error('Error creating booking:', err);
@@ -311,6 +387,60 @@ const BookingPage = () => {
       setSubmittingBooking(false);
     }
   };
+
+  // Complete pending booking after login
+  const completePendingBooking = useCallback(async () => {
+    const pendingBookingStr = sessionStorage.getItem(PENDING_BOOKING_KEY);
+    const token = getToken();
+    
+    // Only proceed if we have both pending booking and a valid token
+    if (!pendingBookingStr || !hasToken || !token) {
+      return;
+    }
+
+    try {
+      const pendingBooking = JSON.parse(pendingBookingStr);
+      
+      const payload = {
+        sessionTypeId: pendingBooking.sessionTypeId,
+        startTimeInstant: pendingBooking.startTimeInstant,
+        clientMessage: pendingBooking.clientMessage,
+      };
+
+      // Verify token exists before making API call
+      if (!getToken()) {
+        console.warn('Token not available for pending booking');
+        return;
+      }
+
+      const response = await apiClient.post('/api/v1/session/booking', payload, {
+        timeout: 10000,
+      });
+
+      if (response && response.status < 400) {
+        // Success - remove pending booking and refresh
+        sessionStorage.removeItem(PENDING_BOOKING_KEY);
+        if (showMyBookings) {
+          await fetchBookings();
+        }
+        // Refresh slots for the date that was selected
+        if (pendingBooking.selectedDate) {
+          const date = dayjs(pendingBooking.selectedDate);
+          await fetchAvailableSlots(date);
+        }
+      }
+    } catch (err) {
+      console.error('Error completing pending booking:', err);
+      // Don't show error to user, just log it
+    }
+  }, [hasToken, showMyBookings]);
+
+  // Check for pending booking when user logs in
+  useEffect(() => {
+    if (hasToken) {
+      completePendingBooking();
+    }
+  }, [hasToken, completePendingBooking]);
 
   // Format time for display
   const formatTime = (timeString) => {
@@ -367,12 +497,28 @@ const BookingPage = () => {
   return (
     <LocalizationProvider dateAdapter={AdapterDayjs}>
       <Box>
-        <Typography variant="h4" component="h1" gutterBottom>
-          My Bookings
-        </Typography>
+        {/* Show "My Bookings" section only if user is logged in */}
+        {hasToken && (
+          <>
+            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+              <Typography variant="h4" component="h1">
+                My Bookings
+              </Typography>
+              {!showMyBookings && (
+                <Button
+                  variant="outlined"
+                  onClick={handleShowMyBookings}
+                  sx={{ textTransform: 'none' }}
+                >
+                  Show My Bookings
+                </Button>
+              )}
+            </Box>
 
-        {/* Bookings List */}
-        {loadingBookings ? (
+            {/* Bookings List - only show if user clicked "Show My Bookings" */}
+            {showMyBookings && (
+              <>
+                {loadingBookings ? (
           <Box
             sx={{
               display: 'flex',
@@ -435,13 +581,16 @@ const BookingPage = () => {
               </Card>
             ))}
           </Box>
-        ) : (
-          <Alert severity="info" sx={{ mt: 2 }}>
-            No bookings found.
-          </Alert>
+                ) : (
+                  <Alert severity="info" sx={{ mt: 2 }}>
+                    No bookings found.
+                  </Alert>
+                )}
+              </>
+            )}
+            <Divider sx={{ my: 4 }} />
+          </>
         )}
-
-        <Divider sx={{ my: 4 }} />
 
         <Typography variant="h4" component="h1" gutterBottom>
           Book a Session
@@ -603,9 +752,67 @@ const BookingPage = () => {
                   <CircularProgress size={16} sx={{ mr: 1 }} />
                   Booking...
                 </>
-              ) : (
+              ) : hasToken ? (
                 'Confirm Booking'
+              ) : (
+                'Log in and confirm'
               )}
+            </Button>
+          </DialogActions>
+        </Dialog>
+
+        {/* Login Required Dialog */}
+        <Dialog open={loginRequiredDialogOpen} onClose={() => setLoginRequiredDialogOpen(false)}>
+          <DialogTitle>Login Required</DialogTitle>
+          <DialogContent>
+            <DialogContentText>
+              You need to be logged in to book a session. Please log in or sign up to continue.
+            </DialogContentText>
+            {dialogSlot && (
+              <Box sx={{ mt: 2, p: 2, bgcolor: 'action.hover', borderRadius: 1 }}>
+                <Typography variant="body2" color="text.secondary">
+                  Selected slot:
+                </Typography>
+                <Typography variant="body1" sx={{ mt: 0.5 }}>
+                  {dialogSlot.startTime 
+                    ? formatTime(dialogSlot.startTime) 
+                    : formatTimeFromInstant(dialogSlot.startTimeInstant)}
+                  {dialogSlot.endTime && ` - ${formatTime(dialogSlot.endTime)}`}
+                  {' '}on {formatDateForDisplay(selectedDate)}
+                </Typography>
+                <Typography variant="caption" color="text.secondary" sx={{ mt: 1, display: 'block' }}>
+                  Your selection will be saved and the booking will be completed after you log in.
+                </Typography>
+              </Box>
+            )}
+          </DialogContent>
+          <DialogActions>
+            <Button
+              onClick={() => setLoginRequiredDialogOpen(false)}
+              color="inherit"
+              sx={{ textTransform: 'none' }}
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={() => {
+                setLoginRequiredDialogOpen(false);
+                navigate('/signup', { state: { returnTo: '/booking' } });
+              }}
+              variant="outlined"
+              sx={{ textTransform: 'none' }}
+            >
+              Sign Up
+            </Button>
+            <Button
+              onClick={() => {
+                setLoginRequiredDialogOpen(false);
+                navigate('/login', { state: { returnTo: '/booking' } });
+              }}
+              variant="contained"
+              sx={{ textTransform: 'none' }}
+            >
+              Log In
             </Button>
           </DialogActions>
         </Dialog>
