@@ -21,6 +21,10 @@ import {
 } from '@mui/material';
 import LogoutIcon from '@mui/icons-material/Logout';
 import AccountCircleIcon from '@mui/icons-material/AccountCircle';
+import LoginIcon from '@mui/icons-material/Login';
+import HomeIcon from '@mui/icons-material/Home';
+import LoginModal from './LoginModal';
+import SignUpModal from './SignUpModal';
 
 const AppLayout = ({ children }) => {
   const navigate = useNavigate();
@@ -32,9 +36,25 @@ const AppLayout = ({ children }) => {
   const [aboutMeData, setAboutMeData] = useState(null);
   const [aboutMeLoading, setAboutMeLoading] = useState(false);
   const [aboutMeError, setAboutMeError] = useState(null);
+  const [loginModalOpen, setLoginModalOpen] = useState(false);
+  const [signUpModalOpen, setSignUpModalOpen] = useState(false);
+  const [scrolled, setScrolled] = useState(false);
 
   // Check if current route is an admin route
   const isAdminRoute = location.pathname.startsWith('/admin');
+  // Check if we're on the landing page
+  const isLandingPage = location.pathname === '/';
+
+  // Handle scroll to change header background
+  useEffect(() => {
+    const handleScroll = () => {
+      const scrollPosition = window.scrollY;
+      setScrolled(scrollPosition > 50);
+    };
+
+    window.addEventListener('scroll', handleScroll);
+    return () => window.removeEventListener('scroll', handleScroll);
+  }, []);
 
   // Fetch user profile
   const lastFetchedTokenRef = useRef(null);
@@ -149,6 +169,94 @@ const AppLayout = ({ children }) => {
     setAboutMeError(null);
   };
 
+  // Scroll to section function
+  const scrollToSection = (sectionId) => {
+    if (isLandingPage) {
+      const element = document.getElementById(sectionId);
+      if (element) {
+        element.scrollIntoView({
+          behavior: 'smooth',
+          block: 'start',
+        });
+      }
+    } else {
+      // Navigate to landing page with hash, then scroll
+      navigate(`/#${sectionId}`);
+      setTimeout(() => {
+        const element = document.getElementById(sectionId);
+        if (element) {
+          element.scrollIntoView({
+            behavior: 'smooth',
+            block: 'start',
+          });
+        }
+      }, 100);
+    }
+  };
+
+  // Handle scroll to section from URL hash
+  useEffect(() => {
+    if (isLandingPage && location.hash) {
+      const sectionId = location.hash.substring(1);
+      setTimeout(() => {
+        const element = document.getElementById(sectionId);
+        if (element) {
+          element.scrollIntoView({
+            behavior: 'smooth',
+            block: 'start',
+          });
+        }
+      }, 100);
+    }
+  }, [isLandingPage, location.hash]);
+
+  // Handle login modal
+  const handleLoginClick = () => {
+    setLoginModalOpen(true);
+  };
+
+  const handleLoginClose = () => {
+    setLoginModalOpen(false);
+  };
+
+  const handleSwitchToSignUp = () => {
+    setLoginModalOpen(false);
+    setTimeout(() => {
+      setSignUpModalOpen(true);
+    }, 300);
+  };
+
+  // Handle signup modal
+  const handleSignUpClick = () => {
+    setSignUpModalOpen(true);
+  };
+
+  const handleSignUpClose = () => {
+    setSignUpModalOpen(false);
+  };
+
+  const handleSwitchToLogin = () => {
+    setSignUpModalOpen(false);
+    setTimeout(() => {
+      setLoginModalOpen(true);
+    }, 300);
+  };
+
+  // Check URL for login/signup redirects
+  useEffect(() => {
+    if (location.pathname === '/login' && !isAdminRoute) {
+      navigate('/');
+      setTimeout(() => {
+        setLoginModalOpen(true);
+      }, 100);
+    } else if (location.pathname === '/signup' && !isAdminRoute) {
+      navigate('/');
+      setTimeout(() => {
+        setSignUpModalOpen(true);
+      }, 100);
+    }
+  }, [location.pathname, navigate, isAdminRoute]);
+
   // Fetch about me data when dialog opens
   useEffect(() => {
     if (aboutMeOpen && !aboutMeData) {
@@ -175,54 +283,208 @@ const AppLayout = ({ children }) => {
 
   return (
     <Box sx={{ display: 'flex', flexDirection: 'column', minHeight: '100vh' }}>
-      <AppBar position="static">
-        <Toolbar>
-          {/* Branding - Left side - Hide on admin routes */}
+      <AppBar 
+        position="fixed"
+        sx={{ 
+          top: 0, 
+          zIndex: 1100, 
+          bgcolor: isLandingPage && !scrolled ? 'transparent' : '#2C5F5F',
+          boxShadow: isLandingPage && !scrolled ? 'none' : 2,
+          transition: 'all 0.3s ease-in-out',
+        }}
+      >
+        <Toolbar sx={{ minHeight: { xs: 56, sm: 64 } }}>
+          {/* Home Icon - Top Left */}
           {!isAdminRoute && (
-            <Typography
-              variant="h6"
-              component={Link}
-              to="/"
-              sx={{
-                flexGrow: 0,
-                textDecoration: 'none',
-                color: 'inherit',
-                mr: 4,
-              }}
-            >
-              Professional's Name
-            </Typography>
+            <Tooltip title="Home" arrow>
+              <IconButton
+                onClick={isLandingPage ? () => scrollToSection('hero') : () => navigate('/')}
+                color="inherit"
+                size="medium"
+                aria-label="home"
+                sx={{ 
+                  mr: { xs: 1, sm: 2 },
+                  transition: 'all 0.2s ease-in-out',
+                  '&:hover': {
+                    bgcolor: 'rgba(255, 255, 255, 0.1)',
+                    transform: 'scale(1.1)',
+                  },
+                }}
+              >
+                <HomeIcon />
+              </IconButton>
+            </Tooltip>
           )}
 
-          {/* Spacer */}
-          <Box sx={{ flexGrow: 1 }} />
-
-          {/* Navigation Links - Right side */}
-          <Stack direction="row" spacing={2} alignItems="center">
+          {/* Navigation Links - Centered */}
+          <Box sx={{ flexGrow: 1, display: 'flex', justifyContent: 'center' }}>
+            <Stack 
+              direction="row" 
+              spacing={{ xs: 1, sm: 2, md: 3 }}
+              alignItems="center"
+            >
             {/* Hide all navigation buttons on admin routes except Logout */}
             {!isAdminRoute && (
               <>
-                {/* Public Links - Always visible */}
+                {/* Public Links - Scroll to section on landing page, navigate otherwise */}
+                {isLandingPage ? (
+                  <>
+                    <Button
+                      onClick={() => scrollToSection('about')}
+                      color="inherit"
+                      sx={{ 
+                        textTransform: 'none',
+                        fontWeight: 500,
+                        fontSize: { xs: '0.875rem', sm: '0.9375rem', md: '1rem' },
+                        px: { xs: 1, sm: 1.5 },
+                        py: 1,
+                        borderRadius: 1,
+                        transition: 'all 0.2s ease-in-out',
+                        '&:hover': {
+                          bgcolor: 'rgba(255, 255, 255, 0.1)',
+                          transform: 'translateY(-1px)',
+                        },
+                      }}
+                    >
+                      About me
+                    </Button>
+                    <Button
+                      onClick={() => scrollToSection('services')}
+                      color="inherit"
+                      sx={{ 
+                        textTransform: 'none',
+                        fontWeight: 500,
+                        fontSize: { xs: '0.875rem', sm: '0.9375rem', md: '1rem' },
+                        px: { xs: 1, sm: 1.5 },
+                        py: 1,
+                        borderRadius: 1,
+                        transition: 'all 0.2s ease-in-out',
+                        '&:hover': {
+                          bgcolor: 'rgba(255, 255, 255, 0.1)',
+                          transform: 'translateY(-1px)',
+                        },
+                      }}
+                    >
+                      Services
+                    </Button>
+                    <Button
+                      onClick={() => scrollToSection('booking')}
+                      color="inherit"
+                      sx={{ 
+                        textTransform: 'none',
+                        fontWeight: 500,
+                        fontSize: { xs: '0.875rem', sm: '0.9375rem', md: '1rem' },
+                        px: { xs: 1, sm: 1.5 },
+                        py: 1,
+                        borderRadius: 1,
+                        transition: 'all 0.2s ease-in-out',
+                        '&:hover': {
+                          bgcolor: 'rgba(255, 255, 255, 0.1)',
+                          transform: 'translateY(-1px)',
+                        },
+                      }}
+                    >
+                      Booking
+                    </Button>
+                    <Button
+                      onClick={() => scrollToSection('testimonials')}
+                      color="inherit"
+                      sx={{ 
+                        textTransform: 'none',
+                        fontWeight: 500,
+                        fontSize: { xs: '0.875rem', sm: '0.9375rem', md: '1rem' },
+                        px: { xs: 1, sm: 1.5 },
+                        py: 1,
+                        borderRadius: 1,
+                        transition: 'all 0.2s ease-in-out',
+                        '&:hover': {
+                          bgcolor: 'rgba(255, 255, 255, 0.1)',
+                          transform: 'translateY(-1px)',
+                        },
+                      }}
+                    >
+                      Testimonials
+                    </Button>
+                    <Button
+                      onClick={() => scrollToSection('contact')}
+                      color="inherit"
+                      sx={{ 
+                        textTransform: 'none',
+                        fontWeight: 500,
+                        fontSize: { xs: '0.875rem', sm: '0.9375rem', md: '1rem' },
+                        px: { xs: 1, sm: 1.5 },
+                        py: 1,
+                        borderRadius: 1,
+                        transition: 'all 0.2s ease-in-out',
+                        '&:hover': {
+                          bgcolor: 'rgba(255, 255, 255, 0.1)',
+                          transform: 'translateY(-1px)',
+                        },
+                      }}
+                    >
+                      Contact
+                    </Button>
+                  </>
+                ) : (
+                  <>
                 <Button
                   component={Link}
                   to="/"
                   color="inherit"
-                  sx={{ textTransform: 'none' }}
+                      sx={{ 
+                        textTransform: 'none',
+                        fontWeight: 500,
+                        fontSize: { xs: '0.875rem', sm: '0.9375rem', md: '1rem' },
+                        px: { xs: 1, sm: 1.5 },
+                        py: 1,
+                        borderRadius: 1,
+                        transition: 'all 0.2s ease-in-out',
+                        '&:hover': {
+                          bgcolor: 'rgba(255, 255, 255, 0.1)',
+                          transform: 'translateY(-1px)',
+                        },
+                      }}
                 >
                   Home
                 </Button>
                 <Button
                   onClick={handleAboutMeOpen}
                   color="inherit"
-                  sx={{ textTransform: 'none' }}
+                      sx={{ 
+                        textTransform: 'none',
+                        fontWeight: 500,
+                        fontSize: { xs: '0.875rem', sm: '0.9375rem', md: '1rem' },
+                        px: { xs: 1, sm: 1.5 },
+                        py: 1,
+                        borderRadius: 1,
+                        transition: 'all 0.2s ease-in-out',
+                        '&:hover': {
+                          bgcolor: 'rgba(255, 255, 255, 0.1)',
+                          transform: 'translateY(-1px)',
+                        },
+                      }}
                 >
                   About me
                 </Button>
+                  </>
+                )}
                 <Button
                   component={Link}
                   to="/blog"
                   color="inherit"
-                  sx={{ textTransform: 'none' }}
+                  sx={{ 
+                    textTransform: 'none',
+                    fontWeight: 500,
+                    fontSize: { xs: '0.875rem', sm: '0.9375rem', md: '1rem' },
+                    px: { xs: 1, sm: 1.5 },
+                    py: 1,
+                    borderRadius: 1,
+                    transition: 'all 0.2s ease-in-out',
+                    '&:hover': {
+                      bgcolor: isLandingPage ? 'rgba(255, 255, 255, 0.1)' : 'rgba(255, 255, 255, 0.1)',
+                      transform: 'translateY(-1px)',
+                    },
+                  }}
                 >
                   Blog
                 </Button>
@@ -234,7 +496,19 @@ const AppLayout = ({ children }) => {
                       component={Link}
                       to="/profile"
                       color="inherit"
-                      sx={{ textTransform: 'none' }}
+                      sx={{ 
+                        textTransform: 'none',
+                        fontWeight: 500,
+                        fontSize: { xs: '0.875rem', sm: '0.9375rem', md: '1rem' },
+                        px: { xs: 1, sm: 1.5 },
+                        py: 1,
+                        borderRadius: 1,
+                        transition: 'all 0.2s ease-in-out',
+                        '&:hover': {
+                          bgcolor: 'rgba(255, 255, 255, 0.1)',
+                          transform: 'translateY(-1px)',
+                        },
+                      }}
                     >
                       My Profile
                     </Button>
@@ -242,7 +516,19 @@ const AppLayout = ({ children }) => {
                       component={Link}
                       to="/booking"
                       color="inherit"
-                      sx={{ textTransform: 'none' }}
+                      sx={{ 
+                        textTransform: 'none',
+                        fontWeight: 500,
+                        fontSize: { xs: '0.875rem', sm: '0.9375rem', md: '1rem' },
+                        px: { xs: 1, sm: 1.5 },
+                        py: 1,
+                        borderRadius: 1,
+                        transition: 'all 0.2s ease-in-out',
+                        '&:hover': {
+                          bgcolor: 'rgba(255, 255, 255, 0.1)',
+                          transform: 'translateY(-1px)',
+                        },
+                      }}
                     >
                       My Bookings
                     </Button>
@@ -250,7 +536,19 @@ const AppLayout = ({ children }) => {
                       component={Link}
                       to="/settings"
                       color="inherit"
-                      sx={{ textTransform: 'none' }}
+                      sx={{ 
+                        textTransform: 'none',
+                        fontWeight: 500,
+                        fontSize: { xs: '0.875rem', sm: '0.9375rem', md: '1rem' },
+                        px: { xs: 1, sm: 1.5 },
+                        py: 1,
+                        borderRadius: 1,
+                        transition: 'all 0.2s ease-in-out',
+                        '&:hover': {
+                          bgcolor: 'rgba(255, 255, 255, 0.1)',
+                          transform: 'translateY(-1px)',
+                        },
+                      }}
                     >
                       Settings
                     </Button>
@@ -279,42 +577,70 @@ const AppLayout = ({ children }) => {
                   component={Link}
                   to="/profile"
                 />
-                <Tooltip title="Logout">
+                <Tooltip title="Logout" arrow>
                   <IconButton
                     onClick={handleLogout}
                     color="inherit"
-                    size="large"
+                    size="medium"
                     aria-label="logout"
+                    sx={{
+                      transition: 'all 0.2s ease-in-out',
+                      '&:hover': {
+                        bgcolor: 'rgba(255, 255, 255, 0.1)',
+                        transform: 'scale(1.1)',
+                      },
+                    }}
                   >
                     <LogoutIcon />
                   </IconButton>
                 </Tooltip>
               </>
-            ) : !isAdminRoute ? (
-              <Button
-                component={Link}
-                to="/login"
-                color="inherit"
-                sx={{ textTransform: 'none' }}
-              >
-                Login
-              </Button>
             ) : null}
-          </Stack>
+            </Stack>
+          </Box>
+
+          {/* Login Icon Button - Top Right Corner */}
+          {!hasToken && !isAdminRoute && (
+            <Tooltip title="Login" arrow>
+              <IconButton
+                onClick={handleLoginClick}
+                color="inherit"
+                size="medium"
+                aria-label="login"
+                sx={{ 
+                  ml: 'auto',
+                  transition: 'all 0.2s ease-in-out',
+                  '&:hover': {
+                    bgcolor: 'rgba(255, 255, 255, 0.1)',
+                    transform: 'scale(1.1)',
+                  },
+                }}
+              >
+                <LoginIcon />
+              </IconButton>
+            </Tooltip>
+          )}
         </Toolbar>
       </AppBar>
 
       {/* Main Content Area */}
-      <Container
-        component="main"
-        maxWidth="lg"
-        sx={{
-          flexGrow: 1,
-          py: 4,
-        }}
-      >
-        {children}
-      </Container>
+      {isLandingPage ? (
+        <Box component="main" sx={{ flexGrow: 1 }}>
+          {children}
+        </Box>
+      ) : (
+        <Container
+          component="main"
+          maxWidth="lg"
+          sx={{
+            flexGrow: 1,
+            py: 4,
+            pt: { xs: '80px', sm: '90px', md: '100px' },
+          }}
+        >
+          {children}
+        </Container>
+      )}
 
       {/* About Me Dialog */}
       <Dialog
@@ -355,6 +681,20 @@ const AppLayout = ({ children }) => {
           )}
         </DialogContent>
       </Dialog>
+
+      {/* Login Modal */}
+      <LoginModal
+        open={loginModalOpen}
+        onClose={handleLoginClose}
+        onSwitchToSignUp={handleSwitchToSignUp}
+      />
+
+      {/* Sign Up Modal */}
+      <SignUpModal
+        open={signUpModalOpen}
+        onClose={handleSignUpClose}
+        onSwitchToLogin={handleSwitchToLogin}
+      />
     </Box>
   );
 };

@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { BrowserRouter as Router, Routes, Route, useNavigate, useLocation } from 'react-router-dom';
 import AppLayout from './components/AppLayout';
+import LandingPage from './pages/LandingPage';
 import BlogPage from './pages/BlogPage';
 import ProfilePage from './pages/ProfilePage';
 import BookingPage from './pages/BookingPage';
@@ -10,6 +11,8 @@ import AdminPage from './pages/AdminPage';
 import AdminDashboard from './pages/AdminDashboard';
 import AdminBlogPage from './pages/AdminBlogPage';
 import AdminProfilePage from './pages/AdminProfilePage';
+import AdminHomePage from './pages/AdminHomePage';
+import AboutMePage from './pages/AboutMePage';
 import AdminRoute from './components/AdminRoute';
 import AdminRedirect from './components/AdminRedirect';
 import ErrorBoundary from './components/ErrorBoundary';
@@ -40,6 +43,17 @@ import dayjs from 'dayjs';
 const theme = createTheme({
   palette: {
     mode: 'light',
+    primary: {
+      main: '#2C5F5F', // Dark teal
+      light: '#3A7A7A',
+      dark: '#1F4545',
+      contrastText: '#ffffff',
+    },
+    secondary: {
+      main: '#4A9B9B', // Lighter teal for accents
+      light: '#6BB8B8',
+      dark: '#357575',
+    },
   },
 });
 
@@ -135,56 +149,8 @@ const HomePage = () => {
   };
 
   const handleBookSession = async () => {
-    setLoadingSlots(true);
-    setSlotsError(null);
-
-    try {
-      // Format date to YYYY-MM-DD for API (use today's date)
-      const dateString = dayjs().format('YYYY-MM-DD');
-      const sessionTypeId = 1; // Default session type ID
-      
-      // Get timezone - use browser timezone or fallback to UTC
-      let timezone = 'UTC';
-      try {
-        timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
-      } catch {
-        timezone = 'UTC'; // Final fallback
-      }
-      
-      // Call public endpoint with required parameters
-      const response = await axios.get('/api/v1/public/booking/available/slot', {
-        params: {
-          sessionTypeId,
-          suggestedDate: dateString,
-          timezone,
-        },
-        timeout: 10000,
-      });
-
-      if (response.data) {
-        // Navigate to booking page - the page will handle displaying the slots
-        navigate('/booking');
-      } else {
-        throw new Error('No data received from server');
-      }
-    } catch (error) {
-      console.error('Error fetching available slots:', error);
-      let errorMessage = 'Failed to load available slots. Please try again later.';
-      
-      if (error.code === 'ECONNABORTED') {
-        errorMessage = 'Request timed out. Please try again.';
-      } else if (error.response) {
-        errorMessage = error.response.data?.message || `Server error: ${error.response.status}`;
-      } else if (error.request) {
-        errorMessage = 'Unable to reach the server. Please check your connection.';
-      } else {
-        errorMessage = error.message || errorMessage;
-      }
-      
-      setSlotsError(errorMessage);
-    } finally {
-      setLoadingSlots(false);
-    }
+    // Navigate to booking page - the page will handle session type selection and slot fetching
+    navigate('/booking');
   };
 
   return (
@@ -593,13 +559,14 @@ function App() {
           <AdminRedirect>
             <AppLayout>
               <Routes>
-                <Route path="/" element={<HomePage />} />
+                <Route path="/" element={<LandingPage />} />
                 <Route path="/blog" element={<BlogPage />} />
                 <Route path="/booking" element={<BookingPage />} />
                 <Route path="/login" element={<LoginPage />} />
                 <Route path="/signup" element={<SignUpPage />} />
                 <Route path="/profile" element={<ProfilePage />} />
                 <Route path="/settings" element={<SettingsPage />} />
+                <Route path="/about-me" element={<AboutMePage />} />
                 <Route path="/admin" element={<AdminPage />} />
                 {/* All /admin/* routes except /admin itself are protected by AdminRoute */}
                 <Route
@@ -608,6 +575,7 @@ function App() {
                     <AdminRoute>
                       <Routes>
                         <Route path="dashboard" element={<AdminDashboard />} />
+                        <Route path="home" element={<AdminHomePage />} />
                         <Route path="blog" element={<AdminBlogPage />} />
                         <Route path="profile" element={<AdminProfilePage />} />
                         {/* Add more admin routes here as needed */}

@@ -5,6 +5,15 @@
     <link rel="icon" type="image/svg+xml" href="/vite.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Professional's Portal</title>
+    <style>
+      html {
+        scroll-behavior: smooth;
+      }
+      /* Account for sticky header when scrolling to sections */
+      section[id] {
+        scroll-margin-top: 64px;
+      }
+    </style>
   </head>
   <body>
     <div id="root"></div>

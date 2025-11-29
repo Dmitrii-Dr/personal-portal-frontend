@@ -11,7 +11,7 @@ services:
     image: nginx:1.27-alpine
     container_name: personal-portal-proxy
     ports:
-      - "8080:8080"
+      - "8081:8081"
     networks:
       - personal-portal-network
     volumes:

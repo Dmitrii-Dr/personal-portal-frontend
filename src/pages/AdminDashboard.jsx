@@ -242,6 +242,14 @@ const AdminDashboard = () => {
           <Button
             variant="outlined"
             color="primary"
+            onClick={() => navigate('/admin/home')}
+            sx={{ textTransform: 'none' }}
+          >
+            Home Page
+          </Button>
+          <Button
+            variant="outlined"
+            color="primary"
             onClick={() => navigate('/admin/blog')}
             sx={{ textTransform: 'none' }}
           >

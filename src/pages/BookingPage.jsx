@@ -22,12 +22,16 @@ import {
   Chip,
   Divider,
   TextField,
+  FormControl,
+  InputLabel,
+  Select,
+  MenuItem,
 } from '@mui/material';
 import { DateCalendar } from '@mui/x-date-pickers/DateCalendar';
 import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
 import { AdapterDayjs } from '@mui/x-date-pickers/AdapterDayjs';
 
-const BookingPage = () => {
+const BookingPage = ({ sessionTypeId: propSessionTypeId }) => {
   const [selectedDate, setSelectedDate] = useState(dayjs());
   const [availableSlots, setAvailableSlots] = useState([]);
   const [loading, setLoading] = useState(true); // Start with true since we fetch on mount
@@ -38,7 +42,10 @@ const BookingPage = () => {
   const [clientMessage, setClientMessage] = useState('');
   const [submittingBooking, setSubmittingBooking] = useState(false);
   const [bookingError, setBookingError] = useState(null);
-  const [sessionTypeId, setSessionTypeId] = useState(1); // Default session type ID, updated from API response
+  const [sessionTypeId, setSessionTypeId] = useState(propSessionTypeId || null); // Use prop or null
+  const [sessionTypes, setSessionTypes] = useState([]);
+  const [loadingSessionTypes, setLoadingSessionTypes] = useState(!propSessionTypeId); // Only load if no prop provided
+  const [sessionTypesError, setSessionTypesError] = useState(null);
   const [userTimezone, setUserTimezone] = useState(null); // User timezone from settings
   const [bookings, setBookings] = useState([]);
   const [loadingBookings, setLoadingBookings] = useState(true);
@@ -82,11 +89,18 @@ const BookingPage = () => {
 
   // Fetch available slots for a given date
   const fetchAvailableSlots = async (date) => {
+    // Don't fetch if no session type is selected
+    if (!sessionTypeId) {
+      setLoading(false);
+      setAvailableSlots([]);
+      setError('Please select a session type');
+      return;
+    }
+
     try {
       setLoading(true);
       setError(null);
       const dateString = formatDateForAPI(date);
-      const sessionTypeId = 1; // Default session type ID
       
       // Use user timezone from settings if available and user is logged in, otherwise use browser timezone
       let timezone = 'UTC';
@@ -112,10 +126,6 @@ const BookingPage = () => {
       // Handle BookingSuggestionsDto response
       if (response.data && response.data.slots && Array.isArray(response.data.slots)) {
         setAvailableSlots(response.data.slots);
-        // Store sessionTypeId from response if available
-        if (response.data.sessionTypeId) {
-          setSessionTypeId(response.data.sessionTypeId);
-        }
       } else {
         setAvailableSlots([]);
       }
@@ -172,6 +182,41 @@ const BookingPage = () => {
     }
   }, []);
 
+  // Fetch session types if not provided as prop
+  useEffect(() => {
+    if (propSessionTypeId) {
+      // Session type provided as prop, no need to fetch
+      setLoadingSessionTypes(false);
+      return;
+    }
+
+    const fetchSessionTypes = async () => {
+      setLoadingSessionTypes(true);
+      setSessionTypesError(null);
+      try {
+        const response = await apiClient.get('/api/v1/public/session/type', {
+          timeout: 10000,
+        });
+        if (response.data && Array.isArray(response.data)) {
+          setSessionTypes(response.data);
+          // Set first session type as default if available
+          if (response.data.length > 0) {
+            setSessionTypeId(response.data[0].id || response.data[0].sessionTypeId);
+          }
+        } else {
+          setSessionTypes([]);
+        }
+      } catch (error) {
+        console.error('Error fetching session types:', error);
+        setSessionTypesError(error.message || 'Failed to load session types');
+        setSessionTypes([]);
+      } finally {
+        setLoadingSessionTypes(false);
+      }
+    };
+    fetchSessionTypes();
+  }, [propSessionTypeId]);
+
   // Check if user is logged in on mount and when token changes
   useEffect(() => {
     const checkToken = () => {
@@ -221,14 +266,21 @@ const BookingPage = () => {
   // Track last fetched date to prevent duplicate calls
   const lastFetchedDateRef = useRef(null);
 
+  // Update sessionTypeId when prop changes
+  useEffect(() => {
+    if (propSessionTypeId !== undefined) {
+      setSessionTypeId(propSessionTypeId);
+    }
+  }, [propSessionTypeId]);
+
   useEffect(() => {
     const dateString = formatDateForAPI(selectedDate);
-    // Only fetch if the date string is different from the last fetched one
-    if (lastFetchedDateRef.current !== dateString) {
+    // Only fetch if the date string is different from the last fetched one and sessionTypeId is available
+    if (lastFetchedDateRef.current !== dateString && sessionTypeId) {
       lastFetchedDateRef.current = dateString;
       fetchAvailableSlots(selectedDate);
     }
-  }, [selectedDate, hasToken, userTimezone]);
+  }, [selectedDate, hasToken, userTimezone, sessionTypeId]);
 
   // Handle date selection
   const handleDateChange = (newDate) => {
@@ -595,6 +647,40 @@ const BookingPage = () => {
         <Typography variant="h4" component="h1" gutterBottom>
           Book a Session
         </Typography>
+
+        {/* Session Type Selection - only show if not provided as prop */}
+        {!propSessionTypeId && (
+          <Box sx={{ mb: 3, mt: 2 }}>
+            {loadingSessionTypes ? (
+              <Box sx={{ display: 'flex', justifyContent: 'center', py: 2 }}>
+                <CircularProgress />
+              </Box>
+            ) : sessionTypesError ? (
+              <Alert severity="error" sx={{ mb: 2 }}>
+                {sessionTypesError}
+              </Alert>
+            ) : sessionTypes.length > 0 ? (
+              <FormControl sx={{ minWidth: 300 }}>
+                <InputLabel>Select Session Type</InputLabel>
+                <Select
+                  value={sessionTypeId || ''}
+                  onChange={(e) => setSessionTypeId(e.target.value)}
+                  label="Select Session Type"
+                >
+                  {sessionTypes.map((st) => (
+                    <MenuItem key={st.id || st.sessionTypeId} value={st.id || st.sessionTypeId}>
+                      {st.name} - ${st.price || 0} ({st.durationMinutes || 60} min)
+                    </MenuItem>
+                  ))}
+                </Select>
+              </FormControl>
+            ) : (
+              <Alert severity="info">
+                No session types available at this time.
+              </Alert>
+            )}
+          </Box>
+        )}
 
         <Grid container spacing={3} sx={{ mt: 2 }}>
           {/* Left Column - Date Calendar */}
