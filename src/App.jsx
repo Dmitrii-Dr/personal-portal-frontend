@@ -6,7 +6,6 @@ import BlogPage from './pages/BlogPage';
 import ProfilePage from './pages/ProfilePage';
 import BookingPage from './pages/BookingPage';
 import SignUpPage from './pages/SignUpPage';
-import SettingsPage from './pages/SettingsPage';
 import AdminPage from './pages/AdminPage';
 import AdminDashboard from './pages/AdminDashboard';
 import AdminBlogPage from './pages/AdminBlogPage';
@@ -338,7 +337,7 @@ const LoginPage = () => {
   const [submitError, setSubmitError] = useState('');
   
   // Get return path from location state
-  const returnTo = location.state?.returnTo || '/';
+  const returnTo = location.state?.returnTo || '/booking';
 
   const validateEmail = (email) => {
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -566,7 +565,6 @@ function App() {
                 <Route path="/login" element={<LoginPage />} />
                 <Route path="/signup" element={<SignUpPage />} />
                 <Route path="/profile" element={<ProfilePage />} />
-                <Route path="/settings" element={<SettingsPage />} />
                 <Route path="/about-me" element={<AboutMePage />} />
                 <Route path="/admin" element={<AdminPage />} />
                 {/* All /admin/* routes except /admin itself are protected by AdminRoute */}
@@ -579,16 +577,9 @@ function App() {
                         <Route path="home" element={<AdminHomePage />} />
                         <Route path="blog" element={<AdminBlogPage />} />
                         <Route path="profile" element={<AdminProfilePage />} />
+                        <Route path="session/configuration" element={<SessionsConfigurationPage />} />
                         {/* Add more admin routes here as needed */}
                       </Routes>
-                    </AdminRoute>
-                  }
-                />
-                <Route
-                  path="/session/configuration"
-                  element={
-                    <AdminRoute>
-                      <SessionsConfigurationPage />
                     </AdminRoute>
                   }
                 />

@@ -18,11 +18,18 @@ import {
   IconButton,
   Tooltip,
   Chip,
+  Menu,
+  MenuItem,
+  ListItemIcon,
+  ListItemText,
+  Divider,
 } from '@mui/material';
 import LogoutIcon from '@mui/icons-material/Logout';
 import AccountCircleIcon from '@mui/icons-material/AccountCircle';
 import LoginIcon from '@mui/icons-material/Login';
 import HomeIcon from '@mui/icons-material/Home';
+import BookOnlineIcon from '@mui/icons-material/BookOnline';
+import PersonIcon from '@mui/icons-material/Person';
 import LoginModal from './LoginModal';
 import SignUpModal from './SignUpModal';
 
@@ -39,11 +46,15 @@ const AppLayout = ({ children }) => {
   const [loginModalOpen, setLoginModalOpen] = useState(false);
   const [signUpModalOpen, setSignUpModalOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
+  const [userMenuAnchorEl, setUserMenuAnchorEl] = useState(null);
+  const userMenuOpen = Boolean(userMenuAnchorEl);
 
   // Check if current route is an admin route
   const isAdminRoute = location.pathname.startsWith('/admin');
   // Check if we're on the landing page
   const isLandingPage = location.pathname === '/';
+  // Check if we're on user pages where navigation buttons should be hidden
+  const isUserPage = ['/profile', '/booking'].includes(location.pathname);
 
   // Handle scroll to change header background
   useEffect(() => {
@@ -58,19 +69,22 @@ const AppLayout = ({ children }) => {
 
   // Fetch user profile
   const lastFetchedTokenRef = useRef(null);
+  const isFetchingRef = useRef(false);
   const fetchUserProfile = useCallback(async () => {
     const token = getToken();
     if (!token) {
       setUserProfile(null);
       lastFetchedTokenRef.current = null;
+      isFetchingRef.current = false;
       return;
     }
 
-    // Avoid refetching if we've already fetched for this token
-    if (lastFetchedTokenRef.current === token) {
+    // Avoid refetching if we've already fetched for this token or if already fetching
+    if (lastFetchedTokenRef.current === token || isFetchingRef.current) {
       return;
     }
 
+    isFetchingRef.current = true;
     setProfileLoading(true);
     try {
       const response = await fetchWithAuth('/api/v1/user/profile');
@@ -86,6 +100,7 @@ const AppLayout = ({ children }) => {
       lastFetchedTokenRef.current = null;
     } finally {
       setProfileLoading(false);
+      isFetchingRef.current = false;
     }
   }, []);
 
@@ -127,6 +142,7 @@ const AppLayout = ({ children }) => {
     };
 
     // Check initially
+    // fetchUserProfile has guards to prevent duplicate calls (isFetchingRef and lastFetchedTokenRef)
     checkToken();
 
     // Listen for storage changes (e.g., when login happens in another tab)
@@ -242,6 +258,24 @@ const AppLayout = ({ children }) => {
     }, 300);
   };
 
+  // Handle user menu
+  const handleUserMenuOpen = (event) => {
+    setUserMenuAnchorEl(event.currentTarget);
+  };
+
+  const handleUserMenuClose = () => {
+    setUserMenuAnchorEl(null);
+  };
+
+  const handleUserMenuClick = (path) => {
+    handleUserMenuClose();
+    if (path === 'logout') {
+      handleLogout();
+    } else {
+      navigate(path);
+    }
+  };
+
   // Check URL for login/signup redirects
   useEffect(() => {
     if (location.pathname === '/login' && !isAdminRoute) {
@@ -316,15 +350,101 @@ const AppLayout = ({ children }) => {
             </Tooltip>
           )}
 
-          {/* Navigation Links - Centered */}
+          {/* Navigation Links */}
           <Box sx={{ flexGrow: 1, display: 'flex', justifyContent: 'center' }}>
             <Stack 
               direction="row" 
               spacing={{ xs: 1, sm: 2, md: 3 }}
               alignItems="center"
             >
-            {/* Hide all navigation buttons on admin routes except Logout */}
-            {!isAdminRoute && (
+            {/* Admin Navigation Links */}
+            {isAdminRoute && (
+              <>
+                <Button
+                  component={Link}
+                  to="/admin/dashboard"
+                  color="inherit"
+                  sx={{ 
+                    textTransform: 'none',
+                    fontWeight: 500,
+                    fontSize: { xs: '0.875rem', sm: '0.9375rem', md: '1rem' },
+                    px: { xs: 1, sm: 1.5 },
+                    py: 1,
+                    borderRadius: 1,
+                    transition: 'all 0.2s ease-in-out',
+                    '&:hover': {
+                      bgcolor: 'rgba(255, 255, 255, 0.1)',
+                      transform: 'translateY(-1px)',
+                    },
+                  }}
+                >
+                  Dashboard
+                </Button>
+                <Button
+                  component={Link}
+                  to="/admin/home"
+                  color="inherit"
+                  sx={{ 
+                    textTransform: 'none',
+                    fontWeight: 500,
+                    fontSize: { xs: '0.875rem', sm: '0.9375rem', md: '1rem' },
+                    px: { xs: 1, sm: 1.5 },
+                    py: 1,
+                    borderRadius: 1,
+                    transition: 'all 0.2s ease-in-out',
+                    '&:hover': {
+                      bgcolor: 'rgba(255, 255, 255, 0.1)',
+                      transform: 'translateY(-1px)',
+                    },
+                  }}
+                >
+                  Home Page
+                </Button>
+                <Button
+                  component={Link}
+                  to="/admin/blog"
+                  color="inherit"
+                  sx={{ 
+                    textTransform: 'none',
+                    fontWeight: 500,
+                    fontSize: { xs: '0.875rem', sm: '0.9375rem', md: '1rem' },
+                    px: { xs: 1, sm: 1.5 },
+                    py: 1,
+                    borderRadius: 1,
+                    transition: 'all 0.2s ease-in-out',
+                    '&:hover': {
+                      bgcolor: 'rgba(255, 255, 255, 0.1)',
+                      transform: 'translateY(-1px)',
+                    },
+                  }}
+                >
+                  Blog
+                </Button>
+                <Button
+                  component={Link}
+                  to="/admin/session/configuration"
+                  color="inherit"
+                  sx={{ 
+                    textTransform: 'none',
+                    fontWeight: 500,
+                    fontSize: { xs: '0.875rem', sm: '0.9375rem', md: '1rem' },
+                    px: { xs: 1, sm: 1.5 },
+                    py: 1,
+                    borderRadius: 1,
+                    transition: 'all 0.2s ease-in-out',
+                    '&:hover': {
+                      bgcolor: 'rgba(255, 255, 255, 0.1)',
+                      transform: 'translateY(-1px)',
+                    },
+                  }}
+                >
+                  Sessions
+                </Button>
+              </>
+            )}
+
+            {/* Public Navigation Links */}
+            {!isAdminRoute && !isUserPage && (
               <>
                 {/* Public Links - Scroll to section on landing page, navigate otherwise */}
                 {isLandingPage ? (
@@ -470,137 +590,155 @@ const AppLayout = ({ children }) => {
                   Blog
                 </Button>
 
-                {/* Conditional Links based on auth state */}
-                {hasToken && (
-                  <>
-                    <Button
-                      component={Link}
-                      to="/profile"
-                      color="inherit"
-                      sx={{ 
-                        textTransform: 'none',
-                        fontWeight: 500,
-                        fontSize: { xs: '0.875rem', sm: '0.9375rem', md: '1rem' },
-                        px: { xs: 1, sm: 1.5 },
-                        py: 1,
-                        borderRadius: 1,
-                        transition: 'all 0.2s ease-in-out',
-                        '&:hover': {
-                          bgcolor: 'rgba(255, 255, 255, 0.1)',
-                          transform: 'translateY(-1px)',
-                        },
-                      }}
-                    >
-                      My Profile
-                    </Button>
-                    <Button
-                      component={Link}
-                      to="/booking"
-                      color="inherit"
-                      sx={{ 
-                        textTransform: 'none',
-                        fontWeight: 500,
-                        fontSize: { xs: '0.875rem', sm: '0.9375rem', md: '1rem' },
-                        px: { xs: 1, sm: 1.5 },
-                        py: 1,
-                        borderRadius: 1,
-                        transition: 'all 0.2s ease-in-out',
-                        '&:hover': {
-                          bgcolor: 'rgba(255, 255, 255, 0.1)',
-                          transform: 'translateY(-1px)',
-                        },
-                      }}
-                    >
-                      My Bookings
-                    </Button>
-                    <Button
-                      component={Link}
-                      to="/settings"
-                      color="inherit"
-                      sx={{ 
-                        textTransform: 'none',
-                        fontWeight: 500,
-                        fontSize: { xs: '0.875rem', sm: '0.9375rem', md: '1rem' },
-                        px: { xs: 1, sm: 1.5 },
-                        py: 1,
-                        borderRadius: 1,
-                        transition: 'all 0.2s ease-in-out',
-                        '&:hover': {
-                          bgcolor: 'rgba(255, 255, 255, 0.1)',
-                          transform: 'translateY(-1px)',
-                        },
-                      }}
-                    >
-                      Settings
-                    </Button>
-                  </>
-                )}
               </>
             )}
-
-            {/* User name and Logout button - always show if has token, Login button if not */}
-            {hasToken ? (
-              <>
-                <Chip
-                  icon={<AccountCircleIcon />}
-                  label={getUserDisplayName() || 'My Profile'}
-                  color="primary"
-                  variant="outlined"
-                  sx={{
-                    mr: 1,
-                    fontWeight: 600,
-                    display: 'inline-flex',
-                    color: 'common.white',
-                    borderColor: 'common.white',
-                    '& .MuiChip-icon': { color: 'common.white' },
-                    '& .MuiChip-label': { color: 'common.white' },
-                  }}
-                  component={Link}
-                  to="/profile"
-                />
-                <Tooltip title="Logout" arrow>
-                  <IconButton
-                    onClick={handleLogout}
-                    color="inherit"
-                    size="medium"
-                    aria-label="logout"
-                    sx={{
-                      transition: 'all 0.2s ease-in-out',
-                      '&:hover': {
-                        bgcolor: 'rgba(255, 255, 255, 0.1)',
-                        transform: 'scale(1.1)',
-                      },
-                    }}
-                  >
-                    <LogoutIcon />
-                  </IconButton>
-                </Tooltip>
-              </>
-            ) : null}
             </Stack>
           </Box>
 
-          {/* Login Icon Button - Top Right Corner */}
-          {!hasToken && !isAdminRoute && (
-            <Tooltip title="Login" arrow>
-              <IconButton
-                onClick={handleLoginClick}
-                color="inherit"
-                size="medium"
-                aria-label="login"
-                sx={{ 
-                  ml: 'auto',
-                  transition: 'all 0.2s ease-in-out',
-                  '&:hover': {
-                    bgcolor: 'rgba(255, 255, 255, 0.1)',
-                    transform: 'scale(1.1)',
-                  },
-                }}
-              >
-                <LoginIcon />
-              </IconButton>
-            </Tooltip>
-          )}
+          {/* Right side: User menu and Login button */}
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+            {/* User menu - only show on non-admin routes when logged in */}
+            {hasToken && !isAdminRoute && (
+              <>
+                <Tooltip title="Account" arrow>
+                  <Box
+                    sx={{
+                      position: 'relative',
+                      display: 'inline-flex',
+                    }}
+                  >
+                    <IconButton
+                      onClick={handleUserMenuOpen}
+                      color="inherit"
+                      size="large"
+                      aria-label="account menu"
+                      aria-controls={userMenuOpen ? 'user-menu' : undefined}
+                      aria-haspopup="true"
+                      aria-expanded={userMenuOpen ? 'true' : undefined}
+                      sx={{
+                        transition: 'all 0.2s ease-in-out',
+                        '&:hover': {
+                          bgcolor: 'rgba(255, 255, 255, 0.1)',
+                          transform: 'scale(1.1)',
+                        },
+                      }}
+                    >
+                      <AccountCircleIcon sx={{ fontSize: 40 }} />
+                    </IconButton>
+                    <Box
+                      sx={{
+                        position: 'absolute',
+                        bottom: 6,
+                        right: 6,
+                        width: 10,
+                        height: 10,
+                        borderRadius: '50%',
+                        bgcolor: '#4caf50',
+                        border: '2px solid',
+                        borderColor: 'background.paper',
+                        zIndex: 1,
+                      }}
+                    />
+                  </Box>
+                </Tooltip>
+                <Menu
+                  id="user-menu"
+                  anchorEl={userMenuAnchorEl}
+                  open={userMenuOpen}
+                  onClose={handleUserMenuClose}
+                  disableScrollLock
+                  MenuListProps={{
+                    'aria-labelledby': 'account-button',
+                    sx: {
+                      padding: 0,
+                    },
+                  }}
+                  PaperProps={{
+                    sx: {
+                      minWidth: 200,
+                      overflow: 'hidden',
+                      mt: 0.5,
+                    },
+                  }}
+                  sx={{
+                    '& .MuiBackdrop-root': {
+                      backgroundColor: 'transparent',
+                    },
+                  }}
+                  anchorOrigin={{
+                    vertical: 'bottom',
+                    horizontal: 'right',
+                  }}
+                  transformOrigin={{
+                    vertical: 'top',
+                    horizontal: 'right',
+                  }}
+                >
+                  <MenuItem onClick={() => handleUserMenuClick('/profile')}>
+                    <ListItemIcon>
+                      <PersonIcon fontSize="small" />
+                    </ListItemIcon>
+                    <ListItemText>My Profile</ListItemText>
+                  </MenuItem>
+                  <MenuItem onClick={() => handleUserMenuClick('/booking')}>
+                    <ListItemIcon>
+                      <BookOnlineIcon fontSize="small" />
+                    </ListItemIcon>
+                    <ListItemText>My Bookings</ListItemText>
+                  </MenuItem>
+                  <Divider />
+                  <MenuItem onClick={() => handleUserMenuClick('logout')}>
+                    <ListItemIcon>
+                      <LogoutIcon fontSize="small" />
+                    </ListItemIcon>
+                    <ListItemText>Logout</ListItemText>
+                  </MenuItem>
+                </Menu>
+              </>
+            )}
+
+            {/* Logout button - only show on admin routes when logged in */}
+            {hasToken && isAdminRoute && (
+              <Tooltip title="Logout" arrow>
+                <IconButton
+                  onClick={handleLogout}
+                  color="inherit"
+                  size="medium"
+                  aria-label="logout"
+                  sx={{
+                    transition: 'all 0.2s ease-in-out',
+                    '&:hover': {
+                      bgcolor: 'rgba(255, 255, 255, 0.1)',
+                      transform: 'scale(1.1)',
+                    },
+                  }}
+                >
+                  <LogoutIcon />
+                </IconButton>
+              </Tooltip>
+            )}
+
+            {/* Login Icon Button - only show if not logged in and not on admin route */}
+            {!hasToken && !isAdminRoute && (
+              <Tooltip title="Login" arrow>
+                <IconButton
+                  onClick={handleLoginClick}
+                  color="inherit"
+                  size="medium"
+                  aria-label="login"
+                  sx={{ 
+                    transition: 'all 0.2s ease-in-out',
+                    '&:hover': {
+                      bgcolor: 'rgba(255, 255, 255, 0.1)',
+                      transform: 'scale(1.1)',
+                    },
+                  }}
+                >
+                  <LoginIcon />
+                </IconButton>
+              </Tooltip>
+            )}
+          </Box>
         </Toolbar>
       </AppBar>
 

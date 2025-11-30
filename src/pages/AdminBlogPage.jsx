@@ -852,14 +852,6 @@ const AdminBlogPage = () => {
         </Typography>
         <Box sx={{ display: 'flex', gap: 2, mb: 2 }}>
           <Button
-            variant="outlined"
-            color="primary"
-            onClick={() => navigate('/admin/dashboard')}
-            sx={{ textTransform: 'none' }}
-          >
-            Dashboard
-          </Button>
-          <Button
             variant="contained"
             color="primary"
             onClick={handleAddPostOpen}

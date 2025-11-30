@@ -147,6 +147,21 @@ export const fetchWithAuth = async (url, options = {}) => {
   });
 };
 
+// Admin API functions
+
+// Fetch grouped bookings for admin
+export const fetchAdminGroupedBookings = async (status = null) => {
+  const params = {};
+  if (status) {
+    params.status = status;
+  }
+  const response = await apiClient.get('/api/v1/admin/session/booking/group', {
+    params,
+    timeout: 10000,
+  });
+  return response.data;
+};
+
 // Export configured axios instance
 export default apiClient;
 

@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { fetchWithAuth } from '../utils/api';
 import apiClient from '../utils/api';
+import AvailabilityRuleComponent from '../components/AvailabilityRuleComponent';
+import BookingSettings from '../components/BookingSettings';
 import {
   Box,
   Typography,
@@ -34,6 +36,14 @@ import { DateCalendar } from '@mui/x-date-pickers/DateCalendar';
 import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
 import { AdapterDayjs } from '@mui/x-date-pickers/AdapterDayjs';
 import dayjs from 'dayjs';
+import updateLocale from 'dayjs/plugin/updateLocale';
+import localeData from 'dayjs/plugin/localeData';
+import 'dayjs/locale/en-gb';
+
+// Configure dayjs to start week on Monday
+dayjs.extend(updateLocale);
+dayjs.extend(localeData);
+dayjs.locale('en-gb'); // Use en-gb locale which starts week on Monday
 
 const SessionsConfigurationPage = () => {
   // Session types state
@@ -209,8 +219,9 @@ const SessionsConfigurationPage = () => {
   const formatTime = (timeString) => {
     if (!timeString) return 'N/A';
     try {
+      // Always display in 24-hour format (HH:mm)
       const time = timeString.includes(':') ? timeString.split(':').slice(0, 2).join(':') : timeString;
-      return dayjs(time, 'HH:mm').format('h:mm A');
+      return dayjs(time, 'HH:mm').format('HH:mm');
     } catch {
       return timeString;
     }
@@ -219,7 +230,8 @@ const SessionsConfigurationPage = () => {
   const formatTimeFromInstant = (instantString) => {
     if (!instantString) return 'N/A';
     try {
-      return dayjs(instantString).format('h:mm A');
+      // Always display in 24-hour format (HH:mm)
+      return dayjs(instantString).format('HH:mm');
     } catch {
       return instantString;
     }
@@ -308,6 +320,24 @@ const SessionsConfigurationPage = () => {
               </Card>
             </Grid>
 
+            {/* Booking Settings Section */}
+            <Grid item xs={12}>
+              <Card>
+                <CardContent>
+                  <BookingSettings />
+                </CardContent>
+              </Card>
+            </Grid>
+
+            {/* Availability Rules Section */}
+            <Grid item xs={12}>
+              <Card>
+                <CardContent>
+                  <AvailabilityRuleComponent />
+                </CardContent>
+              </Card>
+            </Grid>
+
             {/* Available Slots Section */}
             <Grid item xs={12}>
               <Card>
@@ -334,11 +364,12 @@ const SessionsConfigurationPage = () => {
 
                   <Grid container spacing={2}>
                     <Grid item xs={12} md={6}>
-                      <LocalizationProvider dateAdapter={AdapterDayjs}>
+                      <LocalizationProvider dateAdapter={AdapterDayjs} adapterLocale="en-gb">
                         <DateCalendar
                           value={selectedDate}
                           onChange={(newDate) => setSelectedDate(newDate)}
                           minDate={dayjs()}
+                          firstDayOfWeek={1}
                         />
                       </LocalizationProvider>
                     </Grid>

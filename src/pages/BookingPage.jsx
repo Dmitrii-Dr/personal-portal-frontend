@@ -2,7 +2,15 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import dayjs from 'dayjs';
+import updateLocale from 'dayjs/plugin/updateLocale';
+import localeData from 'dayjs/plugin/localeData';
+import 'dayjs/locale/en-gb';
 import apiClient, { fetchWithAuth, getToken } from '../utils/api';
+
+// Configure dayjs to start week on Monday
+dayjs.extend(updateLocale);
+dayjs.extend(localeData);
+dayjs.locale('en-gb'); // Use en-gb locale which starts week on Monday
 import {
   Grid,
   Typography,
@@ -26,6 +34,9 @@ import {
   InputLabel,
   Select,
   MenuItem,
+  Tabs,
+  Tab,
+  Tooltip,
 } from '@mui/material';
 import { DateCalendar } from '@mui/x-date-pickers/DateCalendar';
 import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
@@ -47,15 +58,28 @@ const BookingPage = ({ sessionTypeId: propSessionTypeId }) => {
   const [loadingSessionTypes, setLoadingSessionTypes] = useState(!propSessionTypeId); // Only load if no prop provided
   const [sessionTypesError, setSessionTypesError] = useState(null);
   const [userTimezone, setUserTimezone] = useState(null); // User timezone from settings
-  const [bookings, setBookings] = useState([]);
+  const [groupedBookings, setGroupedBookings] = useState({});
+  const [pastBookings, setPastBookings] = useState([]);
   const [loadingBookings, setLoadingBookings] = useState(true);
+  const [loadingPastBookings, setLoadingPastBookings] = useState(false);
   const [bookingsError, setBookingsError] = useState(null);
+  const [pastBookingsError, setPastBookingsError] = useState(null);
+  const [activeTab, setActiveTab] = useState(0);
   const [cancelDialogOpen, setCancelDialogOpen] = useState(false);
   const [bookingToCancel, setBookingToCancel] = useState(null);
   const [cancelling, setCancelling] = useState(false);
-  const [showMyBookings, setShowMyBookings] = useState(false);
   const [hasToken, setHasToken] = useState(false);
   const [loginRequiredDialogOpen, setLoginRequiredDialogOpen] = useState(false);
+  const [updateDialogOpen, setUpdateDialogOpen] = useState(false);
+  const [bookingToUpdate, setBookingToUpdate] = useState(null);
+  const [updateSelectedDate, setUpdateSelectedDate] = useState(dayjs());
+  const [updateAvailableSlots, setUpdateAvailableSlots] = useState([]);
+  const [updateLoadingSlots, setUpdateLoadingSlots] = useState(false);
+  const [updateSlotError, setUpdateSlotError] = useState(null);
+  const [updateSelectedSlot, setUpdateSelectedSlot] = useState(null);
+  const [updateClientMessage, setUpdateClientMessage] = useState('');
+  const [updatingBooking, setUpdatingBooking] = useState(false);
+  const [updateBookingError, setUpdateBookingError] = useState(null);
   const navigate = useNavigate();
   
   const PENDING_BOOKING_KEY = 'pending_booking';
@@ -150,18 +174,21 @@ const BookingPage = ({ sessionTypeId: propSessionTypeId }) => {
     }
   };
 
-  // Fetch bookings (reusable function)
+  // Fetch bookings grouped by status (reusable function)
   const fetchBookings = useCallback(async () => {
     try {
       setLoadingBookings(true);
       setBookingsError(null);
-      const response = await apiClient.get('/api/v1/session/booking', {
+      const response = await apiClient.get('/api/v1/session/booking/group', {
+        params: {
+          status: 'PENDING_APPROVAL,CONFIRMED',
+        },
         timeout: 10000,
       });
-      if (response.data && Array.isArray(response.data)) {
-        setBookings(response.data);
+      if (response.data && response.data.bookings) {
+        setGroupedBookings(response.data.bookings || {});
       } else {
-        setBookings([]);
+        setGroupedBookings({});
       }
     } catch (err) {
       console.error('Error fetching bookings:', err);
@@ -176,9 +203,44 @@ const BookingPage = ({ sessionTypeId: propSessionTypeId }) => {
         errorMessage = err.message || errorMessage;
       }
       setBookingsError(errorMessage);
-      setBookings([]);
+      setGroupedBookings({});
     } finally {
       setLoadingBookings(false);
+    }
+  }, []);
+
+  // Fetch past bookings (reusable function)
+  const fetchPastBookings = useCallback(async () => {
+    try {
+      setLoadingPastBookings(true);
+      setPastBookingsError(null);
+      const response = await apiClient.get('/api/v1/session/booking', {
+        params: {
+          status: 'DECLINED,CANCELLED,COMPLETED',
+        },
+        timeout: 10000,
+      });
+      if (response.data && Array.isArray(response.data)) {
+        setPastBookings(response.data);
+      } else {
+        setPastBookings([]);
+      }
+    } catch (err) {
+      console.error('Error fetching past bookings:', err);
+      let errorMessage = 'Failed to load past bookings. Please try again later.';
+      if (err.code === 'ECONNABORTED') {
+        errorMessage = 'Request timed out. Please try again.';
+      } else if (err.response) {
+        errorMessage = err.response.data?.message || `Server error: ${err.response.status}`;
+      } else if (err.request) {
+        errorMessage = 'Unable to reach the server. Please check your connection.';
+      } else {
+        errorMessage = err.message || errorMessage;
+      }
+      setPastBookingsError(errorMessage);
+      setPastBookings([]);
+    } finally {
+      setLoadingPastBookings(false);
     }
   }, []);
 
@@ -247,20 +309,17 @@ const BookingPage = ({ sessionTypeId: propSessionTypeId }) => {
     };
   }, []);
 
-  // Fetch user settings and bookings only when user clicks "My Bookings" and is logged in
-  const handleShowMyBookings = async () => {
-    if (!hasToken) {
-      return;
+  // Fetch user settings and bookings automatically when user is logged in
+  useEffect(() => {
+    if (hasToken) {
+      fetchUserSettings();
+      fetchBookings();
+    } else {
+      setGroupedBookings({});
+      setBookingsError(null);
+      setLoadingBookings(false);
     }
-    
-    setShowMyBookings(true);
-    setLoadingBookings(true);
-    
-    // Fetch user settings first to get timezone
-    await fetchUserSettings();
-    // Then fetch bookings
-    await fetchBookings();
-  };
+  }, [hasToken, fetchBookings]);
 
   // Fetch slots on component mount and when date changes
   // Track last fetched date to prevent duplicate calls
@@ -316,6 +375,160 @@ const BookingPage = ({ sessionTypeId: propSessionTypeId }) => {
     setCancelDialogOpen(true);
   };
 
+  // Handle update booking click
+  const handleUpdateClick = (booking) => {
+    setBookingToUpdate(booking);
+    setUpdateSelectedDate(dayjs());
+    setUpdateAvailableSlots([]);
+    setUpdateSlotError(null);
+    setUpdateSelectedSlot(null);
+    setUpdateClientMessage(booking.clientMessage || '');
+    setUpdateBookingError(null);
+    setUpdateDialogOpen(true);
+    // Fetch slots for the booking's session type
+    fetchUpdateSlots(dayjs(), booking.sessionTypeId || booking.sessionType?.id);
+  };
+
+  // Fetch available slots for update (similar to fetchAvailableSlots but for specific session type)
+  const fetchUpdateSlots = async (date, sessionTypeId) => {
+    if (!sessionTypeId) {
+      setUpdateLoadingSlots(false);
+      setUpdateAvailableSlots([]);
+      setUpdateSlotError('Session type not found');
+      return;
+    }
+
+    try {
+      setUpdateLoadingSlots(true);
+      setUpdateSlotError(null);
+      const dateString = formatDateForAPI(date);
+      
+      // Use user timezone from settings if available and user is logged in, otherwise use browser timezone
+      let timezone = 'UTC';
+      if (hasToken && userTimezone) {
+        timezone = userTimezone;
+      } else {
+        try {
+          timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+        } catch {
+          timezone = 'UTC'; // Final fallback
+        }
+      }
+      
+      const response = await apiClient.get('/api/v1/public/booking/available/slot', {
+        params: {
+          sessionTypeId,
+          suggestedDate: dateString,
+          timezone,
+        },
+        timeout: 10000,
+      });
+      
+      // Handle BookingSuggestionsDto response
+      if (response.data && response.data.slots && Array.isArray(response.data.slots)) {
+        setUpdateAvailableSlots(response.data.slots);
+      } else {
+        setUpdateAvailableSlots([]);
+      }
+    } catch (err) {
+      console.error('Error fetching available slots for update:', err);
+      let errorMessage = 'Failed to load available slots. Please try again later.';
+      
+      if (err.code === 'ECONNABORTED') {
+        errorMessage = 'Request timed out. Please try again.';
+      } else if (err.response) {
+        errorMessage = err.response.data?.message || `Server error: ${err.response.status}`;
+      } else if (err.request) {
+        errorMessage = 'Unable to reach the server. Please check your connection.';
+      } else {
+        errorMessage = err.message || errorMessage;
+      }
+      
+      setUpdateSlotError(errorMessage);
+      setUpdateAvailableSlots([]);
+    } finally {
+      setUpdateLoadingSlots(false);
+    }
+  };
+
+  // Handle update date change
+  const handleUpdateDateChange = (newDate) => {
+    setUpdateSelectedDate(newDate);
+    if (bookingToUpdate) {
+      const sessionTypeId = bookingToUpdate.sessionTypeId || bookingToUpdate.sessionType?.id;
+      fetchUpdateSlots(newDate, sessionTypeId);
+    }
+  };
+
+  // Handle update slot selection
+  const handleUpdateSlotClick = (slot) => {
+    setUpdateSelectedSlot(slot);
+  };
+
+  // Handle update dialog close
+  const handleUpdateDialogClose = () => {
+    if (updatingBooking) return; // Prevent closing during update
+    setUpdateDialogOpen(false);
+    setBookingToUpdate(null);
+    setUpdateSelectedSlot(null);
+    setUpdateClientMessage('');
+    setUpdateBookingError(null);
+    setUpdateAvailableSlots([]);
+    setUpdateSlotError(null);
+  };
+
+  // Handle booking update confirmation
+  const handleConfirmUpdate = async () => {
+    if (!bookingToUpdate || !bookingToUpdate.id || !updateSelectedSlot || !updateSelectedSlot.startTimeInstant) {
+      setUpdateBookingError('Please select a time slot');
+      return;
+    }
+
+    setUpdatingBooking(true);
+    setUpdateBookingError(null);
+
+    try {
+      const payload = {
+        id: bookingToUpdate.id,
+        startTime: updateSelectedSlot.startTimeInstant,
+        clientMessage: updateClientMessage.trim() || null,
+      };
+
+      const response = await apiClient.put(`/api/v1/session/booking/${bookingToUpdate.id}`, payload, {
+        timeout: 10000,
+      });
+
+      if (!response || (response.status && response.status >= 400)) {
+        throw new Error('Failed to update booking');
+      }
+
+      // Success - close dialog and refresh bookings and slots
+      handleUpdateDialogClose();
+      if (hasToken) {
+        await fetchBookings(); // Refresh bookings list when user is logged in
+        await fetchPastBookings(); // Refresh past sessions
+      }
+      await fetchAvailableSlots(selectedDate); // Refresh available slots
+    } catch (err) {
+      console.error('Error updating booking:', err);
+      let errorMessage = 'Failed to update booking. Please try again.';
+      
+      if (err.code === 'ECONNABORTED') {
+        errorMessage = 'Request timed out. Please try again.';
+      } else if (err.response) {
+        errorMessage = err.response.data?.message || `Server error: ${err.response.status}`;
+      } else if (err.request) {
+        errorMessage = 'Unable to reach the server. Please check your connection.';
+      } else {
+        errorMessage = err.message || errorMessage;
+      }
+      
+      setUpdateBookingError(errorMessage);
+    } finally {
+      setUpdatingBooking(false);
+    }
+  };
+
   // Handle cancel dialog close
   const handleCancelDialogClose = () => {
     if (cancelling) return; // Prevent closing during cancellation
@@ -331,9 +544,19 @@ const BookingPage = ({ sessionTypeId: propSessionTypeId }) => {
 
     setCancelling(true);
     try {
-      const response = await apiClient.delete(`/api/v1/session/booking/${bookingToCancel.id}`, {
-        timeout: 10000,
-      });
+      let response;
+      const status = bookingToCancel.status?.toUpperCase();
+      
+      // Use POST for PENDING_APPROVAL or PENDING status, DELETE for others
+      if (status === 'PENDING_APPROVAL' || status === 'PENDING') {
+        response = await apiClient.post(`/api/v1/session/booking/${bookingToCancel.id}/cancel`, {}, {
+          timeout: 10000,
+        });
+      } else {
+        response = await apiClient.delete(`/api/v1/session/booking/${bookingToCancel.id}`, {
+          timeout: 10000,
+        });
+      }
 
       if (!response || (response.status && response.status >= 400)) {
         throw new Error('Failed to cancel booking');
@@ -341,8 +564,9 @@ const BookingPage = ({ sessionTypeId: propSessionTypeId }) => {
 
       // Success - close dialog and refresh bookings and slots
       handleCancelDialogClose();
-      if (hasToken && showMyBookings) {
-        await fetchBookings(); // Refresh bookings list only if user is logged in and viewing bookings
+      if (hasToken) {
+        await fetchBookings(); // Refresh bookings list when user is logged in
+        await fetchPastBookings(); // Refresh past sessions to show canceled booking
       }
       await fetchAvailableSlots(selectedDate); // Refresh available slots
     } catch (err) {
@@ -416,8 +640,8 @@ const BookingPage = ({ sessionTypeId: propSessionTypeId }) => {
 
       // Success - close dialog and refresh bookings and slots
       handleDialogClose();
-      if (hasToken && showMyBookings) {
-        await fetchBookings(); // Refresh bookings list only if user is logged in and viewing bookings
+      if (hasToken) {
+        await fetchBookings(); // Refresh bookings list when user is logged in
       }
       await fetchAvailableSlots(selectedDate); // Refresh available slots
     } catch (err) {
@@ -472,7 +696,7 @@ const BookingPage = ({ sessionTypeId: propSessionTypeId }) => {
       if (response && response.status < 400) {
         // Success - remove pending booking and refresh
         sessionStorage.removeItem(PENDING_BOOKING_KEY);
-        if (showMyBookings) {
+        if (hasToken) {
           await fetchBookings();
         }
         // Refresh slots for the date that was selected
@@ -485,7 +709,7 @@ const BookingPage = ({ sessionTypeId: propSessionTypeId }) => {
       console.error('Error completing pending booking:', err);
       // Don't show error to user, just log it
     }
-  }, [hasToken, showMyBookings]);
+  }, [hasToken]);
 
   // Check for pending booking when user logs in
   useEffect(() => {
@@ -498,9 +722,10 @@ const BookingPage = ({ sessionTypeId: propSessionTypeId }) => {
   const formatTime = (timeString) => {
     if (!timeString) return 'N/A';
     try {
+      // Always display in 24-hour format (HH:mm)
       // Handle LocalTime format (HH:mm:ss or HH:mm)
       const time = timeString.includes(':') ? timeString.split(':').slice(0, 2).join(':') : timeString;
-      return dayjs(time, 'HH:mm').format('h:mm A');
+      return dayjs(time, 'HH:mm').format('HH:mm');
     } catch {
       return timeString;
     }
@@ -510,7 +735,8 @@ const BookingPage = ({ sessionTypeId: propSessionTypeId }) => {
   const formatTimeFromInstant = (instantString) => {
     if (!instantString) return 'N/A';
     try {
-      return dayjs(instantString).format('h:mm A');
+      // Always display in 24-hour format (HH:mm)
+      return dayjs(instantString).format('HH:mm');
     } catch {
       return instantString;
     }
@@ -521,11 +747,11 @@ const BookingPage = ({ sessionTypeId: propSessionTypeId }) => {
     return dayjs(date).format('MMMM D, YYYY');
   };
 
-  // Format instant for display
+  // Format instant for display (24-hour format)
   const formatInstant = (instantString) => {
     if (!instantString) return 'N/A';
     try {
-      return dayjs(instantString).format('MMMM D, YYYY h:mm A');
+      return dayjs(instantString).format('MMMM D, YYYY HH:mm');
     } catch {
       return instantString;
     }
@@ -537,106 +763,220 @@ const BookingPage = ({ sessionTypeId: propSessionTypeId }) => {
       case 'CONFIRMED':
       case 'COMPLETED':
         return 'success';
+      case 'PENDING_APPROVAL':
       case 'PENDING':
         return 'warning';
       case 'CANCELLED':
+      case 'DECLINED':
         return 'error';
       default:
         return 'default';
     }
   };
 
+  // Get active bookings (CONFIRMED first, then PENDING_APPROVAL)
+  const getActiveBookings = () => {
+    const confirmed = groupedBookings.CONFIRMED || [];
+    const pendingApproval = groupedBookings.PENDING_APPROVAL || [];
+    return [...confirmed, ...pendingApproval];
+  };
+
+  // Handle tab change
+  const handleTabChange = (event, newValue) => {
+    setActiveTab(newValue);
+    // Fetch past bookings when switching to Past Sessions tab
+    if (newValue === 1 && hasToken && pastBookings.length === 0 && !loadingPastBookings) {
+      fetchPastBookings();
+    }
+  };
+
+  // Fetch past bookings when component mounts if user is already on Past Sessions tab
+  useEffect(() => {
+    if (hasToken && activeTab === 1 && pastBookings.length === 0 && !loadingPastBookings) {
+      fetchPastBookings();
+    }
+  }, [hasToken, activeTab, pastBookings.length, loadingPastBookings, fetchPastBookings]);
+
   return (
-    <LocalizationProvider dateAdapter={AdapterDayjs}>
+    <LocalizationProvider dateAdapter={AdapterDayjs} adapterLocale="en-gb">
       <Box>
         {/* Show "My Bookings" section only if user is logged in */}
         {hasToken && (
           <>
-            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
-              <Typography variant="h4" component="h1">
-                My Bookings
-              </Typography>
-              {!showMyBookings && (
-                <Button
-                  variant="outlined"
-                  onClick={handleShowMyBookings}
-                  sx={{ textTransform: 'none' }}
-                >
-                  Show My Bookings
-                </Button>
-              )}
+            <Typography variant="h4" component="h1" gutterBottom>
+              My Bookings
+            </Typography>
+
+            {/* Tabs for Active Sessions and Past Sessions */}
+            <Box sx={{ borderBottom: 1, borderColor: 'divider', mt: 2 }}>
+              <Tabs value={activeTab} onChange={handleTabChange} aria-label="booking tabs">
+                <Tab label="Active Sessions" />
+                <Tab label="Past Sessions" />
+              </Tabs>
             </Box>
 
-            {/* Bookings List - only show if user clicked "Show My Bookings" */}
-            {showMyBookings && (
+            {/* Tab Panels */}
+            {loadingBookings ? (
+              <Box
+                sx={{
+                  display: 'flex',
+                  justifyContent: 'center',
+                  alignItems: 'center',
+                  minHeight: 200,
+                  mt: 2,
+                }}
+              >
+                <CircularProgress />
+              </Box>
+            ) : bookingsError ? (
+              <Alert severity="error" sx={{ mt: 2 }}>
+                {bookingsError}
+              </Alert>
+            ) : (
               <>
-                {loadingBookings ? (
-          <Box
-            sx={{
-              display: 'flex',
-              justifyContent: 'center',
-              alignItems: 'center',
-              minHeight: 200,
-              mt: 2,
-            }}
-          >
-            <CircularProgress />
-          </Box>
-        ) : bookingsError ? (
-          <Alert severity="error" sx={{ mt: 2 }}>
-            {bookingsError}
-          </Alert>
-        ) : bookings.length > 0 ? (
-          <Box sx={{ mt: 2 }}>
-            {bookings.map((booking) => (
-              <Card key={booking.id} sx={{ mb: 2 }}>
-                <CardContent>
-                  <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 1 }}>
-                    <Box>
-                      <Typography variant="h6" component="h2">
-                        {booking.sessionTypeName || 'Session'}
-                      </Typography>
-                      <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
-                        {formatInstant(booking.startTimeInstant)} - {formatInstant(booking.endTimeInstant)}
-                      </Typography>
-                    </Box>
-                    <Chip
-                      label={booking.status || 'UNKNOWN'}
-                      color={getStatusColor(booking.status)}
-                      size="small"
-                    />
+                {/* Active Sessions Tab */}
+                {activeTab === 0 && (
+                  <Box sx={{ mt: 2 }}>
+                    {getActiveBookings().length > 0 ? (
+                      getActiveBookings().map((booking) => (
+                        <Card key={booking.id} sx={{ mb: 2 }}>
+                          <CardContent>
+                            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 1 }}>
+                              <Box>
+                                <Typography variant="h6" component="h2">
+                                  {booking.sessionTypeName || 'Session'}
+                                </Typography>
+                                <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
+                                  {formatInstant(booking.startTimeInstant)} - {formatInstant(booking.endTimeInstant)}
+                                </Typography>
+                              </Box>
+                              <Chip
+                                label={booking.status || 'UNKNOWN'}
+                                color={getStatusColor(booking.status)}
+                                size="small"
+                              />
+                            </Box>
+                            {booking.clientMessage && (
+                              <>
+                                <Divider sx={{ my: 1 }} />
+                                <Typography variant="body2" color="text.secondary">
+                                  <strong>Message:</strong> {booking.clientMessage}
+                                </Typography>
+                              </>
+                            )}
+                            <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 1 }}>
+                              Created: {formatInstant(booking.createdAt)}
+                            </Typography>
+                            <Box sx={{ display: 'flex', justifyContent: 'flex-end', gap: 1, mt: 2 }}>
+                              {booking.status?.toUpperCase() === 'CONFIRMED' ? (
+                                <Tooltip title="Please contact me to cancel or change session time">
+                                  <span>
+                                    <Button
+                                      variant="outlined"
+                                      color="error"
+                                      size="small"
+                                      disabled={true}
+                                      sx={{ textTransform: 'none' }}
+                                    >
+                                      Cancel Booking
+                                    </Button>
+                                  </span>
+                                </Tooltip>
+                              ) : (
+                                <>
+                                  {(booking.status?.toUpperCase() === 'PENDING_APPROVAL' || booking.status?.toUpperCase() === 'PENDING') && (
+                                    <Button
+                                      variant="outlined"
+                                      color="primary"
+                                      size="small"
+                                      onClick={() => handleUpdateClick(booking)}
+                                      disabled={updatingBooking}
+                                      sx={{ textTransform: 'none' }}
+                                    >
+                                      Update Session Date/Time
+                                    </Button>
+                                  )}
+                                  <Button
+                                    variant="outlined"
+                                    color="error"
+                                    size="small"
+                                    onClick={() => handleCancelClick(booking)}
+                                    disabled={cancelling}
+                                    sx={{ textTransform: 'none' }}
+                                  >
+                                    Cancel Booking
+                                  </Button>
+                                </>
+                              )}
+                            </Box>
+                          </CardContent>
+                        </Card>
+                      ))
+                    ) : (
+                      <Alert severity="info" sx={{ mt: 2 }}>
+                        No active bookings found.
+                      </Alert>
+                    )}
                   </Box>
-                  {booking.clientMessage && (
-                    <>
-                      <Divider sx={{ my: 1 }} />
-                      <Typography variant="body2" color="text.secondary">
-                        <strong>Message:</strong> {booking.clientMessage}
-                      </Typography>
-                    </>
-                  )}
-                  <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 1 }}>
-                    Created: {formatInstant(booking.createdAt)}
-                  </Typography>
-                  <Box sx={{ display: 'flex', justifyContent: 'flex-end', mt: 2 }}>
-                    <Button
-                      variant="outlined"
-                      color="error"
-                      size="small"
-                      onClick={() => handleCancelClick(booking)}
-                      disabled={cancelling}
-                      sx={{ textTransform: 'none' }}
-                    >
-                      Cancel Booking
-                    </Button>
+                )}
+
+                {/* Past Sessions Tab */}
+                {activeTab === 1 && (
+                  <Box sx={{ mt: 2 }}>
+                    {loadingPastBookings ? (
+                      <Box
+                        sx={{
+                          display: 'flex',
+                          justifyContent: 'center',
+                          alignItems: 'center',
+                          minHeight: 200,
+                        }}
+                      >
+                        <CircularProgress />
+                      </Box>
+                    ) : pastBookingsError ? (
+                      <Alert severity="error">
+                        {pastBookingsError}
+                      </Alert>
+                    ) : pastBookings.length > 0 ? (
+                      pastBookings.map((booking) => (
+                        <Card key={booking.id} sx={{ mb: 2 }}>
+                          <CardContent>
+                            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 1 }}>
+                              <Box>
+                                <Typography variant="h6" component="h2">
+                                  {booking.sessionTypeName || 'Session'}
+                                </Typography>
+                                <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
+                                  {formatInstant(booking.startTimeInstant)} - {formatInstant(booking.endTimeInstant)}
+                                </Typography>
+                              </Box>
+                              <Chip
+                                label={booking.status || 'UNKNOWN'}
+                                color={getStatusColor(booking.status)}
+                                size="small"
+                              />
+                            </Box>
+                            {booking.clientMessage && (
+                              <>
+                                <Divider sx={{ my: 1 }} />
+                                <Typography variant="body2" color="text.secondary">
+                                  <strong>Message:</strong> {booking.clientMessage}
+                                </Typography>
+                              </>
+                            )}
+                            <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 1 }}>
+                              Created: {formatInstant(booking.createdAt)}
+                            </Typography>
+                          </CardContent>
+                        </Card>
+                      ))
+                    ) : (
+                      <Alert severity="info">
+                        No past bookings found.
+                      </Alert>
+                    )}
                   </Box>
-                </CardContent>
-              </Card>
-            ))}
-          </Box>
-                ) : (
-                  <Alert severity="info" sx={{ mt: 2 }}>
-                    No bookings found.
-                  </Alert>
                 )}
               </>
             )}
@@ -701,6 +1041,7 @@ const BookingPage = ({ sessionTypeId: propSessionTypeId }) => {
                 onChange={handleDateChange}
                 minDate={dayjs()}
                 sx={{ width: '100%' }}
+                firstDayOfWeek={1}
               />
             </Box>
           </Grid>
@@ -944,6 +1285,164 @@ const BookingPage = ({ sessionTypeId: propSessionTypeId }) => {
                 </>
               ) : (
                 'Cancel Booking'
+              )}
+            </Button>
+          </DialogActions>
+        </Dialog>
+
+        {/* Update Booking Dialog */}
+        <Dialog open={updateDialogOpen} onClose={handleUpdateDialogClose} maxWidth="md" fullWidth>
+          <DialogTitle>Update Session Date/Time</DialogTitle>
+          <DialogContent>
+            {bookingToUpdate && (
+              <>
+                <DialogContentText sx={{ mb: 2 }}>
+                  Select a new date and time for your <strong>{bookingToUpdate.sessionTypeName || 'Session'}</strong> booking.
+                </DialogContentText>
+
+                {updateBookingError && (
+                  <Alert severity="error" sx={{ mb: 2 }}>
+                    {updateBookingError}
+                  </Alert>
+                )}
+
+                <Grid container spacing={3} sx={{ mt: 1 }}>
+                  {/* Left Column - Date Calendar */}
+                  <Grid item xs={12} md={6}>
+                    <Box
+                      sx={{
+                        display: 'flex',
+                        justifyContent: 'center',
+                        border: 1,
+                        borderColor: 'divider',
+                        borderRadius: 2,
+                        p: 2,
+                        bgcolor: 'background.paper',
+                      }}
+                    >
+                      <DateCalendar
+                        value={updateSelectedDate}
+                        onChange={handleUpdateDateChange}
+                        minDate={dayjs()}
+                        sx={{ width: '100%' }}
+                        firstDayOfWeek={1}
+                      />
+                    </Box>
+                  </Grid>
+
+                  {/* Right Column - Available Slots */}
+                  <Grid item xs={12} md={6}>
+                    <Typography variant="h6" gutterBottom>
+                      Available Times on {formatDateForDisplay(updateSelectedDate)}
+                    </Typography>
+
+                    {updateSlotError && (
+                      <Alert severity="error" sx={{ mb: 2 }}>
+                        {updateSlotError}
+                      </Alert>
+                    )}
+
+                    {updateLoadingSlots ? (
+                      <Box
+                        sx={{
+                          display: 'flex',
+                          justifyContent: 'center',
+                          alignItems: 'center',
+                          minHeight: 200,
+                        }}
+                      >
+                        <CircularProgress />
+                      </Box>
+                    ) : updateAvailableSlots.length > 0 ? (
+                      <List>
+                        {updateAvailableSlots.map((slot, index) => {
+                          const startTime = slot.startTime 
+                            ? formatTime(slot.startTime) 
+                            : (slot.startTimeInstant ? formatTimeFromInstant(slot.startTimeInstant) : 'N/A');
+                          const endTime = slot.endTime 
+                            ? formatTime(slot.endTime) 
+                            : 'N/A';
+                          const isSelected = updateSelectedSlot?.startTimeInstant === slot.startTimeInstant;
+                          
+                          return (
+                            <ListItemButton
+                              key={slot.startTimeInstant || `slot-${index}`}
+                              onClick={() => handleUpdateSlotClick(slot)}
+                              selected={isSelected}
+                              sx={{
+                                border: 1,
+                                borderColor: isSelected ? 'primary.main' : 'divider',
+                                borderRadius: 1,
+                                mb: 1,
+                                bgcolor: isSelected ? 'action.selected' : 'transparent',
+                                '&:hover': {
+                                  bgcolor: 'action.hover',
+                                },
+                              }}
+                            >
+                              <Typography variant="body1">
+                                {startTime}{endTime !== 'N/A' ? ` - ${endTime}` : ''}
+                              </Typography>
+                            </ListItemButton>
+                          );
+                        })}
+                      </List>
+                    ) : (
+                      <Alert severity="info">
+                        No available sessions on this day. Please select another day.
+                      </Alert>
+                    )}
+                  </Grid>
+                </Grid>
+
+                <TextField
+                  fullWidth
+                  multiline
+                  rows={4}
+                  label="Message (Optional)"
+                  placeholder="Add any additional notes or questions..."
+                  value={updateClientMessage}
+                  onChange={(e) => {
+                    const value = e.target.value;
+                    if (value.length <= 2000) {
+                      setUpdateClientMessage(value);
+                    }
+                  }}
+                  disabled={updatingBooking}
+                  error={updateClientMessage.length > 2000}
+                  helperText={
+                    updateClientMessage.length > 2000
+                      ? 'Message must be 2000 characters or less'
+                      : `${updateClientMessage.length}/2000 characters`
+                  }
+                  sx={{ mt: 3 }}
+                />
+              </>
+            )}
+          </DialogContent>
+          <DialogActions>
+            <Button 
+              onClick={handleUpdateDialogClose} 
+              color="inherit"
+              disabled={updatingBooking}
+              sx={{ textTransform: 'none' }}
+            >
+              Cancel
+            </Button>
+            <Button 
+              onClick={handleConfirmUpdate} 
+              color="primary" 
+              variant="contained"
+              disabled={updatingBooking || !updateSelectedSlot || !updateSelectedSlot.startTimeInstant}
+              sx={{ textTransform: 'none' }}
+            >
+              {updatingBooking ? (
+                <>
+                  <CircularProgress size={16} sx={{ mr: 1 }} />
+                  Updating...
+                </>
+              ) : (
+                'Update Booking'
               )}
             </Button>
           </DialogActions>

@@ -184,8 +184,10 @@ const SignUpModal = ({ open, onClose, onSwitchToLogin }) => {
       // Close modal after 2 seconds
       setTimeout(() => {
         onClose();
-        // If token is available, user is logged in, otherwise they need to login
-        if (!signupToken && onSwitchToLogin) {
+        // If token is available, user is logged in, redirect to booking
+        if (signupToken) {
+          navigate('/booking');
+        } else if (onSwitchToLogin) {
           setTimeout(() => {
             onSwitchToLogin();
           }, 300);

@@ -9,11 +9,10 @@ const AdminRedirect = ({ children }) => {
   useEffect(() => {
     const token = getToken();
     
-    // Only redirect if user has admin role and is not on an admin route or session configuration
+    // Only redirect if user has admin role and is not on an admin route
     const isAdminRoute = location.pathname.startsWith('/admin');
-    const isSessionConfig = location.pathname === '/session/configuration';
     
-    if (token && hasAdminRole(token) && !isAdminRoute && !isSessionConfig) {
+    if (token && hasAdminRole(token) && !isAdminRoute) {
       navigate('/admin/dashboard', { replace: true });
     }
   }, [location.pathname, navigate]);

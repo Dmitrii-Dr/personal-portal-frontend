@@ -123,8 +123,8 @@ const LoginModal = ({ open, onClose, onSwitchToSignUp }) => {
           // Admin user - redirect to admin dashboard
           navigate('/admin/dashboard');
         } else {
-          // Regular user - stay on landing page
-          // The auth state change will update the UI
+          // Regular user - redirect to booking page
+          navigate('/booking');
         }
       } else {
         throw new Error('No token received from server');
