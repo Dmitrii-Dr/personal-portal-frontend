@@ -256,6 +256,14 @@ const AdminDashboard = () => {
             Blog
           </Button>
           <Button
+            variant="outlined"
+            color="primary"
+            onClick={() => navigate('/session/configuration')}
+            sx={{ textTransform: 'none' }}
+          >
+            Sessions Configuration
+          </Button>
+          <Button
             variant="contained"
             color="primary"
             onClick={handleAddPostOpen}

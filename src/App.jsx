@@ -13,6 +13,7 @@ import AdminBlogPage from './pages/AdminBlogPage';
 import AdminProfilePage from './pages/AdminProfilePage';
 import AdminHomePage from './pages/AdminHomePage';
 import AboutMePage from './pages/AboutMePage';
+import SessionsConfigurationPage from './pages/SessionsConfigurationPage';
 import AdminRoute from './components/AdminRoute';
 import AdminRedirect from './components/AdminRedirect';
 import ErrorBoundary from './components/ErrorBoundary';
@@ -580,6 +581,14 @@ function App() {
                         <Route path="profile" element={<AdminProfilePage />} />
                         {/* Add more admin routes here as needed */}
                       </Routes>
+                    </AdminRoute>
+                  }
+                />
+                <Route
+                  path="/session/configuration"
+                  element={
+                    <AdminRoute>
+                      <SessionsConfigurationPage />
                     </AdminRoute>
                   }
                 />
