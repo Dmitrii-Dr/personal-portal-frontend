@@ -136,7 +136,7 @@ const AdminHomePage = () => {
     const fetchSessionTypes = async () => {
       setLoadingSessionTypes(true);
       try {
-        const response = await fetchWithAuth('/api/v1/admin/session/type');
+        const response = await fetch('/api/v1/public/session/type');
         if (response.ok) {
           const data = await response.json();
           setSessionTypes(Array.isArray(data) ? data : []);
@@ -377,7 +377,7 @@ const AdminHomePage = () => {
       }
 
       // Refresh session types
-      const refreshResponse = await fetchWithAuth('/api/v1/admin/session/type');
+      const refreshResponse = await fetch('/api/v1/public/session/type');
       if (refreshResponse.ok) {
         const data = await refreshResponse.json();
         setSessionTypes(Array.isArray(data) ? data : []);
@@ -408,7 +408,7 @@ const AdminHomePage = () => {
       }
 
       // Refresh session types
-      const refreshResponse = await fetchWithAuth('/api/v1/admin/session/type');
+      const refreshResponse = await fetch('/api/v1/public/session/type');
       if (refreshResponse.ok) {
         const data = await refreshResponse.json();
         setSessionTypes(Array.isArray(data) ? data : []);
@@ -453,31 +453,6 @@ const AdminHomePage = () => {
         <Typography variant="h4" component="h1" gutterBottom>
           Home Page Management
         </Typography>
-        {error && (
-          <Alert severity="error" sx={{ mb: 2 }}>
-            {error}
-          </Alert>
-        )}
-        {saveSuccess && (
-          <Alert severity="success" sx={{ mb: 2 }}>
-            Changes saved successfully!
-          </Alert>
-        )}
-        <Button
-          variant="contained"
-          onClick={handleSaveWelcome}
-          disabled={saving}
-          sx={{ textTransform: 'none', mt: 2 }}
-        >
-          {saving ? (
-            <>
-              <CircularProgress size={20} sx={{ mr: 1 }} />
-              Saving...
-            </>
-          ) : (
-            'Save Changes'
-          )}
-        </Button>
       </Box>
 
       {/* Hero Section */}
@@ -488,31 +463,47 @@ const AdminHomePage = () => {
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
-          background: 'linear-gradient(135deg, #2C5F5F 0%, #1F4545 100%)',
+          position: 'relative',
           color: 'white',
           textAlign: 'center',
           py: 8,
+          overflow: 'hidden',
+          width: '100%',
+          '&::before': welcomeImageUrl ? {
+            content: '""',
+            position: 'absolute',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            width: '100%',
+            height: '100%',
+            backgroundImage: `url(${welcomeImageUrl})`,
+            backgroundSize: 'cover',
+            backgroundPosition: 'center center',
+            backgroundRepeat: 'no-repeat',
+            zIndex: 0,
+          } : {},
+          '&::after': welcomeImageUrl ? {
+            content: '""',
+            position: 'absolute',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            width: '100%',
+            height: '100%',
+            background: 'linear-gradient(135deg, rgba(44, 95, 95, 0.3) 0%, rgba(31, 69, 69, 0.4) 100%)',
+            zIndex: 0,
+          } : {},
+          background: welcomeImageUrl 
+            ? 'transparent'
+            : 'linear-gradient(135deg, #2C5F5F 0%, #1F4545 100%)',
         }}
       >
-        <Container maxWidth="md">
-          {/* Image Preview */}
+        <Container maxWidth="md" sx={{ position: 'relative', zIndex: 1 }}>
+          {/* Image Upload Button */}
           <Box sx={{ mb: 4, position: 'relative' }}>
-            {welcomeImageUrl && (
-              <Box
-                component="img"
-                src={welcomeImageUrl}
-                alt="Welcome"
-                sx={{
-                  maxWidth: { xs: '100%', md: '500px' },
-                  maxHeight: { xs: '300px', md: '400px' },
-                  width: 'auto',
-                  height: 'auto',
-                  objectFit: 'contain',
-                  borderRadius: 2,
-                  border: '2px solid rgba(255, 255, 255, 0.3)',
-                }}
-              />
-            )}
             <input
               accept="image/*"
               style={{ display: 'none' }}
@@ -534,7 +525,6 @@ const AdminHomePage = () => {
                 disabled={uploadingWelcomeImage}
                 sx={{ 
                   textTransform: 'none',
-                  mt: 2,
                   bgcolor: 'rgba(255, 255, 255, 0.2)',
                   '&:hover': { bgcolor: 'rgba(255, 255, 255, 0.3)' },
                 }}
@@ -846,6 +836,35 @@ const AdminHomePage = () => {
             </Grid>
           </Grid>
         </Container>
+      </Box>
+
+      {/* Save Changes Section */}
+      <Box sx={{ p: 2, bgcolor: 'background.paper', borderTop: 1, borderBottom: 1, borderColor: 'divider' }}>
+        {error && (
+          <Alert severity="error" sx={{ mb: 2 }}>
+            {error}
+          </Alert>
+        )}
+        {saveSuccess && (
+          <Alert severity="success" sx={{ mb: 2 }}>
+            Changes saved successfully!
+          </Alert>
+        )}
+        <Button
+          variant="contained"
+          onClick={handleSaveWelcome}
+          disabled={saving}
+          sx={{ textTransform: 'none' }}
+        >
+          {saving ? (
+            <>
+              <CircularProgress size={20} sx={{ mr: 1 }} />
+              Saving...
+            </>
+          ) : (
+            'Save Changes'
+          )}
+        </Button>
       </Box>
 
       {/* Session Types and Available Slots Section */}
