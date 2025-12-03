@@ -10,7 +10,9 @@ const AdminRedirect = ({ children }) => {
     const token = getToken();
     
     // Only redirect if user has admin role and is not on an admin route
-    if (token && hasAdminRole(token) && !location.pathname.startsWith('/admin')) {
+    const isAdminRoute = location.pathname.startsWith('/admin');
+    
+    if (token && hasAdminRole(token) && !isAdminRoute) {
       navigate('/admin/dashboard', { replace: true });
     }
   }, [location.pathname, navigate]);

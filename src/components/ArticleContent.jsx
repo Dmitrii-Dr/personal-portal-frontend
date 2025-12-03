@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Box, Typography, CircularProgress } from '@mui/material';
-import { fetchWithAuth } from '../utils/api';
+import { loadImageWithCache, getCachedImage } from '../utils/imageCache';
 
 // Component to fetch and display an authenticated image
 const AuthenticatedImage = ({ mediaId, width, height, alignment = 'center' }) => {
@@ -17,24 +17,19 @@ const AuthenticatedImage = ({ mediaId, width, height, alignment = 'center' }) =>
         setLoading(true);
         setError(null);
         
-        // Revoke previous object URL if it exists
-        if (objectUrlRef.current) {
-          URL.revokeObjectURL(objectUrlRef.current);
-          objectUrlRef.current = null;
+        // Check cache first (now async)
+        const cachedUrl = await getCachedImage(mediaId);
+        if (cachedUrl && isMounted) {
+          objectUrlRef.current = cachedUrl;
+          setImageUrl(cachedUrl);
+          setLoading(false);
+          return;
         }
         
-        const response = await fetchWithAuth(`/api/v1/media/image/${mediaId}`, {
-          method: 'GET',
-        });
-
-        if (!response.ok) {
-          throw new Error(`Failed to load image: ${response.status} ${response.statusText}`);
-        }
-
-        const blob = await response.blob();
+        // Load with cache (will fetch if not cached)
+        const objectUrl = await loadImageWithCache(mediaId);
         
         if (isMounted) {
-          const objectUrl = URL.createObjectURL(blob);
           objectUrlRef.current = objectUrl;
           setImageUrl(objectUrl);
           setLoading(false);
@@ -50,13 +45,12 @@ const AuthenticatedImage = ({ mediaId, width, height, alignment = 'center' }) =>
 
     loadImage();
 
-    // Cleanup: revoke object URL when component unmounts or mediaId changes
+    // Cleanup: don't revoke URLs as they're cached and might be used elsewhere
     return () => {
       isMounted = false;
-      if (objectUrlRef.current) {
-        URL.revokeObjectURL(objectUrlRef.current);
-        objectUrlRef.current = null;
-      }
+      // Note: We don't revoke the object URL here because it's cached
+      // and might be used by other components. The cache utility handles cleanup.
+      objectUrlRef.current = null;
     };
   }, [mediaId]);
 

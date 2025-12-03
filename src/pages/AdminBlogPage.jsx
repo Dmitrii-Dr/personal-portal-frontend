@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import apiClient, { fetchWithAuth } from '../utils/api';
 import CreateTagForm from '../components/CreateTagForm';
 import ArticleContent from '../components/ArticleContent';
+import { loadImageWithCache } from '../utils/imageCache';
 import {
   Card,
   CardContent,
@@ -383,11 +384,8 @@ const AdminBlogPage = () => {
     const urls = {};
     for (const mediaId of mediaIds) {
       try {
-        const response = await fetchWithAuth(`/api/v1/media/image/${mediaId}`);
-        if (response.ok) {
-          const blob = await response.blob();
-          urls[mediaId] = URL.createObjectURL(blob);
-        }
+        const objectUrl = await loadImageWithCache(mediaId);
+        urls[mediaId] = objectUrl;
       } catch (err) {
         console.error(`Error loading image ${mediaId}:`, err);
       }
@@ -853,14 +851,6 @@ const AdminBlogPage = () => {
           Admin Blog
         </Typography>
         <Box sx={{ display: 'flex', gap: 2, mb: 2 }}>
-          <Button
-            variant="outlined"
-            color="primary"
-            onClick={() => navigate('/admin/dashboard')}
-            sx={{ textTransform: 'none' }}
-          >
-            Dashboard
-          </Button>
           <Button
             variant="contained"
             color="primary"

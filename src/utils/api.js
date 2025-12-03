@@ -92,6 +92,23 @@ export const hasAdminRole = (token) => {
   return roles.includes('ROLE_ADMIN') || roles.includes('ADMIN_ROLE');
 };
 
+// Check if token is expired
+export const isTokenExpired = (token) => {
+  if (!token) return true;
+  
+  const decoded = decodeToken(token);
+  if (!decoded) return true;
+  
+  // Check if token has exp attribute
+  if (!decoded.exp) return false; // If no exp, assume not expired (let server handle it)
+  
+  // exp is in seconds since epoch, Date.now() is in milliseconds
+  const expirationTime = decoded.exp * 1000;
+  const currentTime = Date.now();
+  
+  return currentTime >= expirationTime;
+};
+
 // Create axios instance with default config
 const apiClient = axios.create({
   baseURL: '/',
@@ -105,6 +122,12 @@ apiClient.interceptors.request.use(
   (config) => {
     const token = getToken();
     if (token) {
+      // Check if token is expired before making request
+      if (isTokenExpired(token)) {
+        removeToken();
+        // Reject the request with a specific error
+        return Promise.reject(new Error('Token expired'));
+      }
       config.headers.Authorization = `Bearer ${token}`;
     } else {
       // Ensure Authorization header is not set if no token
@@ -121,10 +144,11 @@ apiClient.interceptors.request.use(
 apiClient.interceptors.response.use(
   (response) => response,
   (error) => {
-    // Handle 401 unauthorized errors - could clear token here if needed
+    // Handle 401 unauthorized errors - clear token on 401
     if (error.response?.status === 401) {
-      // Optionally clear token on 401
-      // removeToken();
+      removeToken();
+      // Dispatch event to notify components of token expiration
+      window.dispatchEvent(new Event('token-expired'));
     }
     return Promise.reject(error);
   }
@@ -133,6 +157,14 @@ apiClient.interceptors.response.use(
 // Helper function to add Authorization header to fetch requests
 export const fetchWithAuth = async (url, options = {}) => {
   const token = getToken();
+  
+  // Check if token is expired before making request
+  if (token && isTokenExpired(token)) {
+    removeToken();
+    window.dispatchEvent(new Event('token-expired'));
+    throw new Error('Token expired');
+  }
+  
   const headers = {
     ...options.headers,
   };
@@ -145,6 +177,21 @@ export const fetchWithAuth = async (url, options = {}) => {
     ...options,
     headers,
   });
+};
+
+// Admin API functions
+
+// Fetch grouped bookings for admin
+export const fetchAdminGroupedBookings = async (status = null) => {
+  const params = {};
+  if (status) {
+    params.status = status;
+  }
+  const response = await apiClient.get('/api/v1/admin/session/booking/group', {
+    params,
+    timeout: 10000,
+  });
+  return response.data;
 };
 
 // Export configured axios instance

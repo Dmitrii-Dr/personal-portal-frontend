@@ -1,13 +1,10 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   Box,
   Typography,
-  Card,
-  CardContent,
   Alert,
   CircularProgress,
-  Paper,
   Button,
   Dialog,
   DialogTitle,
@@ -21,16 +18,15 @@ import {
   Grid,
   Chip,
   Stack,
+  Divider,
 } from '@mui/material';
 import apiClient from '../utils/api';
 import { fetchWithAuth } from '../utils/api';
 import CreateTagForm from '../components/CreateTagForm';
+import BookingsManagement from '../components/BookingsManagement';
 
 const AdminDashboard = () => {
   const navigate = useNavigate();
-  const [dashboardData, setDashboardData] = useState(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
   const [addPostOpen, setAddPostOpen] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState('');
@@ -49,32 +45,6 @@ const AdminDashboard = () => {
   const [loadingTags, setLoadingTags] = useState(false);
   const [selectedTagIds, setSelectedTagIds] = useState([]);
   const [showCreateTagForm, setShowCreateTagForm] = useState(false);
-
-  const fetchDashboard = async () => {
-    setLoading(true);
-    setError(null);
-
-    try {
-      const response = await fetchWithAuth('/api/v1/admin/dashboard');
-      
-      if (!response.ok) {
-        throw new Error(`Failed to load dashboard: ${response.status} ${response.statusText}`);
-      }
-
-      const data = await response.json();
-      setDashboardData(data);
-    } catch (err) {
-      console.error('Error fetching dashboard:', err);
-      setError(err.message || 'Failed to load dashboard data');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  // Fetch dashboard data on mount (authorization is handled by AdminRoute)
-  useEffect(() => {
-    fetchDashboard();
-  }, []);
 
   const handleAddPostOpen = () => {
     setAddPostOpen(true);
@@ -221,9 +191,8 @@ const AdminDashboard = () => {
         );
       }
 
-      // Success - close dialog and refresh dashboard
+      // Success - close dialog
       handleAddPostClose();
-      fetchDashboard();
     } catch (err) {
       console.error('Error creating article:', err);
       setSubmitError(err.message || 'Failed to create article. Please try again.');
@@ -234,72 +203,18 @@ const AdminDashboard = () => {
 
   return (
     <Box>
-      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
+      <Box sx={{ mb: 3 }}>
         <Typography variant="h4" component="h1">
           Admin Dashboard
         </Typography>
-        <Box sx={{ display: 'flex', gap: 2 }}>
-          <Button
-            variant="outlined"
-            color="primary"
-            onClick={() => navigate('/admin/blog')}
-            sx={{ textTransform: 'none' }}
-          >
-            Blog
-          </Button>
-          <Button
-            variant="contained"
-            color="primary"
-            onClick={handleAddPostOpen}
-            sx={{ textTransform: 'none' }}
-          >
-            Add Post
-          </Button>
-        </Box>
       </Box>
 
-      {loading && (
-        <Box
-          sx={{
-            display: 'flex',
-            justifyContent: 'center',
-            alignItems: 'center',
-            minHeight: 200,
-          }}
-        >
-          <CircularProgress />
-        </Box>
-      )}
+      <Divider sx={{ my: 4 }} />
 
-      {error && (
-        <Alert severity="error" sx={{ mb: 2 }}>
-          {error}
-        </Alert>
-      )}
+      {/* Bookings Management */}
+      <BookingsManagement />
 
-      {!loading && !error && dashboardData && (
-        <Card>
-          <CardContent>
-            <Typography variant="h6" gutterBottom>
-              Dashboard Response:
-            </Typography>
-            <Paper
-              variant="outlined"
-              sx={{
-                p: 2,
-                mt: 2,
-                bgcolor: 'background.default',
-                overflow: 'auto',
-                maxHeight: 600,
-              }}
-            >
-              <pre style={{ margin: 0, whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>
-                {JSON.stringify(dashboardData, null, 2)}
-              </pre>
-            </Paper>
-          </CardContent>
-        </Card>
-      )}
+      <Divider sx={{ my: 4 }} />
 
       {/* Add Post Dialog */}
       <Dialog open={addPostOpen} onClose={handleAddPostClose} maxWidth="md" fullWidth>
