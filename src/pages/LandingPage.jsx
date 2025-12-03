@@ -24,6 +24,18 @@ import {
   IconButton,
 } from '@mui/material';
 import CloseIcon from '@mui/icons-material/Close';
+import ArrowBackIosIcon from '@mui/icons-material/ArrowBackIos';
+import ArrowForwardIosIcon from '@mui/icons-material/ArrowForwardIos';
+import TelegramIcon from '@mui/icons-material/Telegram';
+import LinkedInIcon from '@mui/icons-material/LinkedIn';
+import GitHubIcon from '@mui/icons-material/GitHub';
+import EmailIcon from '@mui/icons-material/Email';
+import LanguageIcon from '@mui/icons-material/Language';
+import PhoneIcon from '@mui/icons-material/Phone';
+import InstagramIcon from '@mui/icons-material/Instagram';
+import TwitterIcon from '@mui/icons-material/Twitter';
+import FacebookIcon from '@mui/icons-material/Facebook';
+import YouTubeIcon from '@mui/icons-material/YouTube';
 import dayjs from 'dayjs';
 import axios from 'axios';
 import apiClient from '../utils/api';
@@ -49,6 +61,8 @@ const LandingPage = () => {
   const [welcomeImageUrl, setWelcomeImageUrl] = useState(null);
   const [aboutImageUrl, setAboutImageUrl] = useState(null);
   const [educationImageUrl, setEducationImageUrl] = useState(null);
+  const [reviewImageUrls, setReviewImageUrls] = useState([]);
+  const [reviewCarouselIndex, setReviewCarouselIndex] = useState(0);
   const educationRef = useRef(null);
   const [contactForm, setContactForm] = useState({
     name: '',
@@ -66,6 +80,25 @@ const LandingPage = () => {
   const [selectedSessionTypeId, setSelectedSessionTypeId] = useState(null);
   const [selectedSessionType, setSelectedSessionType] = useState(null);
   const [bookingDialogOpen, setBookingDialogOpen] = useState(false);
+
+  // Footer/Contact Links
+  // Data comes from /api/v1/public/welcome response in the "contact" field
+  // Expected backend response format:
+  // {
+  //   "contact": [
+  //     {
+  //       "platform": "Telegram",  // Required: Platform name (Telegram, LinkedIn, GitHub, Email, Phone, Instagram, Twitter, Facebook, YouTube, WhatsApp, Website, B17)
+  //       "value": "https://t.me/username",  // Required: URL or contact value
+  //       "description": "Personal Account"  // Optional: Short description/label
+  //     },
+  //     {
+  //       "platform": "Telegram",
+  //       "value": "https://t.me/channel",
+  //       "description": "Channel"
+  //     }
+  //   ]
+  // }
+  const [contactLinks, setContactLinks] = useState([]);
 
   // Load image from mediaId with caching
   const loadImage = async (mediaId, type) => {
@@ -118,6 +151,50 @@ const LandingPage = () => {
           loadImage(data.educationMediaId, 'education').catch(err => {
             console.error('Error loading education image:', err);
           });
+        }
+        
+        // Load review images if reviewMediaIds exist
+        if (data.reviewMediaIds && Array.isArray(data.reviewMediaIds) && data.reviewMediaIds.length > 0) {
+          const loadReviewImages = async () => {
+            const imagePromises = data.reviewMediaIds.map(mediaId => 
+              loadImageWithCache(mediaId).catch(err => {
+                console.error(`Error loading review image ${mediaId}:`, err);
+                return null;
+              })
+            );
+            const urls = await Promise.all(imagePromises);
+            setReviewImageUrls(urls.filter(url => url !== null));
+          };
+          loadReviewImages();
+        }
+        
+        // Load contact links if available
+        if (data.contact && Array.isArray(data.contact)) {
+          setContactLinks(data.contact);
+        } else {
+          // Fallback to stub data if no contact data
+          setContactLinks([
+            {
+              platform: 'Telegram',
+              value: 'https://t.me/example',
+              description: 'Telegram',
+            },
+            {
+              platform: 'LinkedIn',
+              value: 'https://www.linkedin.com/in/example',
+              description: 'LinkedIn',
+            },
+            {
+              platform: 'GitHub',
+              value: 'https://github.com/example',
+              description: 'GitHub',
+            },
+            {
+              platform: 'Email',
+              value: 'mailto:contact@example.com',
+              description: 'Email',
+            },
+          ]);
         }
       } catch (error) {
         console.error('Error fetching welcome data:', error);
@@ -587,6 +664,207 @@ const LandingPage = () => {
         </Container>
       </Box>
 
+      {/* Testimonials/Reviews Section */}
+      {welcomeData?.reviewMessage || (reviewImageUrls && reviewImageUrls.length > 0) ? (
+        <Box
+          ref={testimonialsRef}
+          id="testimonials"
+          component="section"
+          sx={{
+            py: { xs: 6, md: 10 },
+            bgcolor: 'background.paper',
+            scrollMarginTop: '64px',
+          }}
+        >
+          <Container maxWidth="lg">
+            {/* Header with line above */}
+            <Box sx={{ mb: 4, textAlign: 'center' }}>
+              <Box sx={{ display: 'flex', justifyContent: 'center', mb: 2 }}>
+                <Divider 
+                  sx={{ 
+                    width: '60px', 
+                    height: '2px', 
+                    bgcolor: 'black',
+                  }} 
+                />
+              </Box>
+              <Typography
+                variant="h2"
+                component="h2"
+                sx={{
+                  fontSize: { xs: '2rem', sm: '2.5rem', md: '3rem' },
+                  fontWeight: 700,
+                  color: 'black',
+                  letterSpacing: '0.05em',
+                  textTransform: 'uppercase',
+                  fontFamily: 'sans-serif',
+                  mb: 3,
+                }}
+              >
+                TESTIMONIALS
+              </Typography>
+            </Box>
+
+            {/* Review Message */}
+            {welcomeData?.reviewMessage && (
+              <Box sx={{ mb: 6, textAlign: 'center', maxWidth: '800px', mx: 'auto', px: { xs: 2, sm: 4 } }}>
+                <Typography
+                  variant="body1"
+                  sx={{
+                    fontSize: { xs: '0.95rem', md: '1rem' },
+                    lineHeight: 1.8,
+                    color: 'text.primary',
+                    whiteSpace: 'pre-wrap',
+                    fontFamily: 'sans-serif',
+                  }}
+                >
+                  {welcomeData.reviewMessage}
+                </Typography>
+              </Box>
+            )}
+
+            {/* Review Images Carousel */}
+            {reviewImageUrls && reviewImageUrls.length > 0 && (
+              <Box sx={{ position: 'relative', width: '100%' }}>
+                <Box
+                  sx={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: 2,
+                    position: 'relative',
+                  }}
+                >
+                  {/* Left Arrow */}
+                  {reviewImageUrls.length > 3 && (
+                    <IconButton
+                      onClick={() => {
+                        setReviewCarouselIndex((prev) => {
+                          if (prev === 0) {
+                            // Wrap to end
+                            return reviewImageUrls.length - 3;
+                          }
+                          return prev - 1;
+                        });
+                      }}
+                      sx={{
+                        position: 'absolute',
+                        left: { xs: -10, md: -40 },
+                        zIndex: 2,
+                        bgcolor: 'white',
+                        boxShadow: 2,
+                        '&:hover': {
+                          bgcolor: 'grey.100',
+                        },
+                      }}
+                    >
+                      <ArrowBackIosIcon />
+                    </IconButton>
+                  )}
+
+                  {/* Image Frames Container */}
+                  <Box
+                    sx={{
+                      display: 'flex',
+                      gap: 2,
+                      overflow: 'hidden',
+                      width: '100%',
+                      justifyContent: 'center',
+                      maxWidth: { xs: '100%', md: '900px' },
+                    }}
+                  >
+                    {Array.from({ length: 3 }).map((_, frameIndex) => {
+                      const imageIndex = reviewCarouselIndex + frameIndex;
+                      const imageUrl = reviewImageUrls[imageIndex] || null;
+                      
+                      return (
+                        <Box
+                          key={frameIndex}
+                          sx={{
+                            flex: '1 1 0',
+                            minWidth: 0,
+                            maxWidth: { xs: '100%', sm: '300px' },
+                            aspectRatio: '4/3',
+                            position: 'relative',
+                            overflow: 'hidden',
+                            bgcolor: '#F0F7F7',
+                            border: '1px solid',
+                            borderColor: 'divider',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                          }}
+                        >
+                          {imageUrl ? (
+                            <Box
+                              component="img"
+                              src={imageUrl}
+                              alt={`Review ${imageIndex + 1}`}
+                              sx={{
+                                width: '100%',
+                                height: '100%',
+                                objectFit: 'contain',
+                              }}
+                            />
+                          ) : (
+                            <Box
+                              sx={{
+                                width: '100%',
+                                height: '100%',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                bgcolor: '#E0E0E0',
+                              }}
+                            >
+                              <Typography
+                                variant="body2"
+                                color="text.secondary"
+                                sx={{ fontStyle: 'italic' }}
+                              >
+                                {imageIndex < reviewImageUrls.length ? 'Loading...' : ''}
+                              </Typography>
+                            </Box>
+                          )}
+                        </Box>
+                      );
+                    })}
+                  </Box>
+
+                  {/* Right Arrow */}
+                  {reviewImageUrls.length > 3 && (
+                    <IconButton
+                      onClick={() => {
+                        const maxIndex = reviewImageUrls.length - 3;
+                        setReviewCarouselIndex((prev) => {
+                          if (prev >= maxIndex) {
+                            // Wrap to beginning
+                            return 0;
+                          }
+                          return prev + 1;
+                        });
+                      }}
+                      sx={{
+                        position: 'absolute',
+                        right: { xs: -10, md: -40 },
+                        zIndex: 2,
+                        bgcolor: 'white',
+                        boxShadow: 2,
+                        '&:hover': {
+                          bgcolor: 'grey.100',
+                        },
+                      }}
+                    >
+                      <ArrowForwardIosIcon />
+                    </IconButton>
+                  )}
+                </Box>
+              </Box>
+            )}
+          </Container>
+        </Box>
+      ) : null}
+
       {/* Services Section */}
       <Box
         ref={servicesRef}
@@ -799,68 +1077,6 @@ const LandingPage = () => {
         </DialogContent>
       </Dialog>
 
-      {/* Testimonials Section */}
-      <Box
-        ref={testimonialsRef}
-        id="testimonials"
-        component="section"
-        sx={{
-          py: 8,
-          bgcolor: '#F0F7F7', // Light teal tint background
-          scrollMarginTop: '64px',
-        }}
-      >
-        <Container maxWidth="lg">
-          <Typography
-            variant="h3"
-            component="h2"
-            align="center"
-            gutterBottom
-            sx={{ mb: 4, fontWeight: 600 }}
-          >
-            Testimonials
-          </Typography>
-          <Grid container spacing={3}>
-            <Grid item xs={12} md={4}>
-              <Card>
-                <CardContent>
-                  <Typography variant="body1" sx={{ mb: 2, fontStyle: 'italic' }}>
-                    "This coaching has transformed my life. I couldn't be happier with the
-                    results!"
-                  </Typography>
-                  <Typography variant="subtitle2" color="text.secondary">
-                    - Client Name
-                  </Typography>
-                </CardContent>
-              </Card>
-            </Grid>
-            <Grid item xs={12} md={4}>
-              <Card>
-                <CardContent>
-                  <Typography variant="body1" sx={{ mb: 2, fontStyle: 'italic' }}>
-                    "Professional, insightful, and truly caring. Highly recommend!"
-                  </Typography>
-                  <Typography variant="subtitle2" color="text.secondary">
-                    - Client Name
-                  </Typography>
-                </CardContent>
-              </Card>
-            </Grid>
-            <Grid item xs={12} md={4}>
-              <Card>
-                <CardContent>
-                  <Typography variant="body1" sx={{ mb: 2, fontStyle: 'italic' }}>
-                    "The best investment I've made in myself. Thank you!"
-                  </Typography>
-                  <Typography variant="subtitle2" color="text.secondary">
-                    - Client Name
-                  </Typography>
-                </CardContent>
-              </Card>
-            </Grid>
-          </Grid>
-        </Container>
-      </Box>
 
       {/* Contact Section */}
       <Box
@@ -960,6 +1176,230 @@ const LandingPage = () => {
               </Box>
             </CardContent>
           </Card>
+        </Container>
+      </Box>
+
+      {/* Footer/Contact Links Section */}
+      <Box
+        component="footer"
+        sx={{
+          py: { xs: 6, md: 8 },
+          bgcolor: '#1F4545',
+          color: 'white',
+          scrollMarginTop: '64px',
+        }}
+      >
+        <Container maxWidth="lg">
+          <Typography
+            variant="h4"
+            component="h2"
+            align="center"
+            gutterBottom
+            sx={{
+              mb: 4,
+              fontWeight: 600,
+              fontSize: { xs: '1.5rem', md: '2rem' },
+            }}
+          >
+            Connect With Me
+          </Typography>
+          <Typography
+            variant="body1"
+            align="center"
+            sx={{
+              mb: 4,
+              opacity: 0.9,
+              fontSize: { xs: '0.9rem', md: '1rem' },
+            }}
+          >
+            Follow me on social media or reach out directly
+          </Typography>
+          
+          {/* Social Links */}
+          <Box
+            sx={{
+              display: 'flex',
+              justifyContent: 'center',
+              alignItems: 'center',
+              flexWrap: 'wrap',
+              gap: { xs: 2, sm: 3, md: 4 },
+            }}
+          >
+            {contactLinks.map((link, index) => {
+              // Map platform name to icon component
+              const getIcon = (platform) => {
+                const platformLower = (platform || '').toLowerCase();
+                switch (platformLower) {
+                  case 'telegram':
+                    return <TelegramIcon sx={{ fontSize: { xs: 32, md: 40 } }} />;
+                  case 'linkedin':
+                    return <LinkedInIcon sx={{ fontSize: { xs: 32, md: 40 } }} />;
+                  case 'github':
+                    return <GitHubIcon sx={{ fontSize: { xs: 32, md: 40 } }} />;
+                  case 'email':
+                    return <EmailIcon sx={{ fontSize: { xs: 32, md: 40 } }} />;
+                  case 'phone':
+                    return <PhoneIcon sx={{ fontSize: { xs: 32, md: 40 } }} />;
+                  case 'instagram':
+                    return <InstagramIcon sx={{ fontSize: { xs: 32, md: 40 } }} />;
+                  case 'twitter':
+                    return <TwitterIcon sx={{ fontSize: { xs: 32, md: 40 } }} />;
+                  case 'facebook':
+                    return <FacebookIcon sx={{ fontSize: { xs: 32, md: 40 } }} />;
+                  case 'youtube':
+                    return <YouTubeIcon sx={{ fontSize: { xs: 32, md: 40 } }} />;
+                  case 'whatsapp':
+                    return (
+                      <Box
+                        component="img"
+                        src="https://upload.wikimedia.org/wikipedia/commons/6/6b/WhatsApp.svg"
+                        alt="WhatsApp"
+                        sx={{
+                          width: { xs: 32, md: 40 },
+                          height: { xs: 32, md: 40 },
+                          objectFit: 'contain',
+                          filter: 'brightness(0) invert(1)',
+                        }}
+                        onError={(e) => {
+                          // Fallback: show text if image fails to load
+                          e.target.style.display = 'none';
+                          const parent = e.target.parentElement;
+                          if (parent && !parent.querySelector('.whatsapp-fallback')) {
+                            const fallback = document.createElement('span');
+                            fallback.className = 'whatsapp-fallback';
+                            fallback.textContent = 'WA';
+                            fallback.style.cssText = 'font-size: 18px; font-weight: bold; color: white; display: flex; align-items: center; justify-content: center;';
+                            parent.appendChild(fallback);
+                          }
+                        }}
+                      />
+                    );
+                  case 'website':
+                    return <LanguageIcon sx={{ fontSize: { xs: 32, md: 40 } }} />;
+                  case 'b17':
+                    return (
+                      <Box
+                        component="img"
+                        src="https://www.b17.ru/favicon.ico"
+                        alt="B17"
+                        sx={{
+                          width: { xs: 32, md: 40 },
+                          height: { xs: 32, md: 40 },
+                          objectFit: 'contain',
+                          filter: 'brightness(0) invert(1)',
+                        }}
+                        onError={(e) => {
+                          // Fallback: show text if image fails to load
+                          e.target.style.display = 'none';
+                          const parent = e.target.parentElement;
+                          if (parent && !parent.querySelector('.b17-fallback')) {
+                            const fallback = document.createElement('span');
+                            fallback.className = 'b17-fallback';
+                            fallback.textContent = 'B17';
+                            fallback.style.cssText = 'font-size: 18px; font-weight: bold; color: white; display: flex; align-items: center; justify-content: center;';
+                            parent.appendChild(fallback);
+                          }
+                        }}
+                      />
+                    );
+                  default:
+                    return <LanguageIcon sx={{ fontSize: { xs: 32, md: 40 } }} />;
+                }
+              };
+
+              // Get display label
+              const getLabel = (link) => {
+                if (link.description) {
+                  return link.description;
+                }
+                return link.platform || 'Link';
+              };
+
+              return (
+                <Box
+                  key={index}
+                  component="a"
+                  href={link.value}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  sx={{
+                    display: 'flex',
+                    flexDirection: 'column',
+                    alignItems: 'center',
+                    justifyContent: 'flex-start',
+                    textDecoration: 'none',
+                    color: 'white',
+                    transition: 'all 0.3s ease-in-out',
+                    width: { xs: 80, sm: 100, md: 120 },
+                    minHeight: { xs: 100, md: 110 },
+                    '&:hover': {
+                      transform: 'translateY(-4px)',
+                      opacity: 0.8,
+                    },
+                  }}
+                >
+                  <Box
+                    sx={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      width: { xs: 56, md: 72 },
+                      height: { xs: 56, md: 72 },
+                      borderRadius: '50%',
+                      bgcolor: 'rgba(255, 255, 255, 0.1)',
+                      mb: 1.5,
+                      flexShrink: 0,
+                      transition: 'all 0.3s ease-in-out',
+                      '&:hover': {
+                        bgcolor: 'rgba(255, 255, 255, 0.2)',
+                        transform: 'scale(1.1)',
+                      },
+                    }}
+                  >
+                    {getIcon(link.platform)}
+                  </Box>
+                  <Typography
+                    variant="caption"
+                    sx={{
+                      fontSize: { xs: '0.75rem', md: '0.875rem' },
+                      textAlign: 'center',
+                      opacity: 0.9,
+                      width: '100%',
+                      minHeight: { xs: '2.5em', md: '2.5em' },
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      lineHeight: 1.3,
+                      wordBreak: 'break-word',
+                      hyphens: 'auto',
+                    }}
+                  >
+                    {getLabel(link)}
+                  </Typography>
+                </Box>
+              );
+            })}
+          </Box>
+
+          {/* Copyright */}
+          <Box
+            sx={{
+              mt: 6,
+              pt: 4,
+              borderTop: '1px solid rgba(255, 255, 255, 0.1)',
+              textAlign: 'center',
+            }}
+          >
+            <Typography
+              variant="body2"
+              sx={{
+                opacity: 0.7,
+                fontSize: { xs: '0.75rem', md: '0.875rem' },
+              }}
+            >
+              © {new Date().getFullYear()} All rights reserved.
+            </Typography>
+          </Box>
         </Container>
       </Box>
     </Box>

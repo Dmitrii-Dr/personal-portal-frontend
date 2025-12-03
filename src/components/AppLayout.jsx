@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
-import { fetchWithAuth, getToken, removeToken, decodeToken } from '../utils/api';
+import { fetchWithAuth, getToken, removeToken, decodeToken, isTokenExpired } from '../utils/api';
 import {
   AppBar,
   Toolbar,
@@ -132,7 +132,16 @@ const AppLayout = ({ children }) => {
   // Check token on mount and listen for storage changes
   useEffect(() => {
     const checkToken = () => {
-      const tokenExists = !!getToken();
+      const token = getToken();
+      const tokenExists = !!token;
+      
+      // Check if token is expired
+      if (tokenExists && isTokenExpired(token)) {
+        // Token expired, log out user
+        handleLogout();
+        return;
+      }
+      
       setHasToken(tokenExists);
       if (tokenExists) {
         fetchUserProfile();
@@ -157,13 +166,20 @@ const AppLayout = ({ children }) => {
       checkToken();
     };
 
+    // Listen for token expiration event
+    const handleTokenExpired = () => {
+      handleLogout();
+    };
+
     // Check when window regains focus (user might have logged in in another tab)
     window.addEventListener('storage', handleStorageChange);
     window.addEventListener('auth-changed', handleLogin);
+    window.addEventListener('token-expired', handleTokenExpired);
 
     return () => {
       window.removeEventListener('storage', handleStorageChange);
       window.removeEventListener('auth-changed', handleLogin);
+      window.removeEventListener('token-expired', handleTokenExpired);
     };
   }, [fetchUserProfile]);
 
@@ -290,6 +306,21 @@ const AppLayout = ({ children }) => {
       }, 100);
     }
   }, [location.pathname, navigate, isAdminRoute]);
+
+  // Periodic token expiration check
+  useEffect(() => {
+    // Check token expiration every 5 minutes
+    const checkInterval = setInterval(() => {
+      const token = getToken();
+      if (token && isTokenExpired(token)) {
+        handleLogout();
+      }
+    }, 300000); // Check every 5 minutes (300000 ms)
+
+    return () => {
+      clearInterval(checkInterval);
+    };
+  }, []);
 
   // Fetch about me data when dialog opens
   useEffect(() => {
