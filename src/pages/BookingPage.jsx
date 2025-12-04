@@ -80,6 +80,7 @@ const BookingPage = ({ sessionTypeId: propSessionTypeId }) => {
   const [updateClientMessage, setUpdateClientMessage] = useState('');
   const [updatingBooking, setUpdatingBooking] = useState(false);
   const [updateBookingError, setUpdateBookingError] = useState(null);
+  const [updateSessionTypeId, setUpdateSessionTypeId] = useState(null); // Matched session type ID for update
   const navigate = useNavigate();
   
   const PENDING_BOOKING_KEY = 'pending_booking';
@@ -376,7 +377,7 @@ const BookingPage = ({ sessionTypeId: propSessionTypeId }) => {
   };
 
   // Handle update booking click
-  const handleUpdateClick = (booking) => {
+  const handleUpdateClick = async (booking) => {
     setBookingToUpdate(booking);
     setUpdateSelectedDate(dayjs());
     setUpdateAvailableSlots([]);
@@ -384,9 +385,34 @@ const BookingPage = ({ sessionTypeId: propSessionTypeId }) => {
     setUpdateSelectedSlot(null);
     setUpdateClientMessage(booking.clientMessage || '');
     setUpdateBookingError(null);
+    setUpdateSessionTypeId(null);
     setUpdateDialogOpen(true);
-    // Fetch slots for the booking's session type
-    fetchUpdateSlots(dayjs(), booking.sessionTypeId || booking.sessionType?.id);
+    
+    // Fetch active session types and match by name to find the session type ID
+    try {
+      const response = await apiClient.get('/api/v1/public/session/type', {
+        timeout: 10000,
+      });
+      if (response.data && Array.isArray(response.data)) {
+        // Match booking session name to find the session type
+        const matchedSessionType = response.data.find(
+          st => st.name === booking.sessionName
+        );
+        if (matchedSessionType) {
+          const sessionTypeId = matchedSessionType.id || matchedSessionType.sessionTypeId;
+          setUpdateSessionTypeId(sessionTypeId);
+          // Fetch slots for the matched session type
+          fetchUpdateSlots(dayjs(), sessionTypeId);
+        } else {
+          setUpdateSlotError(`Session type "${booking.sessionName}" is no longer available for booking.`);
+        }
+      } else {
+        setUpdateSlotError('Failed to load session types.');
+      }
+    } catch (err) {
+      console.error('Error fetching session types for update:', err);
+      setUpdateSlotError('Failed to load session types. Please try again.');
+    }
   };
 
   // Fetch available slots for update (similar to fetchAvailableSlots but for specific session type)
@@ -454,9 +480,8 @@ const BookingPage = ({ sessionTypeId: propSessionTypeId }) => {
   // Handle update date change
   const handleUpdateDateChange = (newDate) => {
     setUpdateSelectedDate(newDate);
-    if (bookingToUpdate) {
-      const sessionTypeId = bookingToUpdate.sessionTypeId || bookingToUpdate.sessionType?.id;
-      fetchUpdateSlots(newDate, sessionTypeId);
+    if (updateSessionTypeId) {
+      fetchUpdateSlots(newDate, updateSessionTypeId);
     }
   };
 
@@ -475,6 +500,7 @@ const BookingPage = ({ sessionTypeId: propSessionTypeId }) => {
     setUpdateBookingError(null);
     setUpdateAvailableSlots([]);
     setUpdateSlotError(null);
+    setUpdateSessionTypeId(null);
   };
 
   // Handle booking update confirmation
@@ -844,7 +870,7 @@ const BookingPage = ({ sessionTypeId: propSessionTypeId }) => {
                             <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 1 }}>
                               <Box>
                                 <Typography variant="h6" component="h2">
-                                  {booking.sessionTypeName || 'Session'}
+                                  {booking.sessionName || 'Session'}
                                 </Typography>
                                 <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
                                   {formatInstant(booking.startTimeInstant)} - {formatInstant(booking.endTimeInstant)}
@@ -945,7 +971,7 @@ const BookingPage = ({ sessionTypeId: propSessionTypeId }) => {
                             <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 1 }}>
                               <Box>
                                 <Typography variant="h6" component="h2">
-                                  {booking.sessionTypeName || 'Session'}
+                                  {booking.sessionName || 'Session'}
                                 </Typography>
                                 <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
                                   {formatInstant(booking.startTimeInstant)} - {formatInstant(booking.endTimeInstant)}
@@ -1255,7 +1281,7 @@ const BookingPage = ({ sessionTypeId: propSessionTypeId }) => {
                   <br />
                   <br />
                   <strong>
-                    {bookingToCancel.sessionTypeName || 'Session'} on{' '}
+                    {bookingToCancel.sessionName || 'Session'} on{' '}
                     {formatInstant(bookingToCancel.startTimeInstant)}
                   </strong>
                 </>
@@ -1297,7 +1323,7 @@ const BookingPage = ({ sessionTypeId: propSessionTypeId }) => {
             {bookingToUpdate && (
               <>
                 <DialogContentText sx={{ mb: 2 }}>
-                  Select a new date and time for your <strong>{bookingToUpdate.sessionTypeName || 'Session'}</strong> booking.
+                  Select a new date and time for your <strong>{bookingToUpdate.sessionName || 'Session'}</strong> booking.
                 </DialogContentText>
 
                 {updateBookingError && (

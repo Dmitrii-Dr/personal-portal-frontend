@@ -992,165 +992,171 @@ const LandingPage = () => {
       </Box>
 
       {/* Blog Section */}
-      {welcomeData?.welcomeArticleIds && Array.isArray(welcomeData.welcomeArticleIds) && welcomeData.welcomeArticleIds.length > 0 && (
-        <Box
-          ref={blogRef}
-          id="blog"
-          component="section"
-          sx={{
-            py: { xs: 6, md: 10 },
-            bgcolor: 'background.paper',
-            scrollMarginTop: '64px',
-          }}
-        >
-          <Container maxWidth="lg">
-            {/* Header with line above */}
-            <Box sx={{ mb: 4, textAlign: 'center' }}>
-              <Box sx={{ display: 'flex', justifyContent: 'center', mb: 2 }}>
-                <Divider 
-                  sx={{ 
-                    width: '60px', 
-                    height: '2px', 
-                    bgcolor: 'black',
-                  }} 
-                />
-              </Box>
-              <Typography
-                variant="h2"
-                component="h2"
-                sx={{
-                  fontSize: { xs: '2rem', sm: '2.5rem', md: '3rem' },
-                  fontWeight: 700,
-                  color: 'black',
-                  letterSpacing: '0.05em',
-                  textTransform: 'uppercase',
-                  fontFamily: 'sans-serif',
-                  mb: 3,
-                }}
-              >
-                BLOG
-              </Typography>
+      <Box
+        ref={blogRef}
+        id="blog"
+        component="section"
+        sx={{
+          py: { xs: 6, md: 10 },
+          bgcolor: 'background.paper',
+          scrollMarginTop: '64px',
+        }}
+      >
+        <Container maxWidth="lg">
+          {/* Header with line above */}
+          <Box sx={{ mb: 4, textAlign: 'center' }}>
+            <Box sx={{ display: 'flex', justifyContent: 'center', mb: 2 }}>
+              <Divider 
+                sx={{ 
+                  width: '60px', 
+                  height: '2px', 
+                  bgcolor: 'black',
+                }} 
+              />
             </Box>
+            <Typography
+              variant="h2"
+              component="h2"
+              sx={{
+                fontSize: { xs: '2rem', sm: '2.5rem', md: '3rem' },
+                fontWeight: 700,
+                color: 'black',
+                letterSpacing: '0.05em',
+                textTransform: 'uppercase',
+                fontFamily: 'sans-serif',
+                mb: 3,
+              }}
+            >
+              BLOG
+            </Typography>
+          </Box>
 
-            {blogLoading ? (
-              <Box sx={{ display: 'flex', justifyContent: 'center', py: 4 }}>
-                <CircularProgress />
-              </Box>
-            ) : blogError ? (
-              <Alert severity="error" sx={{ mb: 3 }}>
-                {blogError}
-              </Alert>
-            ) : blogArticles.length > 0 ? (
-              <>
-                <Grid container spacing={3}>
-                  {blogArticles.map((article) => {
-                    // Get first 300 characters of content, stripping HTML tags
-                    const stripHtml = (html) => {
-                      if (!html) return '';
-                      // Remove HTML tags using regex
-                      return html.replace(/<[^>]*>/g, '').replace(/\s+/g, ' ').trim();
-                    };
-                    
-                    const plainContent = stripHtml(article.content || '');
-                    const contentPreview = plainContent.length > 300 
-                      ? plainContent.substring(0, 300) + '...' 
-                      : plainContent;
-
-                    return (
-                      <Grid item xs={12} md={4} key={article.articleId}>
-                        <Card
-                          sx={{
-                            height: '100%',
-                            display: 'flex',
-                            flexDirection: 'column',
-                            transition: 'transform 0.2s ease-in-out, box-shadow 0.2s ease-in-out',
-                            '&:hover': {
-                              transform: 'translateY(-4px)',
-                              boxShadow: 4,
-                            },
-                          }}
-                        >
-                          <CardContent sx={{ flexGrow: 1 }}>
-                            <Typography
-                              variant="h5"
-                              component="h3"
-                              gutterBottom
-                              sx={{
-                                fontWeight: 600,
-                                mb: 2,
-                                minHeight: '3em',
-                                display: '-webkit-box',
-                                WebkitLineClamp: 2,
-                                WebkitBoxOrient: 'vertical',
-                                overflow: 'hidden',
-                              }}
-                            >
-                              {article.title || 'Untitled'}
-                            </Typography>
-                            <Typography
-                              variant="body2"
-                              color="text.secondary"
-                              sx={{
-                                lineHeight: 1.6,
-                                mb: 2,
-                                minHeight: '4.5em',
-                                display: '-webkit-box',
-                                WebkitLineClamp: 3,
-                                WebkitBoxOrient: 'vertical',
-                                overflow: 'hidden',
-                              }}
-                            >
-                              {contentPreview}
-                            </Typography>
-                          </CardContent>
-                          <CardActions sx={{ p: 2, pt: 0 }}>
-                            <Button
-                              variant="outlined"
-                              onClick={() => {
-                                const identifier = article.slug || article.articleId;
-                                navigate(`/blog/${identifier}`);
-                              }}
-                              sx={{ textTransform: 'none' }}
-                            >
-                              Read More
-                            </Button>
-                          </CardActions>
-                        </Card>
-                      </Grid>
-                    );
-                  })}
-                </Grid>
-                {/* Button to redirect to blog page */}
-                <Box sx={{ display: 'flex', justifyContent: 'center', mt: 4 }}>
-                  <Button
-                    variant="contained"
-                    onClick={() => navigate('/blog')}
-                    sx={{
-                      bgcolor: 'black',
-                      color: 'white',
-                      textTransform: 'none',
-                      px: 4,
-                      py: 1.5,
-                      fontSize: '1rem',
-                      fontWeight: 500,
-                      borderRadius: 0,
-                      '&:hover': {
-                        bgcolor: '#333',
-                      },
-                    }}
-                  >
-                    View All Articles
-                  </Button>
+          {welcomeData?.welcomeArticleIds && Array.isArray(welcomeData.welcomeArticleIds) && welcomeData.welcomeArticleIds.length > 0 ? (
+            <>
+              {blogLoading ? (
+                <Box sx={{ display: 'flex', justifyContent: 'center', py: 4 }}>
+                  <CircularProgress />
                 </Box>
-              </>
-            ) : (
-              <Alert severity="info" sx={{ mt: 2 }}>
-                No articles available at this time.
-              </Alert>
-            )}
-          </Container>
-        </Box>
-      )}
+              ) : blogError ? (
+                <Alert severity="error" sx={{ mb: 3 }}>
+                  {blogError}
+                </Alert>
+              ) : blogArticles.length > 0 ? (
+                <>
+                  <Grid container spacing={3}>
+                    {blogArticles.map((article) => {
+                      // Get first 300 characters of content, stripping HTML tags
+                      const stripHtml = (html) => {
+                        if (!html) return '';
+                        // Remove HTML tags using regex
+                        return html.replace(/<[^>]*>/g, '').replace(/\s+/g, ' ').trim();
+                      };
+                      
+                      const plainContent = stripHtml(article.content || '');
+                      const contentPreview = plainContent.length > 300 
+                        ? plainContent.substring(0, 300) + '...' 
+                        : plainContent;
+
+                      return (
+                        <Grid item xs={12} md={4} key={article.articleId}>
+                          <Card
+                            sx={{
+                              height: '100%',
+                              display: 'flex',
+                              flexDirection: 'column',
+                              transition: 'transform 0.2s ease-in-out, box-shadow 0.2s ease-in-out',
+                              '&:hover': {
+                                transform: 'translateY(-4px)',
+                                boxShadow: 4,
+                              },
+                            }}
+                          >
+                            <CardContent sx={{ flexGrow: 1 }}>
+                              <Typography
+                                variant="h5"
+                                component="h3"
+                                gutterBottom
+                                sx={{
+                                  fontWeight: 600,
+                                  mb: 2,
+                                  minHeight: '3em',
+                                  display: '-webkit-box',
+                                  WebkitLineClamp: 2,
+                                  WebkitBoxOrient: 'vertical',
+                                  overflow: 'hidden',
+                                }}
+                              >
+                                {article.title || 'Untitled'}
+                              </Typography>
+                              <Typography
+                                variant="body2"
+                                color="text.secondary"
+                                sx={{
+                                  lineHeight: 1.6,
+                                  mb: 2,
+                                  minHeight: '4.5em',
+                                  display: '-webkit-box',
+                                  WebkitLineClamp: 3,
+                                  WebkitBoxOrient: 'vertical',
+                                  overflow: 'hidden',
+                                }}
+                              >
+                                {contentPreview}
+                              </Typography>
+                            </CardContent>
+                            <CardActions sx={{ p: 2, pt: 0 }}>
+                              <Button
+                                variant="outlined"
+                                onClick={() => {
+                                  const identifier = article.slug || article.articleId;
+                                  navigate(`/blog/${identifier}`);
+                                }}
+                                sx={{ textTransform: 'none' }}
+                              >
+                                Read More
+                              </Button>
+                            </CardActions>
+                          </Card>
+                        </Grid>
+                      );
+                    })}
+                  </Grid>
+                  {/* Button to redirect to blog page */}
+                  <Box sx={{ display: 'flex', justifyContent: 'center', mt: 4 }}>
+                    <Button
+                      variant="contained"
+                      onClick={() => navigate('/blog')}
+                      sx={{
+                        bgcolor: 'black',
+                        color: 'white',
+                        textTransform: 'none',
+                        px: 4,
+                        py: 1.5,
+                        fontSize: '1rem',
+                        fontWeight: 500,
+                        borderRadius: 0,
+                        '&:hover': {
+                          bgcolor: '#333',
+                        },
+                      }}
+                    >
+                      View All Articles
+                    </Button>
+                  </Box>
+                </>
+              ) : (
+                <Alert severity="info" sx={{ mt: 2 }}>
+                  No articles available at this time.
+                </Alert>
+              )}
+            </>
+          ) : (
+            <Alert severity="info" sx={{ mt: 2 }}>
+              No blog articles configured.
+            </Alert>
+          )}
+        </Container>
+      </Box>
 
       {/* Testimonials/Reviews Section */}
       {welcomeData?.reviewMessage || (reviewImageUrls && reviewImageUrls.length > 0) ? (

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { fetchWithAuth } from '../utils/api';
 import apiClient from '../utils/api';
 import AvailabilityRuleComponent from '../components/AvailabilityRuleComponent';
@@ -28,6 +28,8 @@ import {
   Select,
   MenuItem,
   Container,
+  FormControlLabel,
+  Checkbox,
 } from '@mui/material';
 import EditIcon from '@mui/icons-material/Edit';
 import DeleteIcon from '@mui/icons-material/Delete';
@@ -56,6 +58,7 @@ const SessionsConfigurationPage = () => {
     description: '',
     durationMinutes: 60,
     bufferMinutes: 0,
+    active: true,
     prices: {
       Rub: '',
       Tenge: '',
@@ -70,17 +73,29 @@ const SessionsConfigurationPage = () => {
   const [loadingSlots, setLoadingSlots] = useState(false);
   const [slotsError, setSlotsError] = useState(null);
   const [selectedSessionTypeId, setSelectedSessionTypeId] = useState(1);
+  const hasFetchedSessionTypesRef = useRef(false);
 
-  // Fetch session types
+  // Fetch session types (admin endpoint returns all session types, active and inactive)
   useEffect(() => {
+    // Prevent duplicate calls in React StrictMode
+    if (hasFetchedSessionTypesRef.current) {
+      return;
+    }
+    hasFetchedSessionTypesRef.current = true;
+
     const fetchSessionTypes = async () => {
       setLoadingSessionTypes(true);
       try {
-        const response = await fetch('/api/v1/public/session/type');
+        const response = await fetchWithAuth('/api/v1/admin/session/type/all');
         if (response.ok) {
           const data = await response.json();
           setSessionTypes(Array.isArray(data) ? data : []);
-          if (data.length > 0) {
+          // Filter to only active session types for the available slots selector
+          const activeSessionTypes = Array.isArray(data) ? data.filter(st => st.active !== false) : [];
+          if (activeSessionTypes.length > 0) {
+            setSelectedSessionTypeId(activeSessionTypes[0].id || activeSessionTypes[0].sessionTypeId || 1);
+          } else if (data.length > 0) {
+            // Fallback to first session type if no active ones
             setSelectedSessionTypeId(data[0].id || data[0].sessionTypeId || 1);
           }
         }
@@ -141,6 +156,7 @@ const SessionsConfigurationPage = () => {
         description: sessionType.description || '',
         durationMinutes: sessionType.durationMinutes || 60,
         bufferMinutes: sessionType.bufferMinutes || 0,
+        active: sessionType.active !== undefined ? sessionType.active : true,
         prices: sessionType.prices || {
           Rub: '',
           Tenge: '',
@@ -154,6 +170,7 @@ const SessionsConfigurationPage = () => {
         description: '',
         durationMinutes: 60,
         bufferMinutes: 0,
+        active: true,
         prices: {
           Rub: '',
           Tenge: '',
@@ -198,6 +215,12 @@ const SessionsConfigurationPage = () => {
         prices: Object.keys(prices).length > 0 ? prices : undefined,
       };
 
+      // Include active field when updating (optional field in UpdateSessionTypeRequest)
+      // New session types are created as active by default, so we only need to include it for updates
+      if (editingSessionType) {
+        requestBody.active = sessionTypeForm.active !== false;
+      }
+
       const response = await fetchWithAuth(url, {
         method,
         headers: {
@@ -211,10 +234,15 @@ const SessionsConfigurationPage = () => {
       }
 
       // Refresh session types
-      const refreshResponse = await fetch('/api/v1/public/session/type');
+      const refreshResponse = await fetchWithAuth('/api/v1/admin/session/type/all');
       if (refreshResponse.ok) {
         const data = await refreshResponse.json();
         setSessionTypes(Array.isArray(data) ? data : []);
+        // Update selected session type if needed
+        const activeSessionTypes = Array.isArray(data) ? data.filter(st => st.active !== false) : [];
+        if (activeSessionTypes.length > 0 && !activeSessionTypes.find(st => (st.id || st.sessionTypeId) === selectedSessionTypeId)) {
+          setSelectedSessionTypeId(activeSessionTypes[0].id || activeSessionTypes[0].sessionTypeId || 1);
+        }
       }
 
       handleCloseSessionTypeDialog();
@@ -242,10 +270,15 @@ const SessionsConfigurationPage = () => {
       }
 
       // Refresh session types
-      const refreshResponse = await fetch('/api/v1/public/session/type');
+      const refreshResponse = await fetchWithAuth('/api/v1/admin/session/type/all');
       if (refreshResponse.ok) {
         const data = await refreshResponse.json();
         setSessionTypes(Array.isArray(data) ? data : []);
+        // Update selected session type if needed
+        const activeSessionTypes = Array.isArray(data) ? data.filter(st => st.active !== false) : [];
+        if (activeSessionTypes.length > 0 && !activeSessionTypes.find(st => (st.id || st.sessionTypeId) === selectedSessionTypeId)) {
+          setSelectedSessionTypeId(activeSessionTypes[0].id || activeSessionTypes[0].sessionTypeId || 1);
+        }
       }
     } catch (err) {
       console.error('Error deleting session type:', err);
@@ -323,6 +356,11 @@ const SessionsConfigurationPage = () => {
                                   </Typography>
                                 )}
                                 <Box sx={{ display: 'flex', gap: 1, mt: 0.5, flexWrap: 'wrap' }}>
+                                  <Chip 
+                                    label={sessionType.active !== false ? 'Active' : 'Inactive'} 
+                                    size="small" 
+                                    color={sessionType.active !== false ? 'success' : 'default'}
+                                  />
                                   <Chip label={`${sessionType.durationMinutes} min`} size="small" />
                                   {sessionType.prices && Object.keys(sessionType.prices).length > 0 ? (
                                     Object.entries(sessionType.prices).map(([currency, price]) => (
@@ -519,6 +557,18 @@ const SessionsConfigurationPage = () => {
             }
             margin="normal"
             required
+          />
+          <FormControlLabel
+            control={
+              <Checkbox
+                checked={sessionTypeForm.active !== false}
+                onChange={(e) =>
+                  setSessionTypeForm({ ...sessionTypeForm, active: e.target.checked })
+                }
+              />
+            }
+            label="Active (can be used for new bookings)"
+            sx={{ mt: 2 }}
           />
           <Typography variant="subtitle2" sx={{ mt: 2, mb: 1 }}>
             Prices

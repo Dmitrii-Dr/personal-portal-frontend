@@ -630,9 +630,39 @@ const PastSessions = () => {
                         <Typography variant="body2" color="text.secondary">
                           Session Type
                         </Typography>
-                        <Typography variant="body1" gutterBottom>
-                          {booking.sessionTypeName || 'N/A'}
-                        </Typography>
+                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
+                          {booking.sessionDurationMinutes && (
+                            <Chip
+                              label={`${booking.sessionDurationMinutes} min`}
+                              size="small"
+                              sx={{ 
+                                height: 20, 
+                                fontSize: '0.65rem',
+                                '& .MuiChip-label': { px: 0.75 }
+                              }}
+                            />
+                          )}
+                          <Typography variant="body1">
+                            {booking.sessionName || 'N/A'}
+                          </Typography>
+                        </Box>
+                        {/* Prices on a new row */}
+                        {booking.sessionPrices && Object.keys(booking.sessionPrices).length > 0 && (
+                          <Stack direction="row" spacing={0.5} sx={{ mt: 0.5, flexWrap: 'wrap', gap: 0.5 }}>
+                            {Object.entries(booking.sessionPrices).map(([currency, price]) => (
+                              <Chip
+                                key={currency}
+                                label={`${currency}: ${price}`}
+                                size="small"
+                                sx={{ 
+                                  height: 20, 
+                                  fontSize: '0.65rem',
+                                  '& .MuiChip-label': { px: 0.75 }
+                                }}
+                              />
+                            ))}
+                          </Stack>
+                        )}
                       </Grid>
                       <Grid item xs={12} sm={6}>
                         <Typography variant="body2" color="text.secondary">
