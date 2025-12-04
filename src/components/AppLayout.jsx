@@ -55,6 +55,8 @@ const AppLayout = ({ children }) => {
   const isLandingPage = location.pathname === '/';
   // Check if we're on user pages where navigation buttons should be hidden
   const isUserPage = ['/profile', '/booking'].includes(location.pathname);
+  // Check if we're on the blog page where navigation buttons should be hidden
+  const isBlogPage = location.pathname.startsWith('/blog');
 
   // Handle scroll to change header background
   useEffect(() => {
@@ -125,6 +127,25 @@ const AppLayout = ({ children }) => {
         decoded.email ||
         decoded.sub;
       if (name) return name;
+    }
+    return '';
+  };
+
+  // Get full name (first + last) from user profile
+  const getUserFullName = () => {
+    if (userProfile) {
+      const firstName = userProfile.firstName || '';
+      const lastName = userProfile.lastName || '';
+      return `${firstName} ${lastName}`.trim();
+    }
+    // Fallback: try to derive from token if profile not loaded yet
+    const token = getToken();
+    const decoded = decodeToken(token);
+    if (decoded) {
+      const firstName = decoded.given_name || '';
+      const lastName = decoded.family_name || '';
+      const fullName = `${firstName} ${lastName}`.trim();
+      if (fullName) return fullName;
     }
     return '';
   };
@@ -358,7 +379,7 @@ const AppLayout = ({ children }) => {
           transition: 'all 0.3s ease-in-out',
         }}
       >
-        <Toolbar sx={{ minHeight: { xs: 56, sm: 64 } }}>
+        <Toolbar sx={{ minHeight: { xs: 56, sm: 64 }, position: 'relative' }}>
           {/* Home Icon - Top Left */}
           {!isAdminRoute && (
             <Tooltip title="Home" arrow>
@@ -387,6 +408,16 @@ const AppLayout = ({ children }) => {
               direction="row" 
               spacing={{ xs: 1, sm: 2, md: 3 }}
               alignItems="center"
+              sx={
+                isAdminRoute
+                  ? {
+                      position: 'absolute',
+                      left: '50%',
+                      top: '50%',
+                      transform: 'translate(-50%, -50%)',
+                    }
+                  : {}
+              }
             >
             {/* Admin Navigation Links */}
             {isAdminRoute && (
@@ -475,7 +506,7 @@ const AppLayout = ({ children }) => {
             )}
 
             {/* Public Navigation Links */}
-            {!isAdminRoute && !isUserPage && (
+            {!isAdminRoute && !isUserPage && !isBlogPage && (
               <>
                 {/* Public Links - Scroll to section on landing page, navigate otherwise */}
                 {isLandingPage ? (
@@ -517,6 +548,25 @@ const AppLayout = ({ children }) => {
                       }}
                     >
                       Services
+                    </Button>
+                    <Button
+                      onClick={() => scrollToSection('blog')}
+                      color="inherit"
+                      sx={{ 
+                        textTransform: 'none',
+                        fontWeight: 500,
+                        fontSize: { xs: '0.875rem', sm: '0.9375rem', md: '1rem' },
+                        px: { xs: 1, sm: 1.5 },
+                        py: 1,
+                        borderRadius: 1,
+                        transition: 'all 0.2s ease-in-out',
+                        '&:hover': {
+                          bgcolor: 'rgba(255, 255, 255, 0.1)',
+                          transform: 'translateY(-1px)',
+                        },
+                      }}
+                    >
+                      Blog
                     </Button>
                     <Button
                       onClick={() => scrollToSection('testimonials')}
@@ -600,26 +650,6 @@ const AppLayout = ({ children }) => {
                 </Button>
                   </>
                 )}
-                <Button
-                  component={Link}
-                  to="/blog"
-                  color="inherit"
-                  sx={{ 
-                    textTransform: 'none',
-                    fontWeight: 500,
-                    fontSize: { xs: '0.875rem', sm: '0.9375rem', md: '1rem' },
-                    px: { xs: 1, sm: 1.5 },
-                    py: 1,
-                    borderRadius: 1,
-                    transition: 'all 0.2s ease-in-out',
-                    '&:hover': {
-                      bgcolor: isLandingPage ? 'rgba(255, 255, 255, 0.1)' : 'rgba(255, 255, 255, 0.1)',
-                      transform: 'translateY(-1px)',
-                    },
-                  }}
-                >
-                  Blog
-                </Button>
 
               </>
             )}
@@ -631,47 +661,61 @@ const AppLayout = ({ children }) => {
             {/* User menu - only show on non-admin routes when logged in */}
             {hasToken && !isAdminRoute && (
               <>
-                <Tooltip title="Account" arrow>
-                  <Box
-                    sx={{
-                      position: 'relative',
-                      display: 'inline-flex',
-                    }}
-                  >
-                    <IconButton
-                      onClick={handleUserMenuOpen}
-                      color="inherit"
-                      size="large"
-                      aria-label="account menu"
-                      aria-controls={userMenuOpen ? 'user-menu' : undefined}
-                      aria-haspopup="true"
-                      aria-expanded={userMenuOpen ? 'true' : undefined}
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                  {getUserFullName() && (
+                    <Typography
+                      variant="body1"
                       sx={{
-                        transition: 'all 0.2s ease-in-out',
-                        '&:hover': {
-                          bgcolor: 'rgba(255, 255, 255, 0.1)',
-                          transform: 'scale(1.1)',
-                        },
+                        display: { xs: 'none', sm: 'block' },
+                        fontWeight: 500,
+                        color: 'inherit',
                       }}
                     >
-                      <AccountCircleIcon sx={{ fontSize: 40 }} />
-                    </IconButton>
+                      {getUserFullName()}
+                    </Typography>
+                  )}
+                  <Tooltip title="Account" arrow>
                     <Box
                       sx={{
-                        position: 'absolute',
-                        bottom: 6,
-                        right: 6,
-                        width: 10,
-                        height: 10,
-                        borderRadius: '50%',
-                        bgcolor: '#4caf50',
-                        border: '2px solid',
-                        borderColor: 'background.paper',
-                        zIndex: 1,
+                        position: 'relative',
+                        display: 'inline-flex',
                       }}
-                    />
-                  </Box>
-                </Tooltip>
+                    >
+                      <IconButton
+                        onClick={handleUserMenuOpen}
+                        color="inherit"
+                        size="large"
+                        aria-label="account menu"
+                        aria-controls={userMenuOpen ? 'user-menu' : undefined}
+                        aria-haspopup="true"
+                        aria-expanded={userMenuOpen ? 'true' : undefined}
+                        sx={{
+                          transition: 'all 0.2s ease-in-out',
+                          '&:hover': {
+                            bgcolor: 'rgba(255, 255, 255, 0.1)',
+                            transform: 'scale(1.1)',
+                          },
+                        }}
+                      >
+                        <AccountCircleIcon sx={{ fontSize: 40 }} />
+                      </IconButton>
+                      <Box
+                        sx={{
+                          position: 'absolute',
+                          bottom: 6,
+                          right: 6,
+                          width: 10,
+                          height: 10,
+                          borderRadius: '50%',
+                          bgcolor: '#4caf50',
+                          border: '2px solid',
+                          borderColor: 'background.paper',
+                          zIndex: 1,
+                        }}
+                      />
+                    </Box>
+                  </Tooltip>
+                </Box>
                 <Menu
                   id="user-menu"
                   anchorEl={userMenuAnchorEl}
@@ -728,25 +772,112 @@ const AppLayout = ({ children }) => {
               </>
             )}
 
-            {/* Logout button - only show on admin routes when logged in */}
+            {/* Admin user menu - show on admin routes when logged in */}
             {hasToken && isAdminRoute && (
-              <Tooltip title="Logout" arrow>
-                <IconButton
-                  onClick={handleLogout}
-                  color="inherit"
-                  size="medium"
-                  aria-label="logout"
-                  sx={{
-                    transition: 'all 0.2s ease-in-out',
-                    '&:hover': {
-                      bgcolor: 'rgba(255, 255, 255, 0.1)',
-                      transform: 'scale(1.1)',
+              <>
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                  {getUserFullName() && (
+                    <Typography
+                      variant="body1"
+                      sx={{
+                        display: { xs: 'none', sm: 'block' },
+                        fontWeight: 500,
+                        color: 'inherit',
+                      }}
+                    >
+                      {getUserFullName()}
+                    </Typography>
+                  )}
+                  <Tooltip title="Admin Account" arrow>
+                    <Box
+                      sx={{
+                        position: 'relative',
+                        display: 'inline-flex',
+                      }}
+                    >
+                      <IconButton
+                        onClick={handleUserMenuOpen}
+                        color="inherit"
+                        size="large"
+                        aria-label="admin account menu"
+                        aria-controls={userMenuOpen ? 'admin-user-menu' : undefined}
+                        aria-haspopup="true"
+                        aria-expanded={userMenuOpen ? 'true' : undefined}
+                        sx={{
+                          transition: 'all 0.2s ease-in-out',
+                          '&:hover': {
+                            bgcolor: 'rgba(255, 255, 255, 0.1)',
+                            transform: 'scale(1.1)',
+                          },
+                        }}
+                      >
+                        <AccountCircleIcon sx={{ fontSize: 40 }} />
+                      </IconButton>
+                      <Box
+                        sx={{
+                          position: 'absolute',
+                          bottom: 6,
+                          right: 6,
+                          width: 10,
+                          height: 10,
+                          borderRadius: '50%',
+                          bgcolor: '#4caf50',
+                          border: '2px solid',
+                          borderColor: 'background.paper',
+                          zIndex: 1,
+                        }}
+                      />
+                    </Box>
+                  </Tooltip>
+                </Box>
+                <Menu
+                  id="admin-user-menu"
+                  anchorEl={userMenuAnchorEl}
+                  open={userMenuOpen}
+                  onClose={handleUserMenuClose}
+                  disableScrollLock
+                  MenuListProps={{
+                    'aria-labelledby': 'admin-account-button',
+                    sx: {
+                      padding: 0,
                     },
                   }}
+                  PaperProps={{
+                    sx: {
+                      minWidth: 200,
+                      overflow: 'hidden',
+                      mt: 0.5,
+                    },
+                  }}
+                  sx={{
+                    '& .MuiBackdrop-root': {
+                      backgroundColor: 'transparent',
+                    },
+                  }}
+                  anchorOrigin={{
+                    vertical: 'bottom',
+                    horizontal: 'right',
+                  }}
+                  transformOrigin={{
+                    vertical: 'top',
+                    horizontal: 'right',
+                  }}
                 >
-                  <LogoutIcon />
-                </IconButton>
-              </Tooltip>
+                  <MenuItem onClick={() => handleUserMenuClick('/admin/profile')}>
+                    <ListItemIcon>
+                      <PersonIcon fontSize="small" />
+                    </ListItemIcon>
+                    <ListItemText>My Profile</ListItemText>
+                  </MenuItem>
+                  <Divider />
+                  <MenuItem onClick={() => handleUserMenuClick('logout')}>
+                    <ListItemIcon>
+                      <LogoutIcon fontSize="small" />
+                    </ListItemIcon>
+                    <ListItemText>Logout</ListItemText>
+                  </MenuItem>
+                </Menu>
+              </>
             )}
 
             {/* Login Icon Button - only show if not logged in and not on admin route */}

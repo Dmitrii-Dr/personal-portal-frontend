@@ -15,13 +15,18 @@ import {
   Container,
   CircularProgress,
   Alert,
-  TextField,
   Avatar,
   Divider,
   Dialog,
   DialogTitle,
   DialogContent,
   IconButton,
+  FormControl,
+  InputLabel,
+  Select,
+  MenuItem,
+  Menu,
+  Tooltip,
 } from '@mui/material';
 import CloseIcon from '@mui/icons-material/Close';
 import ArrowBackIosIcon from '@mui/icons-material/ArrowBackIos';
@@ -42,13 +47,23 @@ import apiClient from '../utils/api';
 import BookingPageContent from './BookingPage';
 import { loadImageWithCache } from '../utils/imageCache';
 
+// Currency symbol mapping
+const getCurrencySymbol = (currency) => {
+  const currencyMap = {
+    'Rub': '₽',
+    'Tenge': '₸',
+    'USD': '$',
+  };
+  return currencyMap[currency] || currency;
+};
+
 const LandingPage = () => {
   const navigate = useNavigate();
   const heroRef = useRef(null);
   const aboutRef = useRef(null);
   const servicesRef = useRef(null);
   const testimonialsRef = useRef(null);
-  const contactRef = useRef(null);
+  const blogRef = useRef(null);
 
   const [aboutMeData, setAboutMeData] = useState(null);
   const [aboutMeLoading, setAboutMeLoading] = useState(false);
@@ -63,15 +78,8 @@ const LandingPage = () => {
   const [educationImageUrl, setEducationImageUrl] = useState(null);
   const [reviewImageUrls, setReviewImageUrls] = useState([]);
   const [reviewCarouselIndex, setReviewCarouselIndex] = useState(0);
+  const [sessionTypesCarouselIndex, setSessionTypesCarouselIndex] = useState(0);
   const educationRef = useRef(null);
-  const [contactForm, setContactForm] = useState({
-    name: '',
-    email: '',
-    message: '',
-  });
-  const [contactSubmitting, setContactSubmitting] = useState(false);
-  const [contactSuccess, setContactSuccess] = useState(false);
-  const [contactError, setContactError] = useState('');
   
   // Session types state
   const [sessionTypes, setSessionTypes] = useState([]);
@@ -80,6 +88,13 @@ const LandingPage = () => {
   const [selectedSessionTypeId, setSelectedSessionTypeId] = useState(null);
   const [selectedSessionType, setSelectedSessionType] = useState(null);
   const [bookingDialogOpen, setBookingDialogOpen] = useState(false);
+  const [selectedCurrency, setSelectedCurrency] = useState('Rub');
+  const [currencyMenuAnchor, setCurrencyMenuAnchor] = useState(null);
+
+  // Blog articles state
+  const [blogArticles, setBlogArticles] = useState([]);
+  const [blogLoading, setBlogLoading] = useState(false);
+  const [blogError, setBlogError] = useState(null);
 
   // Footer/Contact Links
   // Data comes from /api/v1/public/welcome response in the "contact" field
@@ -235,6 +250,39 @@ const LandingPage = () => {
     fetchSessionTypes();
   }, []);
 
+  // Fetch blog articles
+  useEffect(() => {
+    const fetchBlogArticles = async () => {
+      if (!welcomeData?.welcomeArticleIds || !Array.isArray(welcomeData.welcomeArticleIds) || welcomeData.welcomeArticleIds.length === 0) {
+        return;
+      }
+
+      setBlogLoading(true);
+      setBlogError(null);
+      try {
+        // Build query string with article IDs
+        const articleIds = welcomeData.welcomeArticleIds.join(',');
+        const response = await apiClient.get(`/api/v1/public/articles?id=${articleIds}`, {
+          timeout: 10000,
+        });
+        
+        if (response.data && Array.isArray(response.data)) {
+          setBlogArticles(response.data);
+        } else {
+          setBlogArticles([]);
+        }
+      } catch (error) {
+        console.error('Error fetching blog articles:', error);
+        setBlogError(error.message || 'Failed to load blog articles');
+        setBlogArticles([]);
+      } finally {
+        setBlogLoading(false);
+      }
+    };
+
+    fetchBlogArticles();
+  }, [welcomeData]);
+
   // Smooth scroll function
   const scrollToSection = (ref) => {
     if (ref && ref.current) {
@@ -242,25 +290,6 @@ const LandingPage = () => {
         behavior: 'smooth',
         block: 'start',
       });
-    }
-  };
-
-  // Handle contact form submission
-  const handleContactSubmit = async (e) => {
-    e.preventDefault();
-    setContactSubmitting(true);
-    setContactError('');
-    setContactSuccess(false);
-
-    try {
-      // TODO: Replace with actual contact API endpoint
-      await new Promise((resolve) => setTimeout(resolve, 1000));
-      setContactSuccess(true);
-      setContactForm({ name: '', email: '', message: '' });
-    } catch (error) {
-      setContactError('Failed to send message. Please try again.');
-    } finally {
-      setContactSubmitting(false);
     }
   };
 
@@ -664,6 +693,465 @@ const LandingPage = () => {
         </Container>
       </Box>
 
+      {/* Services Section */}
+      <Box
+        ref={servicesRef}
+        id="services"
+        component="section"
+        sx={{
+          py: 8,
+          bgcolor: '#F0F7F7', // Light teal tint background
+          scrollMarginTop: '64px',
+        }}
+      >
+        <Container maxWidth="lg">
+          <Typography
+            variant="h3"
+            component="h2"
+            align="center"
+            gutterBottom
+            sx={{ mb: 2, fontWeight: 600 }}
+          >
+            Services & Pricing
+          </Typography>
+          <Typography
+            variant="body1"
+            color="text.secondary"
+            align="center"
+            paragraph
+            sx={{ mb: 4 }}
+          >
+            Choose the service package that best fits your needs
+          </Typography>
+
+          {loadingSessionTypes ? (
+            <Box sx={{ display: 'flex', justifyContent: 'center', py: 4 }}>
+              <CircularProgress />
+            </Box>
+          ) : sessionTypesError ? (
+            <Alert severity="error" sx={{ mb: 2 }}>
+              {sessionTypesError}
+            </Alert>
+          ) : sessionTypes.length > 0 ? (
+            <Box sx={{ position: 'relative', width: '100%' }}>
+              {/* Currency Selector Line */}
+              <Box
+                sx={{
+                  display: 'flex',
+                  justifyContent: 'flex-end',
+                  alignItems: 'center',
+                  mb: 2,
+                  pb: 1,
+                  borderBottom: '1px solid',
+                  borderColor: 'divider',
+                }}
+              >
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                  <Typography variant="caption" color="text.secondary" sx={{ fontSize: '0.75rem' }}>
+                    Currency:
+                  </Typography>
+                  <Tooltip title="Select currency">
+                    <IconButton
+                      onClick={(e) => setCurrencyMenuAnchor(e.currentTarget)}
+                      size="small"
+                      sx={{
+                        color: 'text.primary',
+                        fontSize: '1rem',
+                        minWidth: 'auto',
+                        padding: '4px 8px',
+                        '&:hover': {
+                          bgcolor: 'action.hover',
+                        },
+                      }}
+                    >
+                      <Typography variant="body2" sx={{ fontSize: '1rem', fontWeight: 500 }}>
+                        {getCurrencySymbol(selectedCurrency)}
+                      </Typography>
+                    </IconButton>
+                  </Tooltip>
+                </Box>
+                <Menu
+                  anchorEl={currencyMenuAnchor}
+                  open={Boolean(currencyMenuAnchor)}
+                  onClose={() => setCurrencyMenuAnchor(null)}
+                >
+                  <MenuItem
+                    onClick={() => {
+                      setSelectedCurrency('Rub');
+                      setCurrencyMenuAnchor(null);
+                    }}
+                    selected={selectedCurrency === 'Rub'}
+                  >
+                    ₽ Rub
+                  </MenuItem>
+                  <MenuItem
+                    onClick={() => {
+                      setSelectedCurrency('Tenge');
+                      setCurrencyMenuAnchor(null);
+                    }}
+                    selected={selectedCurrency === 'Tenge'}
+                  >
+                    ₸ Tenge
+                  </MenuItem>
+                  <MenuItem
+                    onClick={() => {
+                      setSelectedCurrency('USD');
+                      setCurrencyMenuAnchor(null);
+                    }}
+                    selected={selectedCurrency === 'USD'}
+                  >
+                    $ USD
+                  </MenuItem>
+                </Menu>
+              </Box>
+              <Box
+                sx={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: 2,
+                  position: 'relative',
+                }}
+              >
+                {/* Left Arrow */}
+                {sessionTypes.length > 3 && (
+                  <IconButton
+                    onClick={() => {
+                      setSessionTypesCarouselIndex((prev) => {
+                        if (prev === 0) {
+                          // Wrap to end
+                          return sessionTypes.length - 3;
+                        }
+                        return prev - 1;
+                      });
+                    }}
+                    sx={{
+                      position: 'absolute',
+                      left: { xs: -10, md: -40 },
+                      zIndex: 2,
+                      bgcolor: 'white',
+                      boxShadow: 2,
+                      '&:hover': {
+                        bgcolor: 'grey.100',
+                      },
+                    }}
+                  >
+                    <ArrowBackIosIcon />
+                  </IconButton>
+                )}
+
+                {/* Session Types Container */}
+                <Box
+                  sx={{
+                    display: 'flex',
+                    gap: 3,
+                    overflow: 'hidden',
+                    width: '100%',
+                    justifyContent: 'center',
+                    maxWidth: { xs: '100%', md: '1200px' },
+                  }}
+                >
+                  <Grid container spacing={3} sx={{ mt: 2, width: '100%', display: 'flex' }}>
+                    {Array.from({ length: Math.min(3, sessionTypes.length) }).map((_, frameIndex) => {
+                      const sessionTypeIndex = sessionTypesCarouselIndex + frameIndex;
+                      const sessionType = sessionTypes[sessionTypeIndex];
+                      
+                      if (!sessionType) return null;
+                      
+                      return (
+                        <Grid item xs={12} md={4} key={sessionType.id || sessionType.sessionTypeId} sx={{ display: 'flex' }}>
+                          <Card
+                            sx={{
+                              width: '100%',
+                              minHeight: '230px',
+                              display: 'flex',
+                              flexDirection: 'column',
+                              transition: 'transform 0.2s ease-in-out, box-shadow 0.2s ease-in-out',
+                              '&:hover': {
+                                transform: 'translateY(-4px)',
+                                boxShadow: 4,
+                              },
+                            }}
+                          >
+                            <CardContent sx={{ flexGrow: 1, display: 'flex', flexDirection: 'column', p: 2.5 }}>
+                              <Box
+                                sx={{
+                                  display: 'flex',
+                                  justifyContent: 'space-between',
+                                  alignItems: 'flex-start',
+                                  mb: 1.5,
+                                }}
+                              >
+                                <Typography variant="h5" component="h3" sx={{ fontSize: '1.25rem' }}>
+                                  {sessionType.name}
+                                </Typography>
+                                <Chip
+                                  label={`${sessionType.durationMinutes || 60} min`}
+                                  size="small"
+                                  color="primary"
+                                  variant="outlined"
+                                />
+                              </Box>
+                              {sessionType.description && (
+                                <Typography
+                                  variant="body2"
+                                  color="text.secondary"
+                                  sx={{ 
+                                    mb: 1.5,
+                                    flexGrow: 1,
+                                    display: '-webkit-box',
+                                    WebkitLineClamp: 3,
+                                    WebkitBoxOrient: 'vertical',
+                                    overflow: 'hidden',
+                                    textOverflow: 'ellipsis',
+                                    lineHeight: 1.5,
+                                  }}
+                                >
+                                  {sessionType.description}
+                                </Typography>
+                              )}
+                              <Box sx={{ mb: 1, mt: 'auto' }}>
+                                {sessionType.prices && sessionType.prices[selectedCurrency] ? (
+                                  <Typography variant="h4" component="span" color="primary" sx={{ fontSize: '1.75rem' }}>
+                                    {sessionType.prices[selectedCurrency]} {getCurrencySymbol(selectedCurrency)}
+                                  </Typography>
+                                ) : sessionType.prices && Object.keys(sessionType.prices).length > 0 ? (
+                                  <Typography variant="h6" component="span" color="text.secondary" sx={{ fontSize: '1rem' }}>
+                                    Price not available in {selectedCurrency}
+                                  </Typography>
+                                ) : sessionType.price ? (
+                                  <Typography variant="h4" component="span" color="primary" sx={{ fontSize: '1.75rem' }}>
+                                    ${sessionType.price}
+                                  </Typography>
+                                ) : (
+                                  <Typography variant="h6" component="span" color="text.secondary" sx={{ fontSize: '1rem' }}>
+                                    Price on request
+                                  </Typography>
+                                )}
+                              </Box>
+                            </CardContent>
+                            <CardActions sx={{ p: 1.5, pt: 0 }}>
+                              <Button
+                                variant="contained"
+                                fullWidth
+                                color="primary"
+                                size="medium"
+                                onClick={() => {
+                                  const sessionTypeId = sessionType.id || sessionType.sessionTypeId;
+                                  setSelectedSessionTypeId(sessionTypeId);
+                                  setSelectedSessionType(sessionType);
+                                  setBookingDialogOpen(true);
+                                }}
+                                sx={{ textTransform: 'none' }}
+                              >
+                                Book Now
+                              </Button>
+                            </CardActions>
+                          </Card>
+                        </Grid>
+                      );
+                    })}
+                  </Grid>
+                </Box>
+
+                {/* Right Arrow */}
+                {sessionTypes.length > 3 && (
+                  <IconButton
+                    onClick={() => {
+                      const maxIndex = sessionTypes.length - 3;
+                      setSessionTypesCarouselIndex((prev) => {
+                        if (prev >= maxIndex) {
+                          // Wrap to beginning
+                          return 0;
+                        }
+                        return prev + 1;
+                      });
+                    }}
+                    sx={{
+                      position: 'absolute',
+                      right: { xs: -10, md: -40 },
+                      zIndex: 2,
+                      bgcolor: 'white',
+                      boxShadow: 2,
+                      '&:hover': {
+                        bgcolor: 'grey.100',
+                      },
+                    }}
+                  >
+                    <ArrowForwardIosIcon />
+                  </IconButton>
+                )}
+              </Box>
+            </Box>
+          ) : (
+            <Alert severity="info" sx={{ mt: 2 }}>
+              No session types available at this time.
+            </Alert>
+          )}
+        </Container>
+      </Box>
+
+      {/* Blog Section */}
+      {welcomeData?.welcomeArticleIds && Array.isArray(welcomeData.welcomeArticleIds) && welcomeData.welcomeArticleIds.length > 0 && (
+        <Box
+          ref={blogRef}
+          id="blog"
+          component="section"
+          sx={{
+            py: { xs: 6, md: 10 },
+            bgcolor: 'background.paper',
+            scrollMarginTop: '64px',
+          }}
+        >
+          <Container maxWidth="lg">
+            {/* Header with line above */}
+            <Box sx={{ mb: 4, textAlign: 'center' }}>
+              <Box sx={{ display: 'flex', justifyContent: 'center', mb: 2 }}>
+                <Divider 
+                  sx={{ 
+                    width: '60px', 
+                    height: '2px', 
+                    bgcolor: 'black',
+                  }} 
+                />
+              </Box>
+              <Typography
+                variant="h2"
+                component="h2"
+                sx={{
+                  fontSize: { xs: '2rem', sm: '2.5rem', md: '3rem' },
+                  fontWeight: 700,
+                  color: 'black',
+                  letterSpacing: '0.05em',
+                  textTransform: 'uppercase',
+                  fontFamily: 'sans-serif',
+                  mb: 3,
+                }}
+              >
+                BLOG
+              </Typography>
+            </Box>
+
+            {blogLoading ? (
+              <Box sx={{ display: 'flex', justifyContent: 'center', py: 4 }}>
+                <CircularProgress />
+              </Box>
+            ) : blogError ? (
+              <Alert severity="error" sx={{ mb: 3 }}>
+                {blogError}
+              </Alert>
+            ) : blogArticles.length > 0 ? (
+              <>
+                <Grid container spacing={3}>
+                  {blogArticles.map((article) => {
+                    // Get first 300 characters of content, stripping HTML tags
+                    const stripHtml = (html) => {
+                      if (!html) return '';
+                      // Remove HTML tags using regex
+                      return html.replace(/<[^>]*>/g, '').replace(/\s+/g, ' ').trim();
+                    };
+                    
+                    const plainContent = stripHtml(article.content || '');
+                    const contentPreview = plainContent.length > 300 
+                      ? plainContent.substring(0, 300) + '...' 
+                      : plainContent;
+
+                    return (
+                      <Grid item xs={12} md={4} key={article.articleId}>
+                        <Card
+                          sx={{
+                            height: '100%',
+                            display: 'flex',
+                            flexDirection: 'column',
+                            transition: 'transform 0.2s ease-in-out, box-shadow 0.2s ease-in-out',
+                            '&:hover': {
+                              transform: 'translateY(-4px)',
+                              boxShadow: 4,
+                            },
+                          }}
+                        >
+                          <CardContent sx={{ flexGrow: 1 }}>
+                            <Typography
+                              variant="h5"
+                              component="h3"
+                              gutterBottom
+                              sx={{
+                                fontWeight: 600,
+                                mb: 2,
+                                minHeight: '3em',
+                                display: '-webkit-box',
+                                WebkitLineClamp: 2,
+                                WebkitBoxOrient: 'vertical',
+                                overflow: 'hidden',
+                              }}
+                            >
+                              {article.title || 'Untitled'}
+                            </Typography>
+                            <Typography
+                              variant="body2"
+                              color="text.secondary"
+                              sx={{
+                                lineHeight: 1.6,
+                                mb: 2,
+                                minHeight: '4.5em',
+                                display: '-webkit-box',
+                                WebkitLineClamp: 3,
+                                WebkitBoxOrient: 'vertical',
+                                overflow: 'hidden',
+                              }}
+                            >
+                              {contentPreview}
+                            </Typography>
+                          </CardContent>
+                          <CardActions sx={{ p: 2, pt: 0 }}>
+                            <Button
+                              variant="outlined"
+                              onClick={() => {
+                                const identifier = article.slug || article.articleId;
+                                navigate(`/blog/${identifier}`);
+                              }}
+                              sx={{ textTransform: 'none' }}
+                            >
+                              Read More
+                            </Button>
+                          </CardActions>
+                        </Card>
+                      </Grid>
+                    );
+                  })}
+                </Grid>
+                {/* Button to redirect to blog page */}
+                <Box sx={{ display: 'flex', justifyContent: 'center', mt: 4 }}>
+                  <Button
+                    variant="contained"
+                    onClick={() => navigate('/blog')}
+                    sx={{
+                      bgcolor: 'black',
+                      color: 'white',
+                      textTransform: 'none',
+                      px: 4,
+                      py: 1.5,
+                      fontSize: '1rem',
+                      fontWeight: 500,
+                      borderRadius: 0,
+                      '&:hover': {
+                        bgcolor: '#333',
+                      },
+                    }}
+                  >
+                    View All Articles
+                  </Button>
+                </Box>
+              </>
+            ) : (
+              <Alert severity="info" sx={{ mt: 2 }}>
+                No articles available at this time.
+              </Alert>
+            )}
+          </Container>
+        </Box>
+      )}
+
       {/* Testimonials/Reviews Section */}
       {welcomeData?.reviewMessage || (reviewImageUrls && reviewImageUrls.length > 0) ? (
         <Box
@@ -865,124 +1353,6 @@ const LandingPage = () => {
         </Box>
       ) : null}
 
-      {/* Services Section */}
-      <Box
-        ref={servicesRef}
-        id="services"
-        component="section"
-        sx={{
-          py: 8,
-          bgcolor: '#F0F7F7', // Light teal tint background
-          scrollMarginTop: '64px',
-        }}
-      >
-        <Container maxWidth="lg">
-          <Typography
-            variant="h3"
-            component="h2"
-            align="center"
-            gutterBottom
-            sx={{ mb: 2, fontWeight: 600 }}
-          >
-            Services & Pricing
-          </Typography>
-          <Typography
-            variant="body1"
-            color="text.secondary"
-            align="center"
-            paragraph
-            sx={{ mb: 4 }}
-          >
-            Choose the service package that best fits your needs
-          </Typography>
-
-          {loadingSessionTypes ? (
-            <Box sx={{ display: 'flex', justifyContent: 'center', py: 4 }}>
-              <CircularProgress />
-            </Box>
-          ) : sessionTypesError ? (
-            <Alert severity="error" sx={{ mb: 2 }}>
-              {sessionTypesError}
-            </Alert>
-          ) : sessionTypes.length > 0 ? (
-            <Grid container spacing={3} sx={{ mt: 2 }}>
-              {sessionTypes.map((sessionType) => (
-                <Grid item xs={12} md={4} key={sessionType.id || sessionType.sessionTypeId}>
-                  <Card
-                    sx={{
-                      height: '100%',
-                      display: 'flex',
-                      flexDirection: 'column',
-                      transition: 'transform 0.2s ease-in-out, box-shadow 0.2s ease-in-out',
-                      '&:hover': {
-                        transform: 'translateY(-4px)',
-                        boxShadow: 4,
-                      },
-                    }}
-                  >
-                    <CardContent sx={{ flexGrow: 1 }}>
-                      <Box
-                        sx={{
-                          display: 'flex',
-                          justifyContent: 'space-between',
-                          alignItems: 'flex-start',
-                          mb: 2,
-                        }}
-                      >
-                        <Typography variant="h5" component="h3">
-                          {sessionType.name}
-                        </Typography>
-                        <Chip
-                          label={`${sessionType.durationMinutes || 60} min`}
-                          size="small"
-                          color="primary"
-                          variant="outlined"
-                        />
-                      </Box>
-                      {sessionType.description && (
-                        <Typography
-                          variant="body2"
-                          color="text.secondary"
-                          paragraph
-                          sx={{ mb: 2 }}
-                        >
-                          {sessionType.description}
-                        </Typography>
-                      )}
-                      <Box sx={{ mb: 2 }}>
-                        <Typography variant="h4" component="span" color="primary">
-                          ${sessionType.price || 0}
-                        </Typography>
-                      </Box>
-                    </CardContent>
-                    <CardActions sx={{ p: 2, pt: 0 }}>
-                      <Button
-                        variant="contained"
-                        fullWidth
-                        color="primary"
-                        onClick={() => {
-                          const sessionTypeId = sessionType.id || sessionType.sessionTypeId;
-                          setSelectedSessionTypeId(sessionTypeId);
-                          setSelectedSessionType(sessionType);
-                          setBookingDialogOpen(true);
-                        }}
-                        sx={{ textTransform: 'none' }}
-                      >
-                        Book Now
-                      </Button>
-                    </CardActions>
-                  </Card>
-                </Grid>
-              ))}
-            </Grid>
-          ) : (
-            <Alert severity="info" sx={{ mt: 2 }}>
-              No session types available at this time.
-            </Alert>
-          )}
-        </Container>
-      </Box>
-
       {/* Booking Dialog - Popup */}
       <Dialog
         open={bookingDialogOpen}
@@ -1058,15 +1428,37 @@ const LandingPage = () => {
                     fontWeight: 500,
                   }}
                 />
-                <Chip
-                  label={`$${selectedSessionType.price || 0}`}
-                  sx={{
-                    bgcolor: 'rgba(255, 255, 255, 0.2)',
-                    color: 'white',
-                    fontWeight: 'bold',
-                    fontSize: '1rem',
-                  }}
-                />
+                {selectedSessionType.prices && selectedSessionType.prices[selectedCurrency] ? (
+                  <Chip
+                    label={`${selectedSessionType.prices[selectedCurrency]} ${getCurrencySymbol(selectedCurrency)}`}
+                    sx={{
+                      bgcolor: 'rgba(255, 255, 255, 0.2)',
+                      color: 'white',
+                      fontWeight: 'bold',
+                      fontSize: '1rem',
+                    }}
+                  />
+                ) : selectedSessionType.prices && Object.keys(selectedSessionType.prices).length > 0 ? (
+                  <Chip
+                    label={`Price not available in ${selectedCurrency}`}
+                    sx={{
+                      bgcolor: 'rgba(255, 255, 255, 0.2)',
+                      color: 'white',
+                      fontWeight: 'bold',
+                      fontSize: '0.9rem',
+                    }}
+                  />
+                ) : selectedSessionType.price ? (
+                  <Chip
+                    label={`$${selectedSessionType.price}`}
+                    sx={{
+                      bgcolor: 'rgba(255, 255, 255, 0.2)',
+                      color: 'white',
+                      fontWeight: 'bold',
+                      fontSize: '1rem',
+                    }}
+                  />
+                ) : null}
               </Box>
             </Box>
           )}
@@ -1077,110 +1469,9 @@ const LandingPage = () => {
         </DialogContent>
       </Dialog>
 
-
-      {/* Contact Section */}
-      <Box
-        ref={contactRef}
-        id="contact"
-        component="section"
-        sx={{
-          py: 8,
-          bgcolor: 'background.paper',
-          scrollMarginTop: '64px',
-        }}
-      >
-        <Container maxWidth="md">
-          <Typography
-            variant="h3"
-            component="h2"
-            align="center"
-            gutterBottom
-            sx={{ mb: 2, fontWeight: 600 }}
-          >
-            Get in Touch
-          </Typography>
-          <Typography
-            variant="body1"
-            color="text.secondary"
-            align="center"
-            paragraph
-            sx={{ mb: 4 }}
-          >
-            Have questions? We'd love to hear from you.
-          </Typography>
-          <Card>
-            <CardContent sx={{ p: 4 }}>
-              {contactSuccess && (
-                <Alert severity="success" sx={{ mb: 2 }}>
-                  Thank you for your message! We'll get back to you soon.
-                </Alert>
-              )}
-              {contactError && (
-                <Alert severity="error" sx={{ mb: 2 }}>
-                  {contactError}
-                </Alert>
-              )}
-              <Box component="form" onSubmit={handleContactSubmit}>
-                <TextField
-                  fullWidth
-                  label="Name"
-                  value={contactForm.name}
-                  onChange={(e) =>
-                    setContactForm({ ...contactForm, name: e.target.value })
-                  }
-                  margin="normal"
-                  required
-                  disabled={contactSubmitting}
-                />
-                <TextField
-                  fullWidth
-                  label="Email"
-                  type="email"
-                  value={contactForm.email}
-                  onChange={(e) =>
-                    setContactForm({ ...contactForm, email: e.target.value })
-                  }
-                  margin="normal"
-                  required
-                  disabled={contactSubmitting}
-                />
-                <TextField
-                  fullWidth
-                  label="Message"
-                  multiline
-                  rows={4}
-                  value={contactForm.message}
-                  onChange={(e) =>
-                    setContactForm({ ...contactForm, message: e.target.value })
-                  }
-                  margin="normal"
-                  required
-                  disabled={contactSubmitting}
-                />
-                <Button
-                  type="submit"
-                  variant="contained"
-                  fullWidth
-                  sx={{ mt: 3, textTransform: 'none' }}
-                  disabled={contactSubmitting}
-                >
-                  {contactSubmitting ? (
-                    <>
-                      <CircularProgress size={20} sx={{ mr: 1 }} />
-                      Sending...
-                    </>
-                  ) : (
-                    'Send Message'
-                  )}
-                </Button>
-              </Box>
-            </CardContent>
-          </Card>
-        </Container>
-      </Box>
-
       {/* Footer/Contact Links Section */}
       <Box
+        id="contact"
         component="footer"
         sx={{
           py: { xs: 6, md: 8 },

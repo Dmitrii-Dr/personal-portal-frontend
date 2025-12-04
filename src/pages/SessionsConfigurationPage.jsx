@@ -55,7 +55,12 @@ const SessionsConfigurationPage = () => {
     name: '',
     description: '',
     durationMinutes: 60,
-    price: 0,
+    bufferMinutes: 0,
+    prices: {
+      Rub: '',
+      Tenge: '',
+      USD: '',
+    },
   });
   const [error, setError] = useState(null);
 
@@ -135,7 +140,12 @@ const SessionsConfigurationPage = () => {
         name: sessionType.name || '',
         description: sessionType.description || '',
         durationMinutes: sessionType.durationMinutes || 60,
-        price: sessionType.price || 0,
+        bufferMinutes: sessionType.bufferMinutes || 0,
+        prices: sessionType.prices || {
+          Rub: '',
+          Tenge: '',
+          USD: '',
+        },
       });
     } else {
       setEditingSessionType(null);
@@ -143,7 +153,12 @@ const SessionsConfigurationPage = () => {
         name: '',
         description: '',
         durationMinutes: 60,
-        price: 0,
+        bufferMinutes: 0,
+        prices: {
+          Rub: '',
+          Tenge: '',
+          USD: '',
+        },
       });
     }
     setSessionTypeDialogOpen(true);
@@ -161,12 +176,34 @@ const SessionsConfigurationPage = () => {
         : '/api/v1/admin/session/type';
       const method = editingSessionType ? 'PUT' : 'POST';
 
+      // Prepare prices object - filter out empty values and convert to numbers
+      const prices = {};
+      if (sessionTypeForm.prices) {
+        Object.keys(sessionTypeForm.prices).forEach((currency) => {
+          const value = sessionTypeForm.prices[currency];
+          if (value !== '' && value !== null && value !== undefined) {
+            const numValue = parseFloat(value);
+            if (!isNaN(numValue) && numValue >= 0) {
+              prices[currency] = numValue;
+            }
+          }
+        });
+      }
+
+      const requestBody = {
+        name: sessionTypeForm.name,
+        description: sessionTypeForm.description,
+        durationMinutes: sessionTypeForm.durationMinutes,
+        bufferMinutes: sessionTypeForm.bufferMinutes || 0,
+        prices: Object.keys(prices).length > 0 ? prices : undefined,
+      };
+
       const response = await fetchWithAuth(url, {
         method,
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify(sessionTypeForm),
+        body: JSON.stringify(requestBody),
       });
 
       if (!response.ok) {
@@ -285,9 +322,20 @@ const SessionsConfigurationPage = () => {
                                     {sessionType.description}
                                   </Typography>
                                 )}
-                                <Box sx={{ display: 'flex', gap: 1, mt: 0.5 }}>
+                                <Box sx={{ display: 'flex', gap: 1, mt: 0.5, flexWrap: 'wrap' }}>
                                   <Chip label={`${sessionType.durationMinutes} min`} size="small" />
-                                  <Chip label={`$${sessionType.price}`} size="small" color="primary" />
+                                  {sessionType.prices && Object.keys(sessionType.prices).length > 0 ? (
+                                    Object.entries(sessionType.prices).map(([currency, price]) => (
+                                      <Chip
+                                        key={currency}
+                                        label={`${currency}: ${price}`}
+                                        size="small"
+                                        color="primary"
+                                      />
+                                    ))
+                                  ) : sessionType.price ? (
+                                    <Chip label={`$${sessionType.price}`} size="small" color="primary" />
+                                  ) : null}
                                 </Box>
                               </>
                             }
@@ -463,14 +511,68 @@ const SessionsConfigurationPage = () => {
           />
           <TextField
             fullWidth
-            label="Price"
+            label="Buffer (minutes)"
             type="number"
-            value={sessionTypeForm.price}
+            value={sessionTypeForm.bufferMinutes || 0}
             onChange={(e) =>
-              setSessionTypeForm({ ...sessionTypeForm, price: parseFloat(e.target.value) || 0 })
+              setSessionTypeForm({ ...sessionTypeForm, bufferMinutes: parseInt(e.target.value) || 0 })
             }
             margin="normal"
             required
+          />
+          <Typography variant="subtitle2" sx={{ mt: 2, mb: 1 }}>
+            Prices
+          </Typography>
+          <TextField
+            fullWidth
+            label="Price (Rub)"
+            type="number"
+            value={sessionTypeForm.prices?.Rub || ''}
+            onChange={(e) =>
+              setSessionTypeForm({
+                ...sessionTypeForm,
+                prices: {
+                  ...sessionTypeForm.prices,
+                  Rub: e.target.value,
+                },
+              })
+            }
+            margin="normal"
+            inputProps={{ step: '0.01', min: '0' }}
+          />
+          <TextField
+            fullWidth
+            label="Price (Tenge)"
+            type="number"
+            value={sessionTypeForm.prices?.Tenge || ''}
+            onChange={(e) =>
+              setSessionTypeForm({
+                ...sessionTypeForm,
+                prices: {
+                  ...sessionTypeForm.prices,
+                  Tenge: e.target.value,
+                },
+              })
+            }
+            margin="normal"
+            inputProps={{ step: '0.01', min: '0' }}
+          />
+          <TextField
+            fullWidth
+            label="Price (USD)"
+            type="number"
+            value={sessionTypeForm.prices?.USD || ''}
+            onChange={(e) =>
+              setSessionTypeForm({
+                ...sessionTypeForm,
+                prices: {
+                  ...sessionTypeForm.prices,
+                  USD: e.target.value,
+                },
+              })
+            }
+            margin="normal"
+            inputProps={{ step: '0.01', min: '0' }}
           />
         </DialogContent>
         <DialogActions>

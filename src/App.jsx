@@ -3,6 +3,7 @@ import { BrowserRouter as Router, Routes, Route, useNavigate, useLocation } from
 import AppLayout from './components/AppLayout';
 import LandingPage from './pages/LandingPage';
 import BlogPage from './pages/BlogPage';
+import ArticlePage from './pages/ArticlePage';
 import ProfilePage from './pages/ProfilePage';
 import BookingPage from './pages/BookingPage';
 import SignUpPage from './pages/SignUpPage';
@@ -561,6 +562,7 @@ function App() {
               <Routes>
                 <Route path="/" element={<LandingPage />} />
                 <Route path="/blog" element={<BlogPage />} />
+                <Route path="/blog/:articleId" element={<ArticlePage />} />
                 <Route path="/booking" element={<BookingPage />} />
                 <Route path="/login" element={<LoginPage />} />
                 <Route path="/signup" element={<SignUpPage />} />

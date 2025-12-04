@@ -194,6 +194,52 @@ export const fetchAdminGroupedBookings = async (status = null) => {
   return response.data;
 };
 
+// Cache for user settings to prevent duplicate requests
+let userSettingsCache = null;
+let userSettingsPromise = null;
+
+// Fetch user settings with caching
+export const fetchUserSettings = async () => {
+  // Return cached data if available
+  if (userSettingsCache !== null) {
+    return userSettingsCache;
+  }
+
+  // Return existing promise if request is in flight
+  if (userSettingsPromise) {
+    return userSettingsPromise;
+  }
+
+  // Create new request
+  userSettingsPromise = (async () => {
+    try {
+      const response = await fetchWithAuth('/api/v1/user/setting');
+      if (response.ok) {
+        const data = await response.json();
+        userSettingsCache = data;
+        return data;
+      } else {
+        throw new Error(`Failed to fetch user settings: ${response.status}`);
+      }
+    } catch (error) {
+      // Clear promise on error so it can be retried
+      userSettingsPromise = null;
+      throw error;
+    } finally {
+      // Clear promise after completion (success or error)
+      userSettingsPromise = null;
+    }
+  })();
+
+  return userSettingsPromise;
+};
+
+// Clear user settings cache (useful when settings are updated)
+export const clearUserSettingsCache = () => {
+  userSettingsCache = null;
+  userSettingsPromise = null;
+};
+
 // Export configured axios instance
 export default apiClient;
 

@@ -51,6 +51,12 @@ const AdminHomePage = () => {
   const [educationContent, setEducationContent] = useState('');
   const [reviewMessage, setReviewMessage] = useState('');
   
+  // Blog articles state
+  const [welcomeArticleIds, setWelcomeArticleIds] = useState([]);
+  const [availableArticles, setAvailableArticles] = useState([]);
+  const [loadingArticles, setLoadingArticles] = useState(false);
+  const [articlesError, setArticlesError] = useState(null);
+  
   // Media IDs state
   const [welcomeMediaId, setWelcomeMediaId] = useState(null);
   const [aboutMediaId, setAboutMediaId] = useState(null);
@@ -139,6 +145,7 @@ const AdminHomePage = () => {
         setAboutMediaId(data.aboutMediaId || null);
         setEducationMediaId(data.educationMediaId || null);
         setReviewMediaIds(data.reviewMediaIds || []);
+        setWelcomeArticleIds(data.welcomeArticleIds || []);
         
         // Load contact links if available
         if (data.contact && Array.isArray(data.contact)) {
@@ -180,6 +187,30 @@ const AdminHomePage = () => {
     fetchData();
   }, []);
 
+  // Fetch all available articles for selection
+  useEffect(() => {
+    const fetchArticles = async () => {
+      setLoadingArticles(true);
+      setArticlesError(null);
+      try {
+        const response = await apiClient.get('/api/v1/public/articles', {
+          timeout: 10000,
+        });
+        if (response.data && Array.isArray(response.data)) {
+          setAvailableArticles(response.data);
+        } else {
+          setAvailableArticles([]);
+        }
+      } catch (err) {
+        console.error('Error fetching articles:', err);
+        setArticlesError(err.message || 'Failed to load articles');
+        setAvailableArticles([]);
+      } finally {
+        setLoadingArticles(false);
+      }
+    };
+    fetchArticles();
+  }, []);
 
   // Load image from mediaId with caching
   const loadImage = async (mediaId, type) => {
@@ -283,6 +314,7 @@ const AdminHomePage = () => {
           aboutMediaId: aboutMediaId,
           educationMediaId: educationMediaId,
           reviewMediaIds: newReviewMediaIds,
+          welcomeArticleIds: welcomeArticleIds,
           contact: formatContactForBackend(),
         };
 
@@ -310,9 +342,10 @@ const AdminHomePage = () => {
         welcomeMediaId: type === 'welcome' ? mediaId : welcomeMediaId,
         aboutMediaId: type === 'about' ? mediaId : aboutMediaId,
         educationMediaId: type === 'education' ? mediaId : educationMediaId,
-        reviewMediaIds: reviewMediaIds,
-        contact: formatContactForBackend(),
-      };
+          reviewMediaIds: reviewMediaIds,
+          welcomeArticleIds: welcomeArticleIds,
+          contact: formatContactForBackend(),
+        };
 
       const updateResponse = await fetchWithAuth('/api/v1/admin/home', {
         method: 'PUT',
@@ -363,6 +396,7 @@ const AdminHomePage = () => {
         aboutMediaId: aboutMediaId,
         educationMediaId: educationMediaId,
         reviewMediaIds: newReviewMediaIds,
+        welcomeArticleIds: welcomeArticleIds,
         contact: formatContactForBackend(),
       };
 
@@ -516,6 +550,7 @@ const AdminHomePage = () => {
           aboutMediaId: aboutMediaId,
           educationMediaId: educationMediaId,
           reviewMediaIds: reviewMediaIds,
+          welcomeArticleIds: welcomeArticleIds,
           contact: formatContactForBackend(),
         }),
       });
@@ -1089,6 +1124,135 @@ const AdminHomePage = () => {
               </Box>
             )}
           </Box>
+        </Container>
+      </Box>
+
+      {/* Blog Section */}
+      <Box
+        component="section"
+        sx={{
+          py: { xs: 6, md: 10 },
+          bgcolor: 'background.paper',
+        }}
+      >
+        <Container maxWidth="lg">
+          <Box sx={{ mb: 4 }}>
+            <Divider 
+              sx={{ 
+                width: '60px', 
+                height: '2px', 
+                bgcolor: 'black',
+                mb: 2,
+              }} 
+            />
+            <Typography
+              variant="h2"
+              component="h2"
+              sx={{
+                fontSize: { xs: '2rem', sm: '2.5rem', md: '3rem' },
+                fontWeight: 700,
+                color: 'black',
+                letterSpacing: '0.05em',
+                textTransform: 'uppercase',
+                fontFamily: 'sans-serif',
+                mb: 3,
+              }}
+            >
+              BLOG
+            </Typography>
+            <Typography
+              variant="body1"
+              sx={{ mb: 4, opacity: 0.8 }}
+            >
+              Select up to 3 articles to display in the Blog section on the landing page.
+            </Typography>
+          </Box>
+
+          {loadingArticles ? (
+            <Box sx={{ display: 'flex', justifyContent: 'center', py: 4 }}>
+              <CircularProgress />
+            </Box>
+          ) : articlesError ? (
+            <Alert severity="error" sx={{ mb: 3 }}>
+              {articlesError}
+            </Alert>
+          ) : (
+            <Grid container spacing={3}>
+              {[0, 1, 2].map((index) => (
+                <Grid item xs={12} md={4} key={index}>
+                  <Card sx={{ height: '100%' }}>
+                    <CardContent>
+                      <Typography variant="h6" gutterBottom>
+                        Article {index + 1}
+                      </Typography>
+                      <FormControl fullWidth sx={{ mt: 2 }}>
+                        <InputLabel>Select Article</InputLabel>
+                        <Select
+                          value={welcomeArticleIds[index] || ''}
+                          label="Select Article"
+                          onChange={(e) => {
+                            const newArticleIds = [...welcomeArticleIds];
+                            if (e.target.value) {
+                              newArticleIds[index] = e.target.value;
+                            } else {
+                              newArticleIds.splice(index, 1);
+                            }
+                            // Keep only first 3 items
+                            setWelcomeArticleIds(newArticleIds.slice(0, 3));
+                          }}
+                        >
+                          <MenuItem value="">
+                            <em>None</em>
+                          </MenuItem>
+                          {availableArticles.map((article) => {
+                            // Don't show articles that are already selected in other slots
+                            const isSelected = welcomeArticleIds.includes(article.articleId) && welcomeArticleIds[index] !== article.articleId;
+                            return (
+                              <MenuItem
+                                key={article.articleId}
+                                value={article.articleId}
+                                disabled={isSelected}
+                              >
+                                {article.title || 'Untitled'}
+                                {isSelected && ' (Already selected)'}
+                              </MenuItem>
+                            );
+                          })}
+                        </Select>
+                      </FormControl>
+                      {welcomeArticleIds[index] && (
+                        <Box sx={{ mt: 2 }}>
+                          {(() => {
+                            const selectedArticle = availableArticles.find(
+                              (a) => a.articleId === welcomeArticleIds[index]
+                            );
+                            if (selectedArticle) {
+                              const stripHtml = (html) => {
+                                if (!html) return '';
+                                return html.replace(/<[^>]*>/g, '').replace(/\s+/g, ' ').trim();
+                              };
+                              const preview = stripHtml(selectedArticle.content || '').substring(0, 150);
+                              return (
+                                <>
+                                  <Typography variant="subtitle2" color="text.secondary" gutterBottom>
+                                    Preview:
+                                  </Typography>
+                                  <Typography variant="body2" sx={{ fontStyle: 'italic', color: 'text.secondary' }}>
+                                    {preview}...
+                                  </Typography>
+                                </>
+                              );
+                            }
+                            return null;
+                          })()}
+                        </Box>
+                      )}
+                    </CardContent>
+                  </Card>
+                </Grid>
+              ))}
+            </Grid>
+          )}
         </Container>
       </Box>
 

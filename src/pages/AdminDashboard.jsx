@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   Box,
@@ -19,14 +19,674 @@ import {
   Chip,
   Stack,
   Divider,
+  Tabs,
+  Tab,
+  Card,
+  CardContent,
+  Pagination,
+  Paper,
+  Popover,
 } from '@mui/material';
+import dayjs from 'dayjs';
+import utc from 'dayjs/plugin/utc';
+import timezone from 'dayjs/plugin/timezone';
+import FilterAltIcon from '@mui/icons-material/FilterAlt';
+import ClearIcon from '@mui/icons-material/Clear';
+import { DateCalendar } from '@mui/x-date-pickers/DateCalendar';
+import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
+import { AdapterDayjs } from '@mui/x-date-pickers/AdapterDayjs';
+
+// Extend dayjs with timezone support
+dayjs.extend(utc);
+dayjs.extend(timezone);
 import apiClient from '../utils/api';
-import { fetchWithAuth } from '../utils/api';
+import { fetchWithAuth, getToken, fetchUserSettings } from '../utils/api';
 import CreateTagForm from '../components/CreateTagForm';
 import BookingsManagement from '../components/BookingsManagement';
 
+const PastSessions = () => {
+  const [status, setStatus] = useState('COMPLETED');
+  const [bookings, setBookings] = useState([]);
+  const [allBookings, setAllBookings] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+  const [page, setPage] = useState(0);
+  const [size] = useState(10);
+  const [totalPages, setTotalPages] = useState(0);
+  const [totalElements, setTotalElements] = useState(0);
+  const [startDate, setStartDate] = useState(null);
+  const [endDate, setEndDate] = useState(null);
+  const [userTimezone, setUserTimezone] = useState(null);
+  const [calendarAnchorEl, setCalendarAnchorEl] = useState(null);
+  const requestIdRef = useRef(0);
+  const mountedRef = useRef(true);
+  const fetchingParamsRef = useRef(null);
+  const fetchingPromiseRef = useRef(null);
+  const allBookingsRef = useRef([]);
+
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
+    };
+  }, []);
+
+  // Fetch user timezone from settings
+  const fetchUserTimezone = async () => {
+    try {
+      const data = await fetchUserSettings();
+      if (data && data.timezone) {
+        setUserTimezone(data.timezone);
+      } else {
+        const browserTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+        setUserTimezone(browserTimezone);
+      }
+    } catch (err) {
+      console.warn('Error fetching user timezone:', err);
+      const browserTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+      setUserTimezone(browserTimezone);
+    }
+  };
+
+  // Fetch timezone on mount
+  useEffect(() => {
+    if (getToken()) {
+      fetchUserTimezone();
+    } else {
+      const browserTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+      setUserTimezone(browserTimezone);
+    }
+  }, []);
+
+  // Apply date filter to bookings and pagination
+  const applyDateFilter = (bookingsToFilter, start, end) => {
+    let filtered = bookingsToFilter;
+
+    // Apply date filter if dates are set and timezone is loaded
+    if (start && userTimezone) {
+      const startDateStr = dayjs(start).format('YYYY-MM-DD');
+      const endDateStr = end ? dayjs(end).format('YYYY-MM-DD') : startDateStr;
+      
+      const actualStartStr = startDateStr <= endDateStr ? startDateStr : endDateStr;
+      const actualEndStr = startDateStr <= endDateStr ? endDateStr : startDateStr;
+
+      filtered = bookingsToFilter.filter((booking) => {
+        if (!booking.startTimeInstant) {
+          return false;
+        }
+        
+        try {
+          const bookingUtc = dayjs.utc(booking.startTimeInstant);
+          const bookingInTimezone = bookingUtc.tz(userTimezone);
+          const bookingDateStr = bookingInTimezone.format('YYYY-MM-DD');
+          
+          return bookingDateStr >= actualStartStr && bookingDateStr <= actualEndStr;
+        } catch (error) {
+          console.error('Error parsing booking date:', booking.startTimeInstant, error);
+          return false;
+        }
+      });
+    }
+
+    // Apply pagination
+    const totalFiltered = filtered.length;
+    const startIndex = page * size;
+    const endIndex = startIndex + size;
+    const paginated = filtered.slice(startIndex, endIndex);
+
+    setBookings(paginated);
+    setTotalElements(totalFiltered);
+    setTotalPages(Math.ceil(totalFiltered / size));
+  };
+
+  // Handle date selection from calendar
+  const handleDateSelect = (date) => {
+    if (!date) return;
+    
+    const selectedDay = dayjs(date).startOf('day');
+    
+    if (!startDate) {
+      setStartDate(selectedDay);
+      setEndDate(selectedDay);
+      setPage(0); // Reset to first page
+    } else {
+      const startDay = dayjs(startDate).startOf('day');
+      const isSingleDay = endDate && dayjs(startDate).isSame(endDate, 'day');
+      
+      if (selectedDay.isSame(startDay) && isSingleDay) {
+        setStartDate(null);
+        setEndDate(null);
+        setPage(0); // Reset to first page
+      } else if (selectedDay.isBefore(startDay)) {
+        setEndDate(startDate);
+        setStartDate(selectedDay);
+        setPage(0); // Reset to first page
+      } else {
+        setEndDate(selectedDay);
+        setPage(0); // Reset to first page
+      }
+    }
+  };
+
+  // Clear date filter
+  const handleClearFilter = () => {
+    setStartDate(null);
+    setEndDate(null);
+    setPage(0); // Reset to first page
+    setCalendarAnchorEl(null);
+  };
+
+  // Handle predefined filter buttons
+  const handleTodayFilter = () => {
+    const today = dayjs().startOf('day');
+    setStartDate(today);
+    setEndDate(today);
+    setPage(0); // Reset to first page
+    setCalendarAnchorEl(null);
+  };
+
+  const handleThisWeekFilter = () => {
+    const today = dayjs().startOf('day');
+    const startOfWeek = today.startOf('week');
+    const endOfWeek = today.endOf('week');
+    setStartDate(startOfWeek);
+    setEndDate(endOfWeek);
+    setPage(0); // Reset to first page
+    setCalendarAnchorEl(null);
+  };
+
+  const handleThisMonthFilter = () => {
+    const today = dayjs().startOf('day');
+    const startOfMonth = today.startOf('month');
+    const endOfMonth = today.endOf('month');
+    setStartDate(startOfMonth);
+    setEndDate(endOfMonth);
+    setPage(0); // Reset to first page
+    setCalendarAnchorEl(null);
+  };
+
+  // Determine which predefined filter is active
+  const getActiveFilter = () => {
+    if (!startDate || !endDate) return null;
+    
+    const today = dayjs().startOf('day');
+    const startDay = dayjs(startDate).startOf('day');
+    const endDay = dayjs(endDate).startOf('day');
+    
+    const startStr = startDay.format('YYYY-MM-DD');
+    const endStr = endDay.format('YYYY-MM-DD');
+    const todayStr = today.format('YYYY-MM-DD');
+    
+    if (startStr === todayStr && endStr === todayStr) {
+      return 'today';
+    }
+    
+    const startOfWeek = today.startOf('week');
+    const endOfWeek = today.endOf('week');
+    const startOfWeekStr = startOfWeek.format('YYYY-MM-DD');
+    const endOfWeekStr = endOfWeek.format('YYYY-MM-DD');
+    if (startStr === startOfWeekStr && endStr === endOfWeekStr) {
+      return 'thisWeek';
+    }
+    
+    const startOfMonth = today.startOf('month');
+    const endOfMonth = today.endOf('month');
+    const startOfMonthStr = startOfMonth.format('YYYY-MM-DD');
+    const endOfMonthStr = endOfMonth.format('YYYY-MM-DD');
+    if (startStr === startOfMonthStr && endStr === endOfMonthStr) {
+      return 'thisMonth';
+    }
+    
+    return null;
+  };
+
+  // Apply filter when dates or page change
+  useEffect(() => {
+    const currentBookings = allBookingsRef.current;
+    if (currentBookings.length > 0) {
+      applyDateFilter(currentBookings, startDate, endDate);
+    }
+  }, [startDate, endDate, userTimezone, page, size]);
+
+  useEffect(() => {
+    const paramsKey = `${status}-${page}-${size}`;
+    
+    // Skip if we're already fetching the same parameters
+    if (fetchingParamsRef.current === paramsKey && fetchingPromiseRef.current) {
+      return;
+    }
+    
+    // Mark these parameters as being fetched
+    fetchingParamsRef.current = paramsKey;
+    
+    // Increment request ID for this fetch
+    const currentRequestId = ++requestIdRef.current;
+    
+    const fetchPastSessions = async () => {
+      setLoading(true);
+      setError(null);
+      
+      try {
+        const response = await fetchWithAuth(
+          `/api/v1/admin/session/booking/status/${status}?page=${page}&size=${size}`
+        );
+
+        if (!response.ok) {
+          throw new Error(`Failed to load sessions: ${response.status} ${response.statusText}`);
+        }
+        const data = await response.json();
+        
+        // Only update state if this is still the latest request and component is mounted
+        if (currentRequestId !== requestIdRef.current || !mountedRef.current) {
+          return;
+        }
+        
+        // Handle paginated response
+        let fetchedBookings = [];
+        if (data.content && Array.isArray(data.content)) {
+          fetchedBookings = data.content;
+          setTotalPages(data.totalPages || 0);
+          setTotalElements(data.totalElements || 0);
+        } else if (Array.isArray(data)) {
+          fetchedBookings = data;
+          setTotalPages(1);
+          setTotalElements(data.length);
+        } else {
+          fetchedBookings = [];
+          setTotalPages(0);
+          setTotalElements(0);
+        }
+
+        // Store all bookings and apply date filter and pagination
+        setAllBookings(fetchedBookings);
+        allBookingsRef.current = fetchedBookings;
+        applyDateFilter(fetchedBookings, startDate, endDate);
+      } catch (err) {
+        // Only update state if this is still the latest request and component is mounted
+        if (currentRequestId !== requestIdRef.current || !mountedRef.current) {
+          return;
+        }
+        console.error('Error fetching past sessions:', err);
+        setError(err.message || 'Failed to load past sessions. Please try again.');
+        setBookings([]);
+        setTotalPages(0);
+        setTotalElements(0);
+      } finally {
+        // Only clear loading if this is still the latest request
+        if (currentRequestId === requestIdRef.current && mountedRef.current) {
+          setLoading(false);
+        }
+        // Clear fetching params and promise if this was the latest request
+        if (currentRequestId === requestIdRef.current) {
+          fetchingParamsRef.current = null;
+          fetchingPromiseRef.current = null;
+        }
+      }
+    };
+
+    // Store the promise and execute fetch
+    fetchingPromiseRef.current = fetchPastSessions();
+    
+    // Cleanup: don't clear refs here to prevent race condition with React StrictMode
+    // The refs will be cleared in the finally block when the fetch completes
+  }, [status, page, size]);
+
+  const handleStatusChange = (e) => {
+    setStatus(e.target.value);
+    setPage(0); // Reset to first page when status changes
+  };
+
+  const handlePageChange = (event, value) => {
+    setPage(value - 1); // MUI Pagination is 1-based, API is 0-based
+  };
+
+  const formatDateTime = (instantString) => {
+    if (!instantString) return 'N/A';
+    try {
+      return dayjs(instantString).format('MMM DD, YYYY HH:mm');
+    } catch {
+      return instantString;
+    }
+  };
+
+  const getClientName = (booking) => {
+    const firstName = booking.clientFirstName || '';
+    const lastName = booking.clientLastName || '';
+    const name = `${firstName} ${lastName}`.trim();
+    return name || booking.clientEmail || 'Unknown';
+  };
+
+  const STATUS_COLORS = {
+    COMPLETED: 'success',
+    DECLINED: 'error',
+    CANCELLED: 'default',
+  };
+
+  return (
+    <LocalizationProvider dateAdapter={AdapterDayjs}>
+      <Box>
+        <Box sx={{ mb: 3, display: 'flex', alignItems: 'center', gap: 2 }}>
+          <FormControl sx={{ minWidth: 200 }}>
+            <InputLabel>Status</InputLabel>
+            <Select
+              value={status}
+              onChange={handleStatusChange}
+              label="Status"
+            >
+              <MenuItem value="COMPLETED">Completed</MenuItem>
+              <MenuItem value="DECLINED">Declined</MenuItem>
+              <MenuItem value="CANCELLED">Cancelled</MenuItem>
+            </Select>
+          </FormControl>
+          {!loading && (
+            <Typography variant="body2" color="text.secondary">
+              Total: {totalElements} session{totalElements !== 1 ? 's' : ''}
+            </Typography>
+          )}
+        </Box>
+
+        {/* Date Range Filter */}
+        <Paper sx={{ p: 2, mb: 3, bgcolor: 'background.paper' }}>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, flexWrap: 'wrap' }}>
+            <FilterAltIcon color="action" />
+            <Button
+              variant={startDate && endDate && !getActiveFilter() ? 'contained' : 'outlined'}
+              size="small"
+              startIcon={<FilterAltIcon />}
+              onClick={(e) => setCalendarAnchorEl(e.currentTarget)}
+              sx={{ textTransform: 'none' }}
+            >
+              Date Range
+            </Button>
+            <Button
+              variant={getActiveFilter() === 'today' ? 'contained' : 'outlined'}
+              size="small"
+              onClick={handleTodayFilter}
+              sx={{ textTransform: 'none' }}
+            >
+              Today
+            </Button>
+            <Button
+              variant={getActiveFilter() === 'thisWeek' ? 'contained' : 'outlined'}
+              size="small"
+              onClick={handleThisWeekFilter}
+              sx={{ textTransform: 'none' }}
+            >
+              This Week
+            </Button>
+            <Button
+              variant={getActiveFilter() === 'thisMonth' ? 'contained' : 'outlined'}
+              size="small"
+              onClick={handleThisMonthFilter}
+              sx={{ textTransform: 'none' }}
+            >
+              This Month
+            </Button>
+            {startDate && (
+              <Typography variant="body2" color="text.secondary">
+                {endDate && dayjs(startDate).format('YYYY-MM-DD') !== dayjs(endDate).format('YYYY-MM-DD') ? (
+                  <>
+                    From: {dayjs(startDate).format('MMM DD, YYYY')} To: {dayjs(endDate).format('MMM DD, YYYY')}
+                  </>
+                ) : (
+                  <>Date: {dayjs(startDate).format('MMM DD, YYYY')}</>
+                )}
+              </Typography>
+            )}
+            {(startDate || endDate) && (
+              <Button
+                variant="outlined"
+                size="small"
+                startIcon={<ClearIcon />}
+                onClick={handleClearFilter}
+                sx={{ textTransform: 'none', ml: 'auto' }}
+              >
+                Clear Filter
+              </Button>
+            )}
+          </Box>
+
+          {/* Calendar Popover */}
+          <Popover
+            open={Boolean(calendarAnchorEl)}
+            anchorEl={calendarAnchorEl}
+            onClose={() => setCalendarAnchorEl(null)}
+            anchorOrigin={{
+              vertical: 'bottom',
+              horizontal: 'left',
+            }}
+            transformOrigin={{
+              vertical: 'top',
+              horizontal: 'left',
+            }}
+          >
+            <Box sx={{ p: 1 }}>
+              <DateCalendar
+                value={endDate || startDate || null}
+                onChange={handleDateSelect}
+                shouldDisableDate={(date) => false}
+                key={`${startDate?.format('YYYY-MM-DD') || ''}-${endDate?.format('YYYY-MM-DD') || ''}`}
+                sx={{
+                  '& .MuiPickersDay-root': {
+                    position: 'relative',
+                    '&.range-start': {
+                      backgroundColor: 'primary.main',
+                      color: 'primary.contrastText',
+                      borderRadius: '50% 0 0 50%',
+                      fontWeight: 'bold',
+                      '&:hover': {
+                        backgroundColor: 'primary.dark',
+                      },
+                    },
+                    '&.range-end': {
+                      backgroundColor: 'primary.main',
+                      color: 'primary.contrastText',
+                      borderRadius: '0 50% 50% 0',
+                      fontWeight: 'bold',
+                      '&:hover': {
+                        backgroundColor: 'primary.dark',
+                      },
+                    },
+                    '&.range-middle': {
+                      backgroundColor: 'primary.light',
+                      color: 'primary.contrastText',
+                      borderRadius: 0,
+                      '&:hover': {
+                        backgroundColor: 'primary.main',
+                      },
+                    },
+                    '&.range-single': {
+                      backgroundColor: 'primary.main',
+                      color: 'primary.contrastText',
+                      borderRadius: '50%',
+                      fontWeight: 'bold',
+                      '&:hover': {
+                        backgroundColor: 'primary.dark',
+                      },
+                    },
+                  },
+                }}
+                slotProps={{
+                  day: (ownerState) => {
+                    const dayValue = dayjs(ownerState.day).startOf('day');
+                    const dayStr = dayValue.format('YYYY-MM-DD');
+                    
+                    let sx = {};
+                    if (startDate && endDate) {
+                      const startDay = dayjs(startDate).startOf('day');
+                      const endDay = dayjs(endDate).startOf('day');
+                      const startStr = startDay.format('YYYY-MM-DD');
+                      const endStr = endDay.format('YYYY-MM-DD');
+                      const actualStart = startStr <= endStr ? startStr : endStr;
+                      const actualEnd = startStr <= endStr ? endStr : startStr;
+                      
+                      if (dayStr === actualStart && dayStr === actualEnd) {
+                        sx = {
+                          backgroundColor: 'primary.main',
+                          color: 'primary.contrastText',
+                          borderRadius: '50%',
+                          fontWeight: 'bold',
+                          '&:hover': {
+                            backgroundColor: 'primary.dark',
+                          },
+                        };
+                      } else if (dayStr === actualStart) {
+                        sx = {
+                          backgroundColor: 'primary.main',
+                          color: 'primary.contrastText',
+                          borderRadius: '50% 0 0 50%',
+                          fontWeight: 'bold',
+                          '&:hover': {
+                            backgroundColor: 'primary.dark',
+                          },
+                        };
+                      } else if (dayStr === actualEnd) {
+                        sx = {
+                          backgroundColor: 'primary.main',
+                          color: 'primary.contrastText',
+                          borderRadius: '0 50% 50% 0',
+                          fontWeight: 'bold',
+                          '&:hover': {
+                            backgroundColor: 'primary.dark',
+                          },
+                        };
+                      } else if (dayStr > actualStart && dayStr < actualEnd) {
+                        sx = {
+                          backgroundColor: 'primary.light',
+                          color: 'primary.contrastText',
+                          borderRadius: 0,
+                          '&:hover': {
+                            backgroundColor: 'primary.main',
+                          },
+                        };
+                      }
+                    } else if (startDate) {
+                      const startDay = dayjs(startDate).startOf('day');
+                      const startStr = startDay.format('YYYY-MM-DD');
+                      if (dayStr === startStr) {
+                        sx = {
+                          backgroundColor: 'primary.main',
+                          color: 'primary.contrastText',
+                          borderRadius: '50%',
+                          fontWeight: 'bold',
+                          '&:hover': {
+                            backgroundColor: 'primary.dark',
+                          },
+                        };
+                      }
+                    }
+                    
+                    return { sx };
+                  },
+                }}
+              />
+            </Box>
+          </Popover>
+        </Paper>
+
+      {error && (
+        <Alert severity="error" sx={{ mb: 2 }} onClose={() => setError(null)}>
+          {error}
+        </Alert>
+      )}
+
+      {loading ? (
+        <Box sx={{ display: 'flex', justifyContent: 'center', py: 4 }}>
+          <CircularProgress />
+        </Box>
+      ) : bookings.length === 0 ? (
+        <Alert severity="info">No {status.toLowerCase()} sessions found.</Alert>
+      ) : (
+        <>
+          <Grid container spacing={2}>
+            {bookings.map((booking) => (
+              <Grid item xs={12} key={booking.id}>
+                <Card>
+                  <CardContent>
+                    <Box sx={{ display: 'flex', gap: 1, alignItems: 'center', mb: 2 }}>
+                      <Chip
+                        label={booking.status.replace(/_/g, ' ')}
+                        color={STATUS_COLORS[booking.status] || 'default'}
+                        size="small"
+                      />
+                    </Box>
+                    
+                    <Box sx={{ mb: 1 }}>
+                      <Typography variant="h6">
+                        {getClientName(booking)}
+                      </Typography>
+                    </Box>
+                    
+                    <Box sx={{ mb: 2 }}>
+                      <Typography variant="body2" color="text.secondary">
+                        {booking.clientEmail}
+                      </Typography>
+                    </Box>
+
+                    <Divider sx={{ my: 2 }} />
+
+                    <Grid container spacing={2}>
+                      <Grid item xs={12} sm={6}>
+                        <Typography variant="body2" color="text.secondary">
+                          Session Type
+                        </Typography>
+                        <Typography variant="body1" gutterBottom>
+                          {booking.sessionTypeName || 'N/A'}
+                        </Typography>
+                      </Grid>
+                      <Grid item xs={12} sm={6}>
+                        <Typography variant="body2" color="text.secondary">
+                          Start Time
+                        </Typography>
+                        <Typography variant="body1" gutterBottom>
+                          {formatDateTime(booking.startTimeInstant)}
+                        </Typography>
+                      </Grid>
+                      <Grid item xs={12} sm={6}>
+                        <Typography variant="body2" color="text.secondary">
+                          End Time
+                        </Typography>
+                        <Typography variant="body1" gutterBottom>
+                          {formatDateTime(booking.endTimeInstant)}
+                        </Typography>
+                      </Grid>
+                      <Grid item xs={12} sm={6}>
+                        <Typography variant="body2" color="text.secondary">
+                          Created At
+                        </Typography>
+                        <Typography variant="body1" gutterBottom>
+                          {formatDateTime(booking.createdAt)}
+                        </Typography>
+                      </Grid>
+                    </Grid>
+                  </CardContent>
+                </Card>
+              </Grid>
+            ))}
+          </Grid>
+
+          {totalPages > 1 && (
+            <Box sx={{ display: 'flex', justifyContent: 'center', mt: 4 }}>
+              <Pagination
+                count={totalPages}
+                page={page + 1} // MUI Pagination is 1-based
+                onChange={handlePageChange}
+                color="primary"
+                showFirstButton
+                showLastButton
+              />
+            </Box>
+          )}
+        </>
+      )}
+    </Box>
+    </LocalizationProvider>
+  );
+};
+
 const AdminDashboard = () => {
   const navigate = useNavigate();
+  const [activeTab, setActiveTab] = useState(0);
   const [addPostOpen, setAddPostOpen] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState('');
@@ -201,6 +861,10 @@ const AdminDashboard = () => {
     }
   };
 
+  const handleTabChange = (event, newValue) => {
+    setActiveTab(newValue);
+  };
+
   return (
     <Box>
       <Box sx={{ mb: 3 }}>
@@ -211,8 +875,25 @@ const AdminDashboard = () => {
 
       <Divider sx={{ my: 4 }} />
 
-      {/* Bookings Management */}
-      <BookingsManagement />
+      {/* Sessions Tabs */}
+      <Box sx={{ mb: 4 }}>
+        <Tabs value={activeTab} onChange={handleTabChange} sx={{ mb: 3 }}>
+          <Tab label="Active Sessions" />
+          <Tab label="Past Sessions" />
+        </Tabs>
+
+        {activeTab === 0 && (
+          <Box>
+            <BookingsManagement />
+          </Box>
+        )}
+
+        {activeTab === 1 && (
+          <Box>
+            <PastSessions />
+          </Box>
+        )}
+      </Box>
 
       <Divider sx={{ my: 4 }} />
 
