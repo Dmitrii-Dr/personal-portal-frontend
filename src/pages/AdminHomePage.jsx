@@ -56,6 +56,7 @@ const AdminHomePage = () => {
   const [availableArticles, setAvailableArticles] = useState([]);
   const [loadingArticles, setLoadingArticles] = useState(false);
   const [articlesError, setArticlesError] = useState(null);
+  const [invalidArticleIdsError, setInvalidArticleIdsError] = useState(null);
   
   // Media IDs state
   const [welcomeMediaId, setWelcomeMediaId] = useState(null);
@@ -211,6 +212,48 @@ const AdminHomePage = () => {
     };
     fetchArticles();
   }, []);
+
+  // Validate welcomeArticleIds against available articles
+  // This runs when both welcome data and articles are loaded
+  useEffect(() => {
+    // Only validate if both data sources are loaded
+    if (loading || loadingArticles || !welcomeData || availableArticles.length === 0) {
+      return;
+    }
+
+    // Get current welcomeArticleIds from state
+    setWelcomeArticleIds((currentArticleIds) => {
+      // If no article IDs to validate, return as is
+      if (!currentArticleIds || currentArticleIds.length === 0) {
+        setInvalidArticleIdsError(null);
+        return currentArticleIds;
+      }
+
+      // Check if any welcomeArticleIds are invalid (not in availableArticles)
+      const availableArticleIds = new Set(availableArticles.map(article => article.articleId));
+      const invalidArticleIds = currentArticleIds.filter(
+        articleId => articleId && !availableArticleIds.has(articleId)
+      );
+
+      if (invalidArticleIds.length > 0) {
+        // Show error message above Blog section
+        const errorMessage = `Invalid article ID(s) found: ${invalidArticleIds.join(', ')}. These articles are not available and will be cleared.`;
+        setInvalidArticleIdsError(errorMessage);
+        
+        // Clear invalid article IDs - keep only valid ones
+        const validArticleIds = currentArticleIds.filter(
+          articleId => !articleId || availableArticleIds.has(articleId)
+        );
+        
+        console.warn('Invalid welcomeArticleIds detected and cleared:', invalidArticleIds);
+        return validArticleIds;
+      }
+
+      // Clear error if no invalid IDs found
+      setInvalidArticleIdsError(null);
+      return currentArticleIds;
+    });
+  }, [loading, loadingArticles, welcomeData, availableArticles]);
 
   // Load image from mediaId with caching
   const loadImage = async (mediaId, type) => {
@@ -1167,6 +1210,17 @@ const AdminHomePage = () => {
               Select up to 3 articles to display in the Blog section on the landing page.
             </Typography>
           </Box>
+
+          {/* Invalid Article IDs Error */}
+          {invalidArticleIdsError && (
+            <Alert 
+              severity="warning" 
+              sx={{ mb: 3 }}
+              onClose={() => setInvalidArticleIdsError(null)}
+            >
+              {invalidArticleIdsError}
+            </Alert>
+          )}
 
           {loadingArticles ? (
             <Box sx={{ display: 'flex', justifyContent: 'center', py: 4 }}>

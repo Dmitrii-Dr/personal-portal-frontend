@@ -260,8 +260,14 @@ const LandingPage = () => {
       setBlogLoading(true);
       setBlogError(null);
       try {
-        // Build query string with article IDs
-        const articleIds = welcomeData.welcomeArticleIds.join(',');
+        // Build query string with article IDs - filter out empty/null/undefined values
+        const validArticleIds = welcomeData.welcomeArticleIds.filter(id => id && id.trim() !== '');
+        if (validArticleIds.length === 0) {
+          setBlogArticles([]);
+          setBlogLoading(false);
+          return;
+        }
+        const articleIds = validArticleIds.join(',');
         const response = await apiClient.get(`/api/v1/public/articles?id=${articleIds}`, {
           timeout: 10000,
         });

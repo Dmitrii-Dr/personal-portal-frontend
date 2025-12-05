@@ -7,15 +7,53 @@ const AuthenticatedImage = ({ mediaId, width, height, alignment = 'center' }) =>
   const [imageUrl, setImageUrl] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [retryCount, setRetryCount] = useState(0);
   const objectUrlRef = useRef(null);
+
+  const handleImageError = React.useCallback(async (e) => {
+    // Check if this is a resource error - don't retry in that case
+    const errorMsg = e.target.src || '';
+    const isResourceError = errorMsg.includes('ERR_INSUFFICIENT_RESOURCES') || 
+                           errorMsg.includes('Failed to fetch') ||
+                           navigator.onLine === false;
+    
+    if (isResourceError && retryCount === 0) {
+      console.warn(`Resource error for mediaId: ${mediaId}, skipping retry to avoid resource exhaustion`);
+      setError('Resource error - too many requests. Please refresh the page.');
+      e.target.style.border = '1px solid orange';
+      e.target.alt = `Failed to load image: ${mediaId}`;
+      return;
+    }
+    
+    console.warn(`Image failed to load for mediaId: ${mediaId}, clearing cache and retrying...`);
+    // Clear cache and retry (max 1 retry to avoid infinite loops)
+    if (retryCount < 1) {
+      // Clear the invalid cache entry
+      const { clearCachedImage } = await import('../utils/imageCache');
+      await clearCachedImage(mediaId);
+      setRetryCount(prev => prev + 1);
+      // The useEffect will retry when retryCount changes
+    } else {
+      console.error(`Failed to load image after retry for mediaId: ${mediaId}`);
+      setError('Failed to load image after retry');
+      e.target.style.border = '1px solid red';
+      e.target.alt = `Failed to load image: ${mediaId}`;
+    }
+  }, [mediaId, retryCount]);
 
   useEffect(() => {
     let isMounted = true;
 
-    const loadImage = async () => {
+    const loadImage = async (clearCache = false) => {
       try {
         setLoading(true);
         setError(null);
+        
+        // If retrying after error, clear cache first
+        if (clearCache) {
+          const { clearCachedImage } = await import('../utils/imageCache');
+          await clearCachedImage(mediaId);
+        }
         
         // Check cache first (now async)
         const cachedUrl = await getCachedImage(mediaId);
@@ -33,6 +71,7 @@ const AuthenticatedImage = ({ mediaId, width, height, alignment = 'center' }) =>
           objectUrlRef.current = objectUrl;
           setImageUrl(objectUrl);
           setLoading(false);
+          setRetryCount(0); // Reset retry count on success
         }
       } catch (err) {
         console.error(`Error loading image with mediaId: ${mediaId}`, err);
@@ -52,7 +91,7 @@ const AuthenticatedImage = ({ mediaId, width, height, alignment = 'center' }) =>
       // and might be used by other components. The cache utility handles cleanup.
       objectUrlRef.current = null;
     };
-  }, [mediaId]);
+  }, [mediaId, retryCount]);
 
   if (loading) {
     return (
@@ -102,11 +141,7 @@ const AuthenticatedImage = ({ mediaId, width, height, alignment = 'center' }) =>
           display: alignment === 'center' ? 'block' : 'inline-block',
           margin: alignment === 'center' ? '0 auto' : '0',
         }}
-        onError={(e) => {
-          console.error(`Failed to display image with mediaId: ${mediaId}`);
-          e.target.style.border = '1px solid red';
-          e.target.alt = `Failed to load image: ${mediaId}`;
-        }}
+        onError={handleImageError}
         loading="lazy"
       />
     </Box>

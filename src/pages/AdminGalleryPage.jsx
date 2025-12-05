@@ -20,6 +20,8 @@ import {
   Checkbox,
   DialogActions,
   Stack,
+  useMediaQuery,
+  useTheme,
 } from '@mui/material';
 import CloseIcon from '@mui/icons-material/Close';
 import PhotoLibraryIcon from '@mui/icons-material/PhotoLibrary';
@@ -29,13 +31,18 @@ import CheckBoxIcon from '@mui/icons-material/CheckBox';
 import CheckBoxOutlineBlankIcon from '@mui/icons-material/CheckBoxOutlineBlank';
 
 const AdminGalleryPage = () => {
+  const theme = useTheme();
+  const isXs = useMediaQuery(theme.breakpoints.only('xs'));
+  const isSm = useMediaQuery(theme.breakpoints.only('sm'));
+  const isMd = useMediaQuery(theme.breakpoints.only('md'));
+  const isLg = useMediaQuery(theme.breakpoints.up('lg'));
+
   const [mediaItems, setMediaItems] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [page, setPage] = useState(0); // 0-based indexing for API
   const [totalPages, setTotalPages] = useState(1);
   const [totalElements, setTotalElements] = useState(0);
-  const [pageSize] = useState(10);
   const [thumbnailUrls, setThumbnailUrls] = useState({}); // mediaId -> thumbnail objectUrl
   const [fullImageUrls, setFullImageUrls] = useState({}); // mediaId -> full image objectUrl
   const [loadingThumbnails, setLoadingThumbnails] = useState({}); // mediaId -> boolean
@@ -48,6 +55,46 @@ const AdminGalleryPage = () => {
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [successMessage, setSuccessMessage] = useState(null);
   const fileInputRef = useRef(null);
+
+  // Calculate dynamic page size based on screen size
+  // Grid layout: xs=1, sm=2, md=3, lg=4 per row
+  // Aim for 2-3 rows of images visible at once
+  const calculatePageSize = React.useCallback(() => {
+    if (isXs) {
+      return 6; // 1 per row, 6 rows
+    } else if (isSm) {
+      return 12; // 2 per row, 6 rows
+    } else if (isMd) {
+      return 15; // 3 per row, 5 rows
+    } else {
+      return 20; // 4 per row, 5 rows
+    }
+  }, [isXs, isSm, isMd, isLg]);
+
+  const [pageSize, setPageSize] = useState(() => {
+    // Initial calculation - will be updated by useEffect
+    if (typeof window !== 'undefined') {
+      const width = window.innerWidth;
+      if (width < theme.breakpoints.values.sm) return 6;
+      if (width < theme.breakpoints.values.md) return 12;
+      if (width < theme.breakpoints.values.lg) return 15;
+      return 20;
+    }
+    return 10;
+  });
+
+  // Update page size when screen size changes
+  useEffect(() => {
+    const newPageSize = calculatePageSize();
+    setPageSize((prevSize) => {
+      if (prevSize !== newPageSize) {
+        // Reset to first page when page size changes
+        setPage(0);
+        return newPageSize;
+      }
+      return prevSize;
+    });
+  }, [calculatePageSize]);
 
   // Load all thumbnails for media items using cache
   const loadAllThumbnails = async (items) => {
@@ -637,7 +684,7 @@ const AdminGalleryPage = () => {
         </Alert>
       ) : (
         <>
-          <Grid container spacing={3}>
+          <Grid container spacing={1.5}>
             {mediaItems.map((item) => (
               <Grid item xs={12} sm={6} md={4} lg={3} key={item.mediaId}>
                 <Card
@@ -648,12 +695,12 @@ const AdminGalleryPage = () => {
                     display: 'flex',
                     flexDirection: 'column',
                     position: 'relative',
-                    border: selectedMediaIds.has(item.mediaId) ? '2px solid' : '2px solid transparent',
-                    borderColor: selectedMediaIds.has(item.mediaId) ? 'primary.main' : 'transparent',
+                    border: selectedMediaIds.has(item.mediaId) ? '2px solid' : '1px solid transparent',
+                    borderColor: selectedMediaIds.has(item.mediaId) ? 'primary.main' : 'divider',
                     '&:hover': thumbnailUrls[item.mediaId] && !selectionMode
                       ? {
-                          transform: 'translateY(-4px)',
-                          boxShadow: 4,
+                          transform: 'translateY(-2px)',
+                          boxShadow: 2,
                         }
                       : {},
                   }}
@@ -669,11 +716,11 @@ const AdminGalleryPage = () => {
                     <Box
                       sx={{
                         position: 'absolute',
-                        top: 8,
-                        left: 8,
+                        top: 4,
+                        left: 4,
                         zIndex: 1,
                         bgcolor: 'background.paper',
-                        borderRadius: 1,
+                        borderRadius: 0.5,
                       }}
                       onClick={(e) => e.stopPropagation()}
                     >
@@ -681,21 +728,22 @@ const AdminGalleryPage = () => {
                         checked={selectedMediaIds.has(item.mediaId)}
                         icon={<CheckBoxOutlineBlankIcon />}
                         checkedIcon={<CheckBoxIcon />}
-                        sx={{ p: 0.5 }}
+                        size="small"
+                        sx={{ p: 0.25 }}
                         onChange={() => toggleSelection(item.mediaId)}
                         onClick={(e) => e.stopPropagation()}
                       />
                     </Box>
                   )}
                   {loadingThumbnails[item.mediaId] ? (
-                    <Skeleton variant="rectangular" height={200} />
+                    <Skeleton variant="rectangular" height={120} />
                   ) : thumbnailUrls[item.mediaId] ? (
                     <CardMedia
                       component="img"
                       image={thumbnailUrls[item.mediaId]}
                       alt={item.altText || item.fileUrl || 'Gallery image'}
                       sx={{
-                        height: 200,
+                        height: 120,
                         objectFit: 'cover',
                       }}
                       onError={(e) => {
@@ -706,28 +754,39 @@ const AdminGalleryPage = () => {
                   ) : (
                     <Box
                       sx={{
-                        height: 200,
+                        height: 120,
                         display: 'flex',
                         alignItems: 'center',
                         justifyContent: 'center',
                         bgcolor: 'grey.200',
                       }}
                     >
-                      <Typography variant="body2" color="text.secondary">
+                      <Typography variant="caption" color="text.secondary">
                         Failed to load
                       </Typography>
                     </Box>
                   )}
-                  <CardContent sx={{ flexGrow: 1 }}>
+                  <CardContent sx={{ flexGrow: 1, p: 1, '&:last-child': { pb: 1 } }}>
                     <Typography
-                      variant="body2"
+                      variant="caption"
                       color="text.secondary"
                       noWrap
-                      sx={{ mb: 0.5 }}
+                      sx={{ 
+                        fontSize: '0.7rem',
+                        display: 'block',
+                        mb: 0.25,
+                      }}
                     >
                       {item.fileUrl || 'Untitled'}
                     </Typography>
-                    <Typography variant="caption" color="text.secondary">
+                    <Typography 
+                      variant="caption" 
+                      color="text.secondary"
+                      sx={{ 
+                        fontSize: '0.65rem',
+                        opacity: 0.7,
+                      }}
+                    >
                       {formatDate(item.createdAt)}
                     </Typography>
                   </CardContent>
