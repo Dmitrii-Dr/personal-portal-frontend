@@ -502,6 +502,26 @@ const AppLayout = ({ children }) => {
                 >
                   Sessions
                 </Button>
+                <Button
+                  component={Link}
+                  to="/admin/gallery"
+                  color="inherit"
+                  sx={{ 
+                    textTransform: 'none',
+                    fontWeight: 500,
+                    fontSize: { xs: '0.875rem', sm: '0.9375rem', md: '1rem' },
+                    px: { xs: 1, sm: 1.5 },
+                    py: 1,
+                    borderRadius: 1,
+                    transition: 'all 0.2s ease-in-out',
+                    '&:hover': {
+                      bgcolor: 'rgba(255, 255, 255, 0.1)',
+                      transform: 'translateY(-1px)',
+                    },
+                  }}
+                >
+                  Gallery
+                </Button>
               </>
             )}
 

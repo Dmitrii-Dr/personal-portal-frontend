@@ -3,7 +3,7 @@ version: '3.9'
 services:
   frontend:
     container_name: personal-portal-fe
-    build: .
+    tebuild: .
     networks:
       - personal-portal-network
 

@@ -213,6 +213,48 @@ export const clearCachedImage = async (mediaId) => {
 };
 
 /**
+ * Load thumbnail from API with caching
+ * @param {string} mediaId - The media ID to load thumbnail for
+ * @returns {Promise<string>} - Promise resolving to object URL
+ */
+export const loadThumbnailWithCache = async (mediaId) => {
+  if (!mediaId) {
+    throw new Error('Media ID is required');
+  }
+
+  const thumbnailKey = `${mediaId}_thumb`;
+
+  // Check cache first (memory + IndexedDB)
+  const cachedUrl = await getCachedImage(thumbnailKey);
+  if (cachedUrl) {
+    return cachedUrl;
+  }
+
+  // Fetch thumbnail from API
+  try {
+    const response = await fetch(`/api/v1/public/media/image/${mediaId}/thumbnail`, {
+      method: 'GET',
+      cache: 'default', // Use browser HTTP cache as well
+    });
+
+    if (!response.ok) {
+      throw new Error(`Failed to load thumbnail: ${response.status}`);
+    }
+
+    const blob = await response.blob();
+    const objectUrl = URL.createObjectURL(blob);
+
+    // Cache the thumbnail using the thumbnail key
+    await setCachedImage(thumbnailKey, objectUrl, blob);
+
+    return objectUrl;
+  } catch (error) {
+    console.error(`Error loading thumbnail for mediaId ${mediaId}:`, error);
+    throw error;
+  }
+};
+
+/**
  * Clear all cached images
  */
 export const clearAllCachedImages = async () => {

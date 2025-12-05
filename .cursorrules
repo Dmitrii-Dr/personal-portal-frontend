@@ -1,0 +1,108 @@
+# Cursor Rules for Personal Portal Frontend
+
+## API Calls Best Practices
+
+### Always Prevent Duplicate API Calls
+
+When implementing new API calls or adding new API endpoints, ALWAYS:
+
+1. **Use AbortController for request cancellation**:
+   - Create an `AbortController` in useEffect
+   - Pass `signal: controller.signal` to the API call
+   - Cancel requests in the cleanup function: `controller.abort()`
+   - Handle abort errors gracefully (ignore `AbortError`, `CanceledError`, or `ERR_CANCELED`)
+
+2. **Track component mount state**:
+   - Use `isMounted` flag to prevent state updates after unmount
+   - Check `isMounted` before setting state after async operations
+   - Set `isMounted = false` in cleanup function
+
+3. **Example pattern for API calls in useEffect**:
+   ```javascript
+   useEffect(() => {
+     let isMounted = true;
+     const controller = new AbortController();
+
+     const fetchData = async () => {
+       try {
+         setLoading(true);
+         setError(null);
+         
+         const response = await apiClient.get('/api/v1/endpoint', {
+           signal: controller.signal,
+           timeout: 10000,
+         });
+         
+         if (!isMounted) return;
+         
+         // Process response and update state
+         setData(response.data);
+       } catch (err) {
+         // Don't set error if request was aborted
+         if (err.name === 'AbortError' || err.name === 'CanceledError' || err.code === 'ERR_CANCELED') {
+           return;
+         }
+         
+         if (!isMounted) return;
+         
+         // Handle actual errors
+         setError(err.message);
+       } finally {
+         if (isMounted) {
+           setLoading(false);
+         }
+       }
+     };
+
+     fetchData();
+
+     return () => {
+       isMounted = false;
+       controller.abort();
+     };
+   }, [dependencies]);
+   ```
+
+4. **Check existing patterns**: Always look at similar implementations in the codebase (e.g., `BlogPage.jsx`, `AdminGalleryPage.jsx`) for consistency.
+
+5. **Test for duplicate calls**: After implementing, verify in browser DevTools Network tab that API endpoints are not called multiple times on:
+   - Initial component mount
+   - Route navigation
+   - Dependency changes
+   - React.StrictMode double renders (development)
+
+## Code Style
+
+- Use Material-UI components consistently
+- Follow existing error handling patterns
+- Use TypeScript-style JSDoc comments where helpful
+- Keep components focused and single-purpose
+- Extract reusable logic into utility functions
+
+## React Best Practices
+
+- Always use cleanup functions in useEffect for:
+  - API requests (AbortController)
+  - Event listeners
+  - Timers/intervals
+  - Subscriptions
+  
+- Use proper dependency arrays in useEffect hooks
+- Avoid direct state mutations
+- Use functional state updates when state depends on previous state
+
+## Project Structure
+
+- Components: `src/components/`
+- Pages: `src/pages/`
+- Utilities: `src/utils/`
+- Admin routes: `/admin/*`
+- Protected routes use `AdminRoute` wrapper
+
+## API Utilities
+
+- Use `apiClient` from `src/utils/api.js` for authenticated requests
+- Use `fetchWithAuth` for custom fetch requests
+- Use `loadImageWithCache` from `src/utils/imageCache.js` for image loading
+- Always handle authentication errors (401) appropriately
+

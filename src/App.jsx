@@ -12,6 +12,7 @@ import AdminDashboard from './pages/AdminDashboard';
 import AdminBlogPage from './pages/AdminBlogPage';
 import AdminProfilePage from './pages/AdminProfilePage';
 import AdminHomePage from './pages/AdminHomePage';
+import AdminGalleryPage from './pages/AdminGalleryPage';
 import AboutMePage from './pages/AboutMePage';
 import SessionsConfigurationPage from './pages/SessionsConfigurationPage';
 import AdminRoute from './components/AdminRoute';
@@ -578,6 +579,7 @@ function App() {
                         <Route path="dashboard" element={<AdminDashboard />} />
                         <Route path="home" element={<AdminHomePage />} />
                         <Route path="blog" element={<AdminBlogPage />} />
+                        <Route path="gallery" element={<AdminGalleryPage />} />
                         <Route path="profile" element={<AdminProfilePage />} />
                         <Route path="session/configuration" element={<SessionsConfigurationPage />} />
                         {/* Add more admin routes here as needed */}
