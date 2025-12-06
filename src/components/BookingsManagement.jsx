@@ -3,6 +3,7 @@ import dayjs from 'dayjs';
 import utc from 'dayjs/plugin/utc';
 import timezone from 'dayjs/plugin/timezone';
 import { fetchAdminGroupedBookings, fetchWithAuth, getToken, fetchUserSettings } from '../utils/api';
+import apiClient from '../utils/api';
 
 // Extend dayjs with timezone support
 dayjs.extend(utc);
@@ -19,6 +20,7 @@ import {
   Dialog,
   DialogTitle,
   DialogContent,
+  DialogContentText,
   DialogActions,
   FormControl,
   InputLabel,
@@ -30,14 +32,21 @@ import {
   Snackbar,
   Paper,
   Popover,
+  List,
+  ListItemButton,
+  TextField,
+  IconButton,
 } from '@mui/material';
 import { DateCalendar } from '@mui/x-date-pickers/DateCalendar';
 import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
 import { AdapterDayjs } from '@mui/x-date-pickers/AdapterDayjs';
 import EditIcon from '@mui/icons-material/Edit';
-import MessageIcon from '@mui/icons-material/Message';
+import InfoIcon from '@mui/icons-material/Info';
+import AccessTimeIcon from '@mui/icons-material/AccessTime';
 import FilterAltIcon from '@mui/icons-material/FilterAlt';
 import ClearIcon from '@mui/icons-material/Clear';
+import ArrowUpwardIcon from '@mui/icons-material/ArrowUpward';
+import ArrowDownwardIcon from '@mui/icons-material/ArrowDownward';
 
 const STATUS_COLORS = {
   PENDING_APPROVAL: 'warning',
@@ -72,17 +81,66 @@ const BookingsManagement = () => {
   const [updating, setUpdating] = useState(false);
   const [updateError, setUpdateError] = useState(null);
   const [successMessage, setSuccessMessage] = useState(null);
-  const [messageDialogOpen, setMessageDialogOpen] = useState(false);
-  const [selectedBookingMessage, setSelectedBookingMessage] = useState(null);
+  const [infoDialogOpen, setInfoDialogOpen] = useState(false);
+  const [selectedBookingInfo, setSelectedBookingInfo] = useState(null);
   const [startDate, setStartDate] = useState(null);
   const [endDate, setEndDate] = useState(null);
   const [userTimezone, setUserTimezone] = useState(null);
   const [calendarAnchorEl, setCalendarAnchorEl] = useState(null);
+  const [rescheduleDialogOpen, setRescheduleDialogOpen] = useState(false);
+  const [bookingToReschedule, setBookingToReschedule] = useState(null);
+  const [rescheduleSelectedDate, setRescheduleSelectedDate] = useState(dayjs());
+  const [rescheduleAvailableSlots, setRescheduleAvailableSlots] = useState([]);
+  const [rescheduleLoadingSlots, setRescheduleLoadingSlots] = useState(false);
+  const [rescheduleSlotError, setRescheduleSlotError] = useState(null);
+  const [rescheduleSelectedSlot, setRescheduleSelectedSlot] = useState(null);
+  const [rescheduleClientMessage, setRescheduleClientMessage] = useState('');
+  const [reschedulingBooking, setReschedulingBooking] = useState(false);
+  const [rescheduleBookingError, setRescheduleBookingError] = useState(null);
+  const [rescheduleSessionTypeId, setRescheduleSessionTypeId] = useState(null);
+  const [showCustomTimePicker, setShowCustomTimePicker] = useState(false);
+  const [customStartTime, setCustomStartTime] = useState(null);
+  const [hourInput, setHourInput] = useState('00');
+  const [minuteInput, setMinuteInput] = useState('00');
   const hasFetchedRef = useRef(false);
   const allBookingsRef = useRef({
     PENDING_APPROVAL: [],
     CONFIRMED: [],
   });
+
+  // Get currency symbol for display
+  const getCurrencySymbol = (currency) => {
+    if (!currency) return '';
+    const currencyMap = {
+      'Rubles': '₽',
+      'Tenge': '₸',
+      'USD': '$',
+    };
+    return currencyMap[currency] || '';
+  };
+
+  // Get first price from sessionPrices object and format it
+  const getBookingPriceDisplay = (sessionPrices) => {
+    if (!sessionPrices || typeof sessionPrices !== 'object') {
+      return null;
+    }
+    
+    // Get the first key-value pair from sessionPrices
+    const currencies = Object.keys(sessionPrices);
+    if (currencies.length === 0) {
+      return null;
+    }
+    
+    const firstCurrency = currencies[0];
+    const price = sessionPrices[firstCurrency];
+    
+    if (price === null || price === undefined) {
+      return null;
+    }
+    
+    const symbol = getCurrencySymbol(firstCurrency);
+    return `${price}${symbol}`;
+  };
 
   // Fetch user timezone from settings
   const fetchUserTimezone = async () => {
@@ -374,6 +432,90 @@ const BookingsManagement = () => {
     }
   }, [userTimezone]);
 
+  // Fetch reschedule slots when date or session type changes (only for future dates)
+  useEffect(() => {
+    let isMounted = true;
+    const controller = new AbortController();
+
+    const fetchSlots = async () => {
+      if (!rescheduleSessionTypeId || !rescheduleSelectedDate || !userTimezone) {
+        return;
+      }
+
+      // Don't fetch slots for past dates
+      const isPastDate = rescheduleSelectedDate.isBefore(dayjs(), 'day');
+      if (isPastDate) {
+        if (isMounted) {
+          setRescheduleAvailableSlots([]);
+          setRescheduleSlotError(null);
+        }
+        return;
+      }
+
+      try {
+        if (isMounted) {
+          setRescheduleLoadingSlots(true);
+          setRescheduleSlotError(null);
+        }
+
+        const dateString = formatDateForAPI(rescheduleSelectedDate);
+        const timezone = userTimezone || Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC';
+        
+        const response = await apiClient.get('/api/v1/public/booking/available/slot', {
+          params: {
+            sessionTypeId: rescheduleSessionTypeId,
+            suggestedDate: dateString,
+            timezone,
+          },
+          signal: controller.signal,
+          timeout: 10000,
+        });
+        
+        if (!isMounted) return;
+        
+        if (response.data && response.data.slots && Array.isArray(response.data.slots)) {
+          setRescheduleAvailableSlots(response.data.slots);
+        } else {
+          setRescheduleAvailableSlots([]);
+        }
+      } catch (err) {
+        // Don't set error if request was aborted
+        if (err.name === 'AbortError' || err.name === 'CanceledError' || err.code === 'ERR_CANCELED') {
+          return;
+        }
+        
+        console.error('Error fetching available slots for reschedule:', err);
+        if (!isMounted) return;
+        
+        let errorMessage = 'Failed to load available slots. Please try again later.';
+        
+        if (err.code === 'ECONNABORTED') {
+          errorMessage = 'Request timed out. Please try again.';
+        } else if (err.response) {
+          errorMessage = err.response.data?.message || `Server error: ${err.response.status}`;
+        } else if (err.request) {
+          errorMessage = 'Unable to reach the server. Please check your connection.';
+        } else {
+          errorMessage = err.message || errorMessage;
+        }
+        
+        setRescheduleSlotError(errorMessage);
+        setRescheduleAvailableSlots([]);
+      } finally {
+        if (isMounted) {
+          setRescheduleLoadingSlots(false);
+        }
+      }
+    };
+
+    fetchSlots();
+
+    return () => {
+      isMounted = false;
+      controller.abort();
+    };
+  }, [rescheduleSessionTypeId, rescheduleSelectedDate, userTimezone]);
+
   // Format date and time
   const formatDateTime = (instantString) => {
     if (!instantString) return 'N/A';
@@ -408,20 +550,372 @@ const BookingsManagement = () => {
     setUpdateError(null);
   };
 
-  // Handle message dialog open
-  const handleMessageClick = (booking) => {
-    setSelectedBookingMessage({
-      clientName: getClientName(booking),
-      clientEmail: booking.clientEmail,
-      message: booking.clientMessage,
-    });
-    setMessageDialogOpen(true);
+  // Handle info dialog open
+  const handleInfoClick = (booking) => {
+    setSelectedBookingInfo(booking);
+    setInfoDialogOpen(true);
   };
 
-  // Handle message dialog close
-  const handleMessageClose = () => {
-    setMessageDialogOpen(false);
-    setSelectedBookingMessage(null);
+  // Handle info dialog close
+  const handleInfoClose = () => {
+    setInfoDialogOpen(false);
+    setSelectedBookingInfo(null);
+  };
+
+  // Format date to YYYY-MM-DD for API
+  const formatDateForAPI = (date) => {
+    return dayjs(date).format('YYYY-MM-DD');
+  };
+
+  // Format time from instant
+  const formatTimeFromInstant = (instantString) => {
+    if (!instantString) return 'N/A';
+    try {
+      return dayjs(instantString).format('HH:mm');
+    } catch {
+      return instantString;
+    }
+  };
+
+  // Format time from LocalTime string
+  const formatTime = (timeString) => {
+    if (!timeString) return 'N/A';
+    try {
+      const time = timeString.includes(':') ? timeString.split(':').slice(0, 2).join(':') : timeString;
+      return dayjs(time, 'HH:mm').format('HH:mm');
+    } catch {
+      return timeString;
+    }
+  };
+
+  // Format date for display
+  const formatDateForDisplay = (date) => {
+    return dayjs(date).format('MMMM D, YYYY');
+  };
+
+  // Handle reschedule button click
+  const handleRescheduleClick = async (booking) => {
+    setBookingToReschedule(booking);
+    setRescheduleSelectedDate(dayjs());
+    setRescheduleAvailableSlots([]);
+    setRescheduleSlotError(null);
+    setRescheduleSelectedSlot(null);
+    setRescheduleClientMessage(booking.clientMessage || '');
+    setRescheduleBookingError(null);
+    setRescheduleSessionTypeId(null);
+    setRescheduleDialogOpen(true);
+    
+    // Fetch active session types and match by name to find the session type ID
+    try {
+      const response = await apiClient.get('/api/v1/public/session/type', {
+        timeout: 10000,
+      });
+      if (response.data && Array.isArray(response.data)) {
+        // Match booking session name to find the session type
+        const matchedSessionType = response.data.find(
+          st => st.name === booking.sessionName
+        );
+        if (matchedSessionType) {
+          const sessionTypeId = matchedSessionType.id || matchedSessionType.sessionTypeId;
+          setRescheduleSessionTypeId(sessionTypeId);
+          // Fetch slots for the matched session type
+          fetchRescheduleSlots(dayjs(), sessionTypeId);
+        } else {
+          setRescheduleSlotError(`Session type "${booking.sessionName}" is no longer available for booking.`);
+        }
+      } else {
+        setRescheduleSlotError('Failed to load session types.');
+      }
+    } catch (err) {
+      console.error('Error fetching session types for reschedule:', err);
+      setRescheduleSlotError('Failed to load session types. Please try again.');
+    }
+  };
+
+  // Fetch available slots for reschedule
+  const fetchRescheduleSlots = async (date, sessionTypeId) => {
+    if (!sessionTypeId) {
+      setRescheduleLoadingSlots(false);
+      setRescheduleAvailableSlots([]);
+      setRescheduleSlotError('Session type not found');
+      return;
+    }
+
+    try {
+      setRescheduleLoadingSlots(true);
+      setRescheduleSlotError(null);
+      const dateString = formatDateForAPI(date);
+      
+      const timezone = userTimezone || Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC';
+      
+      const response = await apiClient.get('/api/v1/public/booking/available/slot', {
+        params: {
+          sessionTypeId,
+          suggestedDate: dateString,
+          timezone,
+        },
+        timeout: 10000,
+      });
+      
+      if (response.data && response.data.slots && Array.isArray(response.data.slots)) {
+        setRescheduleAvailableSlots(response.data.slots);
+      } else {
+        setRescheduleAvailableSlots([]);
+      }
+    } catch (err) {
+      console.error('Error fetching available slots for reschedule:', err);
+      let errorMessage = 'Failed to load available slots. Please try again later.';
+      
+      if (err.code === 'ECONNABORTED') {
+        errorMessage = 'Request timed out. Please try again.';
+      } else if (err.response) {
+        errorMessage = err.response.data?.message || `Server error: ${err.response.status}`;
+      } else if (err.request) {
+        errorMessage = 'Unable to reach the server. Please check your connection.';
+      } else {
+        errorMessage = err.message || errorMessage;
+      }
+      
+      setRescheduleSlotError(errorMessage);
+      setRescheduleAvailableSlots([]);
+    } finally {
+      setRescheduleLoadingSlots(false);
+    }
+  };
+
+  // Handle reschedule date change
+  const handleRescheduleDateChange = (newDate) => {
+    setRescheduleSelectedDate(newDate);
+    // Reset custom time selection when date changes
+    if (showCustomTimePicker && customStartTime) {
+      // Update the selected slot with new date and existing time
+      const combinedDateTime = newDate
+        .hour(customStartTime.hour())
+        .minute(customStartTime.minute())
+        .second(0)
+        .millisecond(0);
+      
+      const customSlot = {
+        startTimeInstant: combinedDateTime.toISOString(),
+        startTime: `${String(customStartTime.hour()).padStart(2, '0')}:${String(customStartTime.minute()).padStart(2, '0')}`,
+      };
+      setRescheduleSelectedSlot(customSlot);
+    } else {
+      setRescheduleSelectedSlot(null);
+    }
+    
+    // Clear slots for past dates immediately (useEffect will handle fetching for future dates)
+    const isPastDate = newDate.isBefore(dayjs(), 'day');
+    if (isPastDate) {
+      setRescheduleAvailableSlots([]);
+      setRescheduleSlotError(null);
+    }
+  };
+
+  // Handle reschedule slot selection
+  const handleRescheduleSlotClick = (slot) => {
+    setRescheduleSelectedSlot(slot);
+    setShowCustomTimePicker(false);
+    setCustomStartTime(null);
+  };
+
+  // Handle create new slot click
+  const handleCreateNewSlotClick = () => {
+    setShowCustomTimePicker(true);
+    setRescheduleSelectedSlot(null);
+    const defaultTime = dayjs().hour(9).minute(0); // Default to 9:00 AM
+    setCustomStartTime(defaultTime);
+    setHourInput('09');
+    setMinuteInput('00');
+  };
+
+  // Handle custom time selection
+  const handleCustomTimeChange = (newTime) => {
+    setCustomStartTime(newTime);
+    setHourInput(String(newTime.hour()).padStart(2, '0'));
+    setMinuteInput(String(newTime.minute()).padStart(2, '0'));
+    if (newTime && rescheduleSelectedDate) {
+      // Combine date from calendar with custom time
+      const combinedDateTime = rescheduleSelectedDate
+        .hour(newTime.hour())
+        .minute(newTime.minute())
+        .second(0)
+        .millisecond(0);
+      
+      // Create a slot-like object with the combined datetime
+      const customSlot = {
+        startTimeInstant: combinedDateTime.toISOString(),
+        startTime: `${String(newTime.hour()).padStart(2, '0')}:${String(newTime.minute()).padStart(2, '0')}`,
+      };
+      setRescheduleSelectedSlot(customSlot);
+    }
+  };
+
+  // Handle hour increment/decrement
+  const handleHourChange = (increment) => {
+    if (!customStartTime) return;
+    const newHour = increment 
+      ? (customStartTime.hour() + 1) % 24 
+      : (customStartTime.hour() - 1 + 24) % 24;
+    const newTime = customStartTime.hour(newHour);
+    handleCustomTimeChange(newTime);
+  };
+
+  // Handle minute increment/decrement
+  const handleMinuteChange = (increment) => {
+    if (!customStartTime) return;
+    const newMinute = increment 
+      ? (customStartTime.minute() + 5) % 60 
+      : (customStartTime.minute() - 5 + 60) % 60;
+    const newTime = customStartTime.minute(newMinute);
+    handleCustomTimeChange(newTime);
+  };
+
+  // Handle manual hour input change (while typing)
+  const handleHourInputChange = (value) => {
+    // Allow free typing - only update display
+    const numericValue = value.replace(/\D/g, '').slice(0, 2);
+    setHourInput(numericValue || '');
+  };
+
+  // Handle manual hour input blur (when done typing)
+  const handleHourInputBlur = () => {
+    if (!customStartTime) return;
+    const hour = parseInt(hourInput, 10);
+    if (isNaN(hour) || hour < 0) {
+      const newTime = customStartTime.hour(0);
+      handleCustomTimeChange(newTime);
+    } else if (hour > 23) {
+      const newTime = customStartTime.hour(23);
+      handleCustomTimeChange(newTime);
+    } else {
+      const newTime = customStartTime.hour(hour);
+      handleCustomTimeChange(newTime);
+    }
+  };
+
+  // Handle manual minute input change (while typing)
+  const handleMinuteInputChange = (value) => {
+    // Allow free typing - only update display
+    const numericValue = value.replace(/\D/g, '').slice(0, 2);
+    setMinuteInput(numericValue || '');
+  };
+
+  // Handle manual minute input blur (when done typing)
+  const handleMinuteInputBlur = () => {
+    if (!customStartTime) return;
+    const minute = parseInt(minuteInput, 10);
+    if (isNaN(minute) || minute < 0) {
+      const newTime = customStartTime.minute(0);
+      handleCustomTimeChange(newTime);
+    } else if (minute > 59) {
+      const newTime = customStartTime.minute(59);
+      handleCustomTimeChange(newTime);
+    } else {
+      const newTime = customStartTime.minute(minute);
+      handleCustomTimeChange(newTime);
+    }
+  };
+
+  // Handle "Now" button - set to current time
+  const handleSetNow = () => {
+    const now = dayjs();
+    handleCustomTimeChange(now);
+  };
+
+  // Handle "Clear" button
+  const handleClearTime = () => {
+    setCustomStartTime(null);
+    setRescheduleSelectedSlot(null);
+  };
+
+  // Handle reschedule dialog close
+  const handleRescheduleDialogClose = () => {
+    if (reschedulingBooking) return;
+    setRescheduleDialogOpen(false);
+    setBookingToReschedule(null);
+    setRescheduleSelectedSlot(null);
+    setRescheduleClientMessage('');
+    setRescheduleBookingError(null);
+    setRescheduleAvailableSlots([]);
+    setRescheduleSlotError(null);
+    setRescheduleSessionTypeId(null);
+    setShowCustomTimePicker(false);
+    setCustomStartTime(null);
+  };
+
+  // Handle booking reschedule confirmation
+  const handleConfirmReschedule = async () => {
+    if (!bookingToReschedule || !bookingToReschedule.id) {
+      setRescheduleBookingError('Booking information is missing');
+      return;
+    }
+
+    // Check if we have a selected slot or custom time
+    let startTimeInstant;
+    if (rescheduleSelectedSlot && rescheduleSelectedSlot.startTimeInstant) {
+      startTimeInstant = rescheduleSelectedSlot.startTimeInstant;
+    } else if (customStartTime && rescheduleSelectedDate) {
+      // Combine date from calendar with custom time
+      const combinedDateTime = rescheduleSelectedDate
+        .hour(customStartTime.hour())
+        .minute(customStartTime.minute())
+        .second(0)
+        .millisecond(0);
+      startTimeInstant = combinedDateTime.toISOString();
+    } else {
+      setRescheduleBookingError('Please select a time slot or create a custom time');
+      return;
+    }
+
+    // Get userId from booking - try different possible field names
+    const userId = bookingToReschedule.userId || bookingToReschedule.clientId || bookingToReschedule.user?.id;
+    if (!userId) {
+      setRescheduleBookingError('User ID not found in booking data');
+      return;
+    }
+
+    setReschedulingBooking(true);
+    setRescheduleBookingError(null);
+
+    try {
+      const payload = {
+        id: bookingToReschedule.id,
+        startTime: startTimeInstant,
+        clientMessage: rescheduleClientMessage.trim() || undefined,
+        userId: userId,
+      };
+
+      const response = await apiClient.put(`/api/v1/admin/session/booking/${bookingToReschedule.id}`, payload, {
+        timeout: 10000,
+      });
+
+      if (!response || (response.status && response.status >= 400)) {
+        throw new Error('Failed to update booking');
+      }
+
+      // Success - close dialog and refresh bookings
+      handleRescheduleDialogClose();
+      setSuccessMessage('Booking updated successfully');
+      fetchBookings();
+    } catch (err) {
+      console.error('Error rescheduling booking:', err);
+      let errorMessage = 'Failed to update booking. Please try again.';
+      
+      if (err.code === 'ECONNABORTED') {
+        errorMessage = 'Request timed out. Please try again.';
+      } else if (err.response) {
+        errorMessage = err.response.data?.message || `Server error: ${err.response.status}`;
+      } else if (err.request) {
+        errorMessage = 'Unable to reach the server. Please check your connection.';
+      } else {
+        errorMessage = err.message || errorMessage;
+      }
+      
+      setRescheduleBookingError(errorMessage);
+    } finally {
+      setReschedulingBooking(false);
+    }
   };
 
   // Handle status update
@@ -495,8 +989,9 @@ const BookingsManagement = () => {
         }}
       >
         <CardContent>
-          {/* First row: Status chips and action buttons */}
-          <Box sx={{ display: 'flex', gap: 1, alignItems: 'center', mb: 2, flexWrap: 'nowrap' }}>
+          {/* First row: Status chips and Info button on left, Update button on right */}
+          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2, flexWrap: 'wrap', gap: 1 }}>
+            <Box sx={{ display: 'flex', gap: 1, alignItems: 'center', flexWrap: 'wrap' }}>
             <Chip
               label={booking.status.replace(/_/g, ' ')}
               color={STATUS_COLORS[booking.status] || 'default'}
@@ -513,12 +1008,13 @@ const BookingsManagement = () => {
             <Button
               size="small"
               variant="outlined"
-              startIcon={<MessageIcon />}
-              onClick={() => handleMessageClick(booking)}
+                startIcon={<InfoIcon />}
+                onClick={() => handleInfoClick(booking)}
               sx={{ textTransform: 'none' }}
             >
-              Message
+                Info
             </Button>
+            </Box>
             {canUpdate && (
               <Button
                 size="small"
@@ -532,17 +1028,10 @@ const BookingsManagement = () => {
             )}
           </Box>
           
-          {/* Second row: Client name */}
-          <Box sx={{ mb: 1 }}>
+          {/* Client name */}
+          <Box sx={{ mb: 2 }}>
             <Typography variant="h6">
               {getClientName(booking)}
-            </Typography>
-          </Box>
-          
-          {/* Third row: Email */}
-          <Box sx={{ mb: 2 }}>
-            <Typography variant="body2" color="text.secondary">
-              {booking.clientEmail}
             </Typography>
           </Box>
 
@@ -553,7 +1042,7 @@ const BookingsManagement = () => {
               <Typography variant="body2" color="text.secondary">
                 Session Type
               </Typography>
-              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
                 {booking.sessionDurationMinutes && (
                   <Chip
                     label={`${booking.sessionDurationMinutes} min`}
@@ -568,48 +1057,41 @@ const BookingsManagement = () => {
                 <Typography variant="body1">
                   {booking.sessionName || 'N/A'}
                 </Typography>
+                {getBookingPriceDisplay(booking.sessionPrices) && (
+                  <Chip
+                    label={getBookingPriceDisplay(booking.sessionPrices)}
+                    size="small"
+                    color="primary"
+                    variant="outlined"
+                    sx={{ 
+                      height: 20, 
+                      fontSize: '0.65rem',
+                      '& .MuiChip-label': { px: 0.75 }
+                    }}
+                  />
+                )}
               </Box>
-              {/* Prices on a new row */}
-              {booking.sessionPrices && Object.keys(booking.sessionPrices).length > 0 && (
-                <Stack direction="row" spacing={0.5} sx={{ mt: 0.5, flexWrap: 'wrap', gap: 0.5 }}>
-                  {Object.entries(booking.sessionPrices).map(([currency, price]) => (
-                    <Chip
-                      key={currency}
-                      label={`${currency}: ${price}`}
-                      size="small"
-                      sx={{ 
-                        height: 20, 
-                        fontSize: '0.65rem',
-                        '& .MuiChip-label': { px: 0.75 }
-                      }}
-                    />
-                  ))}
-                </Stack>
-              )}
             </Grid>
             <Grid item xs={12} sm={6}>
+              <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 1 }}>
+                <Box sx={{ flex: 1 }}>
               <Typography variant="body2" color="text.secondary">
                 Start Time
               </Typography>
-              <Typography variant="body1" gutterBottom>
+                  <Typography variant="body1">
                 {formatDateTime(booking.startTimeInstant)}
               </Typography>
-            </Grid>
-            <Grid item xs={12} sm={6}>
-              <Typography variant="body2" color="text.secondary">
-                End Time
-              </Typography>
-              <Typography variant="body1" gutterBottom>
-                {formatDateTime(booking.endTimeInstant)}
-              </Typography>
-            </Grid>
-            <Grid item xs={12} sm={6}>
-              <Typography variant="body2" color="text.secondary">
-                Created At
-              </Typography>
-              <Typography variant="body1" gutterBottom>
-                {formatDateTime(booking.createdAt)}
-              </Typography>
+                </Box>
+                <Button
+                  size="small"
+                  variant="outlined"
+                  startIcon={<AccessTimeIcon />}
+                  onClick={() => handleRescheduleClick(booking)}
+                  sx={{ textTransform: 'none', alignSelf: 'flex-end' }}
+                >
+                  Update
+                </Button>
+              </Box>
             </Grid>
           </Grid>
         </CardContent>
@@ -952,34 +1434,683 @@ const BookingsManagement = () => {
         </DialogActions>
       </Dialog>
 
-      {/* Message Dialog */}
-      <Dialog open={messageDialogOpen} onClose={handleMessageClose} maxWidth="sm" fullWidth>
-        <DialogTitle>Client Message</DialogTitle>
+      {/* Info Dialog */}
+      <Dialog open={infoDialogOpen} onClose={handleInfoClose} maxWidth="md" fullWidth>
+        <DialogTitle>Booking Details</DialogTitle>
         <DialogContent>
-          {selectedBookingMessage && (
+          {selectedBookingInfo && (
             <Box>
-              <Typography variant="body2" color="text.secondary" gutterBottom>
-                From: {selectedBookingMessage.clientName}
+              {/* Main Data - Duplicated */}
+              <Box sx={{ mb: 3 }}>
+                <Typography variant="h6" gutterBottom>
+                  Main Information
               </Typography>
-              <Typography variant="body2" color="text.secondary" gutterBottom sx={{ mb: 3 }}>
-                Email: {selectedBookingMessage.clientEmail}
+                <Divider sx={{ mb: 2 }} />
+                <Grid container spacing={2}>
+                  <Grid item xs={12} sm={6}>
+                    <Typography variant="body2" color="text.secondary">
+                      Status
+                    </Typography>
+                    <Box sx={{ mt: 0.5, mb: 1 }}>
+                      <Chip
+                        label={selectedBookingInfo.status.replace(/_/g, ' ')}
+                        color={STATUS_COLORS[selectedBookingInfo.status] || 'default'}
+                        size="small"
+                      />
+                      {isOverdue(selectedBookingInfo) && (
+                        <Chip
+                          label="Overdue"
+                          color="default"
+                          size="small"
+                          sx={{ bgcolor: 'grey.500', color: 'white', ml: 1 }}
+                        />
+                      )}
+                    </Box>
+                  </Grid>
+                  <Grid item xs={12} sm={6}>
+                    <Typography variant="body2" color="text.secondary">
+                      Client Name
+                    </Typography>
+                    <Typography variant="body1" gutterBottom>
+                      {getClientName(selectedBookingInfo)}
+                    </Typography>
+                  </Grid>
+                  <Grid item xs={12} sm={6}>
+                    <Typography variant="body2" color="text.secondary">
+                      Start Time
+                    </Typography>
+                    <Typography variant="body1" gutterBottom>
+                      {formatDateTime(selectedBookingInfo.startTimeInstant)}
+                    </Typography>
+                  </Grid>
+                  <Grid item xs={12} sm={6}>
+                    <Typography variant="body2" color="text.secondary">
+                      Session Type
+                    </Typography>
+                    <Typography variant="body1" gutterBottom>
+                      {selectedBookingInfo.sessionName || 'N/A'}
+                    </Typography>
+                  </Grid>
+                </Grid>
+              </Box>
+
+              <Divider sx={{ my: 3 }} />
+
+              {/* Additional Information */}
+              <Box>
+                <Typography variant="h6" gutterBottom>
+                  Additional Information
               </Typography>
               <Divider sx={{ mb: 2 }} />
-              {selectedBookingMessage.message ? (
-                <Typography variant="body1" sx={{ whiteSpace: 'pre-wrap' }}>
-                  {selectedBookingMessage.message}
+                <Grid container spacing={2}>
+                  <Grid item xs={12} sm={6}>
+                    <Typography variant="body2" color="text.secondary">
+                      Email
+                    </Typography>
+                    <Typography variant="body1" gutterBottom>
+                      {selectedBookingInfo.clientEmail || 'N/A'}
+                    </Typography>
+                  </Grid>
+                  <Grid item xs={12} sm={6}>
+                    <Typography variant="body2" color="text.secondary">
+                      End Time
+                    </Typography>
+                    <Typography variant="body1" gutterBottom>
+                      {formatDateTime(selectedBookingInfo.endTimeInstant)}
+                    </Typography>
+                  </Grid>
+                  <Grid item xs={12} sm={6}>
+                    <Typography variant="body2" color="text.secondary">
+                      Created At
+                    </Typography>
+                    <Typography variant="body1" gutterBottom>
+                      {formatDateTime(selectedBookingInfo.createdAt)}
+                    </Typography>
+                  </Grid>
+                  {selectedBookingInfo.sessionDurationMinutes && (
+                    <Grid item xs={12} sm={6}>
+                      <Typography variant="body2" color="text.secondary">
+                        Duration
+                      </Typography>
+                      <Typography variant="body1" gutterBottom>
+                        {selectedBookingInfo.sessionDurationMinutes} minutes
+                      </Typography>
+                    </Grid>
+                  )}
+                  {selectedBookingInfo.sessionPrices && Object.keys(selectedBookingInfo.sessionPrices).length > 0 && (
+                    <Grid item xs={12}>
+                      <Typography variant="body2" color="text.secondary" gutterBottom>
+                        Prices
+                      </Typography>
+                      <Stack direction="row" spacing={1} sx={{ flexWrap: 'wrap', gap: 1 }}>
+                        {Object.entries(selectedBookingInfo.sessionPrices).map(([currency, price]) => {
+                          const symbol = getCurrencySymbol(currency);
+                          return (
+                            <Chip
+                              key={currency}
+                              label={`${currency}: ${price}${symbol}`}
+                              size="small"
+                            />
+                          );
+                        })}
+                      </Stack>
+                    </Grid>
+                  )}
+                  <Grid item xs={12}>
+                    <Typography variant="body2" color="text.secondary" gutterBottom>
+                      Client Message
+                    </Typography>
+                    {selectedBookingInfo.clientMessage ? (
+                      <Typography variant="body1" sx={{ whiteSpace: 'pre-wrap', bgcolor: 'grey.50', p: 2, borderRadius: 1 }}>
+                        {selectedBookingInfo.clientMessage}
                 </Typography>
               ) : (
-                <Typography variant="body2" color="text.secondary" fontStyle="italic">
+                      <Typography variant="body2" color="text.secondary" fontStyle="italic" sx={{ bgcolor: 'grey.50', p: 2, borderRadius: 1 }}>
                   No message provided
                 </Typography>
               )}
+                  </Grid>
+                </Grid>
+              </Box>
             </Box>
           )}
         </DialogContent>
         <DialogActions>
-          <Button onClick={handleMessageClose} sx={{ textTransform: 'none' }}>
+          <Button onClick={handleInfoClose} sx={{ textTransform: 'none' }}>
             Close
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Reschedule/Update Booking Dialog */}
+      <Dialog open={rescheduleDialogOpen} onClose={handleRescheduleDialogClose} maxWidth="md" fullWidth>
+        <DialogTitle>Update Session Date/Time</DialogTitle>
+        <DialogContent>
+          {bookingToReschedule && (
+            <>
+              <DialogContentText sx={{ mb: 2 }}>
+                Select a new date and time for the <strong>{bookingToReschedule.sessionName || 'Session'}</strong> booking.
+              </DialogContentText>
+
+              {/* Current and New Time Display */}
+              <Box sx={{ mb: 3, p: 2, bgcolor: 'grey.50', borderRadius: 1 }}>
+                <Grid container spacing={2}>
+                  <Grid item xs={12} sm={6}>
+                    <Typography variant="body2" color="text.secondary" gutterBottom>
+                      Current Date/Time
+                    </Typography>
+                    <Typography variant="body1" fontWeight="medium">
+                      {formatDateTime(bookingToReschedule.startTimeInstant)}
+                    </Typography>
+                  </Grid>
+                  {rescheduleSelectedSlot && (
+                    <Grid item xs={12} sm={6}>
+                      <Typography variant="body2" color="text.secondary" gutterBottom>
+                        New Date/Time
+                      </Typography>
+                      <Typography variant="body1" fontWeight="medium" color="primary.main">
+                        {formatDateTime(rescheduleSelectedSlot.startTimeInstant)}
+                      </Typography>
+                    </Grid>
+                  )}
+                </Grid>
+                {(rescheduleSelectedSlot || (customStartTime && rescheduleSelectedDate)) && (
+                  <Alert severity="info" sx={{ mt: 2 }}>
+                    Date/time will be updated from <strong>{formatDateTime(bookingToReschedule.startTimeInstant)}</strong> to <strong>
+                      {rescheduleSelectedSlot 
+                        ? formatDateTime(rescheduleSelectedSlot.startTimeInstant)
+                        : (customStartTime && rescheduleSelectedDate
+                          ? formatDateTime(rescheduleSelectedDate.hour(customStartTime.hour()).minute(customStartTime.minute()).second(0).millisecond(0).toISOString())
+                          : '')
+                      }
+                    </strong>.
+                  </Alert>
+                )}
+              </Box>
+
+              {rescheduleBookingError && (
+                <Alert severity="error" sx={{ mb: 2 }}>
+                  {rescheduleBookingError}
+                </Alert>
+              )}
+
+              {/* Warning for past date selection */}
+              {rescheduleSelectedDate && rescheduleSelectedDate.isBefore(dayjs(), 'day') && (
+                <Alert severity="warning" sx={{ mb: 2 }}>
+                  You are selecting a past date. Please ensure this is intentional.
+                </Alert>
+              )}
+
+              <Grid container spacing={3} sx={{ mt: 1 }}>
+                {/* Left Column - Date Calendar */}
+                <Grid item xs={12} md={6}>
+                  <Box
+                    sx={{
+                      display: 'flex',
+                      justifyContent: 'center',
+                      border: 1,
+                      borderColor: 'divider',
+                      borderRadius: 2,
+                      p: 2,
+                      bgcolor: 'background.paper',
+                    }}
+                  >
+                    <DateCalendar
+                      value={rescheduleSelectedDate}
+                      onChange={handleRescheduleDateChange}
+                      sx={{ width: '100%' }}
+                      firstDayOfWeek={1}
+                    />
+                  </Box>
+                </Grid>
+
+                {/* Right Column - Available Slots */}
+                <Grid item xs={12} md={6}>
+                  <Typography variant="h6" gutterBottom>
+                    Available Times on {formatDateForDisplay(rescheduleSelectedDate)}
+                  </Typography>
+
+                  {rescheduleSlotError && (
+                    <Alert severity="error" sx={{ mb: 2 }}>
+                      {rescheduleSlotError}
+                    </Alert>
+                  )}
+
+                  {rescheduleLoadingSlots ? (
+                    <Box
+                      sx={{
+                        display: 'flex',
+                        justifyContent: 'center',
+                        alignItems: 'center',
+                        minHeight: 200,
+                      }}
+                    >
+                      <CircularProgress />
+                    </Box>
+                  ) : rescheduleAvailableSlots.length > 0 ? (
+                    <List>
+                      {rescheduleAvailableSlots.map((slot, index) => {
+                        const startTime = slot.startTime 
+                          ? formatTime(slot.startTime) 
+                          : (slot.startTimeInstant ? formatTimeFromInstant(slot.startTimeInstant) : 'N/A');
+                        const endTime = slot.endTime 
+                          ? formatTime(slot.endTime) 
+                          : 'N/A';
+                        const isSelected = rescheduleSelectedSlot?.startTimeInstant === slot.startTimeInstant && !showCustomTimePicker;
+                        
+                        return (
+                          <ListItemButton
+                            key={slot.startTimeInstant || `slot-${index}`}
+                            onClick={() => handleRescheduleSlotClick(slot)}
+                            selected={isSelected}
+                            sx={{
+                              border: 1,
+                              borderColor: isSelected ? 'primary.main' : 'divider',
+                              borderRadius: 1,
+                              mb: 1,
+                              bgcolor: isSelected ? 'action.selected' : 'transparent',
+                              '&:hover': {
+                                bgcolor: 'action.hover',
+                              },
+                            }}
+                          >
+                            <Typography variant="body1">
+                              {startTime}{endTime !== 'N/A' ? ` - ${endTime}` : ''}
+                            </Typography>
+                          </ListItemButton>
+                        );
+                      })}
+                      {/* Create new slot option */}
+                      <ListItemButton
+                        onClick={handleCreateNewSlotClick}
+                        selected={showCustomTimePicker}
+                        sx={{
+                          border: 1,
+                          borderColor: showCustomTimePicker ? 'primary.main' : 'divider',
+                          borderStyle: 'dashed',
+                          borderRadius: 1,
+                          mb: 1,
+                          bgcolor: showCustomTimePicker ? 'action.selected' : 'transparent',
+                          '&:hover': {
+                            bgcolor: 'action.hover',
+                          },
+                        }}
+                      >
+                        <Typography variant="body1" sx={{ fontStyle: 'italic' }}>
+                          + Create new slot
+                        </Typography>
+                      </ListItemButton>
+                      {/* Custom time picker */}
+                      {showCustomTimePicker && (
+                        <Box 
+                          sx={{ 
+                            mt: 1, 
+                            p: 2, 
+                            border: 2, 
+                            borderColor: 'primary.main', 
+                            borderRadius: 2, 
+                            bgcolor: 'action.hover',
+                            boxShadow: 2
+                          }}
+                        >
+                          <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+                            Enter time
+                          </Typography>
+                          <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 1, mb: 2 }}>
+                            {/* Hours */}
+                            <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+                              <IconButton 
+                                size="small" 
+                                onClick={() => handleHourChange(true)}
+                                sx={{ mb: 0.5 }}
+                              >
+                                <ArrowUpwardIcon fontSize="small" />
+                              </IconButton>
+                              <TextField
+                                value={hourInput}
+                                onChange={(e) => handleHourInputChange(e.target.value)}
+                                onFocus={(e) => e.target.select()}
+                                onBlur={handleHourInputBlur}
+                                inputProps={{
+                                  style: {
+                                    textAlign: 'center',
+                                    fontSize: '2rem',
+                                    fontWeight: 'bold',
+                                    padding: '16px',
+                                  },
+                                  maxLength: 2,
+                                }}
+                                autoComplete="off"
+                                sx={{
+                                  width: 80,
+                                  '& .MuiOutlinedInput-root': {
+                                    border: 1,
+                                    borderColor: 'divider',
+                                    borderRadius: 1,
+                                    bgcolor: 'grey.100',
+                                    '&:hover': {
+                                      borderColor: 'primary.main',
+                                    },
+                                    '&.Mui-focused': {
+                                      borderColor: 'primary.main',
+                                      bgcolor: 'grey.100',
+                                    },
+                                    '& fieldset': {
+                                      border: 'none',
+                                    },
+                                  },
+                                }}
+                              />
+                              <IconButton 
+                                size="small" 
+                                onClick={() => handleHourChange(false)}
+                                sx={{ mt: 0.5 }}
+                              >
+                                <ArrowDownwardIcon fontSize="small" />
+                              </IconButton>
+                            </Box>
+                            
+                            <Typography variant="h4" sx={{ mx: 1 }}>
+                              :
+                            </Typography>
+                            
+                            {/* Minutes */}
+                            <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+                              <IconButton 
+                                size="small" 
+                                onClick={() => handleMinuteChange(true)}
+                                sx={{ mb: 0.5 }}
+                              >
+                                <ArrowUpwardIcon fontSize="small" />
+                              </IconButton>
+                              <TextField
+                                value={minuteInput}
+                                onChange={(e) => handleMinuteInputChange(e.target.value)}
+                                onFocus={(e) => e.target.select()}
+                                onBlur={handleMinuteInputBlur}
+                                inputProps={{
+                                  style: {
+                                    textAlign: 'center',
+                                    fontSize: '2rem',
+                                    fontWeight: 'bold',
+                                    padding: '16px',
+                                  },
+                                  maxLength: 2,
+                                }}
+                                sx={{
+                                  width: 80,
+                                  '& .MuiOutlinedInput-root': {
+                                    border: 1,
+                                    borderColor: 'divider',
+                                    borderRadius: 1,
+                                    bgcolor: 'grey.100',
+                                    '&:hover': {
+                                      borderColor: 'primary.main',
+                                    },
+                                    '&.Mui-focused': {
+                                      borderColor: 'primary.main',
+                                      bgcolor: 'grey.100',
+                                    },
+                                    '& fieldset': {
+                                      border: 'none',
+                                    },
+                                  },
+                                }}
+                              />
+                              <IconButton 
+                                size="small" 
+                                onClick={() => handleMinuteChange(false)}
+                                sx={{ mt: 0.5 }}
+                              >
+                                <ArrowDownwardIcon fontSize="small" />
+                              </IconButton>
+                            </Box>
+                          </Box>
+                          
+                          {/* Now and Clear buttons */}
+                          <Box sx={{ display: 'flex', justifyContent: 'space-between', gap: 1 }}>
+                            <Button
+                              size="small"
+                              onClick={handleSetNow}
+                              sx={{ color: 'primary.main', textTransform: 'none' }}
+                            >
+                              Now
+                            </Button>
+                            <Button
+                              size="small"
+                              onClick={handleClearTime}
+                              sx={{ color: 'primary.main', textTransform: 'none' }}
+                            >
+                              Clear
+                            </Button>
+                          </Box>
+                        </Box>
+                      )}
+                    </List>
+                  ) : (
+                    <>
+                      <Alert severity="info" sx={{ mb: 2 }}>
+                        No available sessions on this day. Please select another day.
+                      </Alert>
+                      {/* Create new slot option even when no slots available */}
+                      <ListItemButton
+                        onClick={handleCreateNewSlotClick}
+                        selected={showCustomTimePicker}
+                        sx={{
+                          border: 1,
+                          borderColor: showCustomTimePicker ? 'primary.main' : 'divider',
+                          borderStyle: 'dashed',
+                          borderRadius: 1,
+                          bgcolor: showCustomTimePicker ? 'action.selected' : 'transparent',
+                          '&:hover': {
+                            bgcolor: 'action.hover',
+                          },
+                        }}
+                      >
+                        <Typography variant="body1" sx={{ fontStyle: 'italic' }}>
+                          + Create new slot
+                        </Typography>
+                      </ListItemButton>
+                      {/* Custom time picker */}
+                      {showCustomTimePicker && (
+                        <Box 
+                          sx={{ 
+                            mt: 1, 
+                            p: 2, 
+                            border: 2, 
+                            borderColor: 'primary.main', 
+                            borderRadius: 2, 
+                            bgcolor: 'action.hover',
+                            boxShadow: 2
+                          }}
+                        >
+                          <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+                            Enter time
+                          </Typography>
+                          <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 1, mb: 2 }}>
+                            {/* Hours */}
+                            <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+                              <IconButton 
+                                size="small" 
+                                onClick={() => handleHourChange(true)}
+                                sx={{ mb: 0.5 }}
+                              >
+                                <ArrowUpwardIcon fontSize="small" />
+                              </IconButton>
+                              <TextField
+                                value={hourInput}
+                                onChange={(e) => handleHourInputChange(e.target.value)}
+                                onFocus={(e) => e.target.select()}
+                                onBlur={handleHourInputBlur}
+                                inputProps={{
+                                  style: {
+                                    textAlign: 'center',
+                                    fontSize: '2rem',
+                                    fontWeight: 'bold',
+                                    padding: '16px',
+                                  },
+                                  maxLength: 2,
+                                }}
+                                autoComplete="off"
+                                sx={{
+                                  width: 80,
+                                  '& .MuiOutlinedInput-root': {
+                                    border: 1,
+                                    borderColor: 'divider',
+                                    borderRadius: 1,
+                                    bgcolor: 'grey.100',
+                                    '&:hover': {
+                                      borderColor: 'primary.main',
+                                    },
+                                    '&.Mui-focused': {
+                                      borderColor: 'primary.main',
+                                      bgcolor: 'grey.100',
+                                    },
+                                    '& fieldset': {
+                                      border: 'none',
+                                    },
+                                  },
+                                }}
+                              />
+                              <IconButton 
+                                size="small" 
+                                onClick={() => handleHourChange(false)}
+                                sx={{ mt: 0.5 }}
+                              >
+                                <ArrowDownwardIcon fontSize="small" />
+                              </IconButton>
+                            </Box>
+                            
+                            <Typography variant="h4" sx={{ mx: 1 }}>
+                              :
+                            </Typography>
+                            
+                            {/* Minutes */}
+                            <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+                              <IconButton 
+                                size="small" 
+                                onClick={() => handleMinuteChange(true)}
+                                sx={{ mb: 0.5 }}
+                              >
+                                <ArrowUpwardIcon fontSize="small" />
+                              </IconButton>
+                              <TextField
+                                value={minuteInput}
+                                onChange={(e) => handleMinuteInputChange(e.target.value)}
+                                onFocus={(e) => e.target.select()}
+                                onBlur={handleMinuteInputBlur}
+                                inputProps={{
+                                  style: {
+                                    textAlign: 'center',
+                                    fontSize: '2rem',
+                                    fontWeight: 'bold',
+                                    padding: '16px',
+                                  },
+                                  maxLength: 2,
+                                }}
+                                sx={{
+                                  width: 80,
+                                  '& .MuiOutlinedInput-root': {
+                                    border: 1,
+                                    borderColor: 'divider',
+                                    borderRadius: 1,
+                                    bgcolor: 'grey.100',
+                                    '&:hover': {
+                                      borderColor: 'primary.main',
+                                    },
+                                    '&.Mui-focused': {
+                                      borderColor: 'primary.main',
+                                      bgcolor: 'grey.100',
+                                    },
+                                    '& fieldset': {
+                                      border: 'none',
+                                    },
+                                  },
+                                }}
+                              />
+                              <IconButton 
+                                size="small" 
+                                onClick={() => handleMinuteChange(false)}
+                                sx={{ mt: 0.5 }}
+                              >
+                                <ArrowDownwardIcon fontSize="small" />
+                              </IconButton>
+                            </Box>
+                          </Box>
+                          
+                          {/* Now and Clear buttons */}
+                          <Box sx={{ display: 'flex', justifyContent: 'space-between', gap: 1 }}>
+                            <Button
+                              size="small"
+                              onClick={handleSetNow}
+                              sx={{ color: 'primary.main', textTransform: 'none' }}
+                            >
+                              Now
+                            </Button>
+                            <Button
+                              size="small"
+                              onClick={handleClearTime}
+                              sx={{ color: 'primary.main', textTransform: 'none' }}
+                            >
+                              Clear
+                            </Button>
+                          </Box>
+                        </Box>
+                      )}
+                    </>
+                  )}
+                </Grid>
+              </Grid>
+
+              <TextField
+                fullWidth
+                multiline
+                rows={4}
+                label="Message (Optional)"
+                placeholder="Add any additional notes or questions..."
+                value={rescheduleClientMessage}
+                onChange={(e) => {
+                  const value = e.target.value;
+                  if (value.length <= 2000) {
+                    setRescheduleClientMessage(value);
+                  }
+                }}
+                disabled={reschedulingBooking}
+                error={rescheduleClientMessage.length > 2000}
+                helperText={
+                  rescheduleClientMessage.length > 2000
+                    ? 'Message must be 2000 characters or less'
+                    : `${rescheduleClientMessage.length}/2000 characters`
+                }
+                sx={{ mt: 3 }}
+              />
+            </>
+          )}
+        </DialogContent>
+        <DialogActions>
+          <Button 
+            onClick={handleRescheduleDialogClose} 
+            color="inherit"
+            disabled={reschedulingBooking}
+            sx={{ textTransform: 'none' }}
+          >
+            Cancel
+          </Button>
+          <Button 
+            onClick={handleConfirmReschedule} 
+            color="primary" 
+            variant="contained"
+            disabled={reschedulingBooking || (!rescheduleSelectedSlot && !(customStartTime && rescheduleSelectedDate))}
+            sx={{ textTransform: 'none' }}
+          >
+            {reschedulingBooking ? (
+              <>
+                <CircularProgress size={16} sx={{ mr: 1 }} />
+                Updating...
+              </>
+            ) : (
+              'Update Booking'
+            )}
           </Button>
         </DialogActions>
       </Dialog>

@@ -60,9 +60,9 @@ const SessionsConfigurationPage = () => {
     bufferMinutes: 0,
     active: true,
     prices: {
-      Rub: '',
-      Tenge: '',
-      USD: '',
+      Rubles: 0,
+      Tenge: 0,
+      USD: 0,
     },
   });
   const [error, setError] = useState(null);
@@ -72,7 +72,7 @@ const SessionsConfigurationPage = () => {
   const [availableSlots, setAvailableSlots] = useState([]);
   const [loadingSlots, setLoadingSlots] = useState(false);
   const [slotsError, setSlotsError] = useState(null);
-  const [selectedSessionTypeId, setSelectedSessionTypeId] = useState(1);
+  const [selectedSessionTypeId, setSelectedSessionTypeId] = useState(null);
   const hasFetchedSessionTypesRef = useRef(false);
 
   // Fetch session types (admin endpoint returns all session types, active and inactive)
@@ -93,10 +93,13 @@ const SessionsConfigurationPage = () => {
           // Filter to only active session types for the available slots selector
           const activeSessionTypes = Array.isArray(data) ? data.filter(st => st.active !== false) : [];
           if (activeSessionTypes.length > 0) {
-            setSelectedSessionTypeId(activeSessionTypes[0].id || activeSessionTypes[0].sessionTypeId || 1);
+            setSelectedSessionTypeId(activeSessionTypes[0].id || activeSessionTypes[0].sessionTypeId || null);
           } else if (data.length > 0) {
             // Fallback to first session type if no active ones
-            setSelectedSessionTypeId(data[0].id || data[0].sessionTypeId || 1);
+            setSelectedSessionTypeId(data[0].id || data[0].sessionTypeId || null);
+          } else {
+            // No session types available
+            setSelectedSessionTypeId(null);
           }
         }
       } catch (err) {
@@ -151,17 +154,20 @@ const SessionsConfigurationPage = () => {
   const handleOpenSessionTypeDialog = (sessionType = null) => {
     if (sessionType) {
       setEditingSessionType(sessionType);
+      // Normalize prices - ensure all currencies have values, default to 0
+      const normalizedPrices = {
+        Rubles: sessionType.prices?.Rubles ?? 0,
+        Tenge: sessionType.prices?.Tenge ?? 0,
+        USD: sessionType.prices?.USD ?? 0,
+      };
+      
       setSessionTypeForm({
         name: sessionType.name || '',
         description: sessionType.description || '',
         durationMinutes: sessionType.durationMinutes || 60,
         bufferMinutes: sessionType.bufferMinutes || 0,
         active: sessionType.active !== undefined ? sessionType.active : true,
-        prices: sessionType.prices || {
-          Rub: '',
-          Tenge: '',
-          USD: '',
-        },
+        prices: normalizedPrices,
       });
     } else {
       setEditingSessionType(null);
@@ -172,9 +178,9 @@ const SessionsConfigurationPage = () => {
         bufferMinutes: 0,
         active: true,
         prices: {
-          Rub: '',
-          Tenge: '',
-          USD: '',
+          Rubles: 0,
+          Tenge: 0,
+          USD: 0,
         },
       });
     }
@@ -193,18 +199,30 @@ const SessionsConfigurationPage = () => {
         : '/api/v1/admin/session/type';
       const method = editingSessionType ? 'PUT' : 'POST';
 
-      // Prepare prices object - filter out empty values and convert to numbers
+      // Prepare prices object - ensure all currencies have valid numbers (default to 0)
+      // All currencies are required and must be >= 0
       const prices = {};
-      if (sessionTypeForm.prices) {
-        Object.keys(sessionTypeForm.prices).forEach((currency) => {
-          const value = sessionTypeForm.prices[currency];
-          if (value !== '' && value !== null && value !== undefined) {
-            const numValue = parseFloat(value);
-            if (!isNaN(numValue) && numValue >= 0) {
-              prices[currency] = numValue;
-            }
+      const requiredCurrencies = ['Rubles', 'Tenge', 'USD'];
+      let hasInvalidPrice = false;
+      
+      requiredCurrencies.forEach((currency) => {
+        const value = sessionTypeForm.prices?.[currency];
+        // Convert to number, default to 0 if empty/null/undefined
+        let numValue = 0;
+        if (value !== '' && value !== null && value !== undefined) {
+          numValue = parseFloat(value);
+          if (isNaN(numValue) || numValue < 0) {
+            hasInvalidPrice = true;
+            numValue = 0; // Default to 0 for invalid values
           }
-        });
+        }
+        // Always set the price (never null/undefined)
+        prices[currency] = numValue;
+      });
+
+      if (hasInvalidPrice) {
+        setError('All prices must be valid numbers greater than or equal to 0');
+        return;
       }
 
       const requestBody = {
@@ -212,7 +230,7 @@ const SessionsConfigurationPage = () => {
         description: sessionTypeForm.description,
         durationMinutes: sessionTypeForm.durationMinutes,
         bufferMinutes: sessionTypeForm.bufferMinutes || 0,
-        prices: Object.keys(prices).length > 0 ? prices : undefined,
+        prices: prices, // Always include prices with all currencies
       };
 
       // Include active field when updating (optional field in UpdateSessionTypeRequest)
@@ -241,7 +259,9 @@ const SessionsConfigurationPage = () => {
         // Update selected session type if needed
         const activeSessionTypes = Array.isArray(data) ? data.filter(st => st.active !== false) : [];
         if (activeSessionTypes.length > 0 && !activeSessionTypes.find(st => (st.id || st.sessionTypeId) === selectedSessionTypeId)) {
-          setSelectedSessionTypeId(activeSessionTypes[0].id || activeSessionTypes[0].sessionTypeId || 1);
+          setSelectedSessionTypeId(activeSessionTypes[0].id || activeSessionTypes[0].sessionTypeId || null);
+        } else if (activeSessionTypes.length === 0) {
+          setSelectedSessionTypeId(null);
         }
       }
 
@@ -277,7 +297,9 @@ const SessionsConfigurationPage = () => {
         // Update selected session type if needed
         const activeSessionTypes = Array.isArray(data) ? data.filter(st => st.active !== false) : [];
         if (activeSessionTypes.length > 0 && !activeSessionTypes.find(st => (st.id || st.sessionTypeId) === selectedSessionTypeId)) {
-          setSelectedSessionTypeId(activeSessionTypes[0].id || activeSessionTypes[0].sessionTypeId || 1);
+          setSelectedSessionTypeId(activeSessionTypes[0].id || activeSessionTypes[0].sessionTypeId || null);
+        } else if (activeSessionTypes.length === 0) {
+          setSelectedSessionTypeId(null);
         }
       }
     } catch (err) {
@@ -575,54 +597,60 @@ const SessionsConfigurationPage = () => {
           </Typography>
           <TextField
             fullWidth
-            label="Price (Rub)"
+            label="Price (Rubles)"
             type="number"
-            value={sessionTypeForm.prices?.Rub || ''}
-            onChange={(e) =>
+            value={sessionTypeForm.prices?.Rubles ?? 0}
+            onChange={(e) => {
+              const value = e.target.value === '' ? 0 : e.target.value;
               setSessionTypeForm({
                 ...sessionTypeForm,
                 prices: {
                   ...sessionTypeForm.prices,
-                  Rub: e.target.value,
+                  Rubles: value,
                 },
-              })
-            }
+              });
+            }}
             margin="normal"
             inputProps={{ step: '0.01', min: '0' }}
+            required
           />
           <TextField
             fullWidth
             label="Price (Tenge)"
             type="number"
-            value={sessionTypeForm.prices?.Tenge || ''}
-            onChange={(e) =>
+            value={sessionTypeForm.prices?.Tenge ?? 0}
+            onChange={(e) => {
+              const value = e.target.value === '' ? 0 : e.target.value;
               setSessionTypeForm({
                 ...sessionTypeForm,
                 prices: {
                   ...sessionTypeForm.prices,
-                  Tenge: e.target.value,
+                  Tenge: value,
                 },
-              })
-            }
+              });
+            }}
             margin="normal"
             inputProps={{ step: '0.01', min: '0' }}
+            required
           />
           <TextField
             fullWidth
             label="Price (USD)"
             type="number"
-            value={sessionTypeForm.prices?.USD || ''}
-            onChange={(e) =>
+            value={sessionTypeForm.prices?.USD ?? 0}
+            onChange={(e) => {
+              const value = e.target.value === '' ? 0 : e.target.value;
               setSessionTypeForm({
                 ...sessionTypeForm,
                 prices: {
                   ...sessionTypeForm.prices,
-                  USD: e.target.value,
+                  USD: value,
                 },
-              })
-            }
+              });
+            }}
             margin="normal"
             inputProps={{ step: '0.01', min: '0' }}
+            required
           />
         </DialogContent>
         <DialogActions>

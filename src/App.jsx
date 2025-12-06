@@ -57,6 +57,107 @@ const theme = createTheme({
       dark: '#357575',
     },
   },
+  components: {
+    MuiButton: {
+      defaultProps: {
+        disableRipple: true,
+      },
+      styleOverrides: {
+        root: {
+          '&:focus': {
+            outline: 'none',
+            boxShadow: 'none',
+          },
+          '&:focus-visible': {
+            outline: '2px solid',
+            outlineColor: 'primary.main',
+            outlineOffset: '2px',
+          },
+          // Remove shadow after click
+          '&:active': {
+            boxShadow: 'none',
+          },
+          // Remove shadow when not actively focused (for mouse clicks)
+          '&:focus:not(:focus-visible)': {
+            boxShadow: 'none',
+          },
+        },
+      },
+    },
+    MuiIconButton: {
+      defaultProps: {
+        disableRipple: true,
+      },
+      styleOverrides: {
+        root: {
+          '&:focus': {
+            outline: 'none',
+            boxShadow: 'none',
+          },
+          '&:focus-visible': {
+            outline: '2px solid',
+            outlineColor: 'primary.main',
+            outlineOffset: '2px',
+          },
+          '&:active': {
+            boxShadow: 'none',
+          },
+          '&:focus:not(:focus-visible)': {
+            boxShadow: 'none',
+          },
+        },
+      },
+    },
+    MuiListItemButton: {
+      defaultProps: {
+        disableRipple: true,
+      },
+      styleOverrides: {
+        root: {
+          '&:focus': {
+            outline: 'none',
+            boxShadow: 'none',
+          },
+          '&:focus-visible': {
+            outline: '2px solid',
+            outlineColor: 'primary.main',
+            outlineOffset: '2px',
+          },
+          '&:active': {
+            boxShadow: 'none',
+          },
+          '&:focus:not(:focus-visible)': {
+            boxShadow: 'none',
+          },
+        },
+      },
+    },
+    MuiTab: {
+      defaultProps: {
+        disableRipple: true,
+      },
+    },
+    MuiChip: {
+      defaultProps: {
+        disableRipple: true,
+      },
+    },
+    MuiFab: {
+      defaultProps: {
+        disableRipple: true,
+      },
+    },
+    MuiToggleButton: {
+      defaultProps: {
+        disableRipple: true,
+      },
+    },
+    MuiCardActionArea: {
+      defaultProps: {
+        disableRipple: true,
+      },
+    },
+  },
 });
 
 // Placeholder components for routes

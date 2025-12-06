@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useMemo } from 'react';
-import { fetchWithAuth } from '../utils/api';
+import { fetchWithAuth, fetchUserProfile, clearUserProfileCache, fetchUserSettings, clearUserSettingsCache } from '../utils/api';
 import {
   Box,
   Card,
@@ -16,6 +16,7 @@ import {
   InputLabel,
   Select,
   MenuItem,
+  ListItemIcon,
 } from '@mui/material';
 import EditIcon from '@mui/icons-material/Edit';
 
@@ -99,43 +100,67 @@ const ProfilePage = () => {
   const [settingsFormData, setSettingsFormData] = useState({
     timezone: '',
     language: '',
+    currency: '',
   });
   const [settingsErrors, setSettingsErrors] = useState({
     timezone: '',
     language: '',
+    currency: '',
   });
   const [savingSettings, setSavingSettings] = useState(false);
 
   const timezones = getUniqueTimezoneOffsets();
   const languages = ['english', 'spanish', 'french', 'german', 'italian', 'portuguese', 'russian', 'chinese', 'japanese'];
+  const currencies = [
+    { code: 'RUB', symbol: '₽', displayName: 'Rubles' },
+    { code: 'TENGE', symbol: '₸', displayName: 'Tenge' },
+    { code: 'USD', symbol: '$', displayName: 'USD' },
+  ];
+
+  // Helper function to convert display name or code to code
+  const normalizeCurrencyValue = (value) => {
+    if (!value) return '';
+    // Check if it's already a code
+    const currencyByCode = currencies.find(c => c.code === value);
+    if (currencyByCode) return currencyByCode.code;
+    // Check if it's a display name
+    const currencyByDisplayName = currencies.find(c => c.displayName === value);
+    if (currencyByDisplayName) return currencyByDisplayName.code;
+    // Return empty if no match
+    return '';
+  };
 
   useEffect(() => {
     let isMounted = true;
+
     const load = async () => {
       setLoading(true);
       setError('');
       try {
-        const res = await fetchWithAuth('/api/v1/user/profile');
-        if (!res.ok) {
-          throw new Error(`Failed to load profile: ${res.status} ${res.statusText}`);
-        }
-        const data = await res.json();
-        if (isMounted) {
+        // Use cached fetchUserProfile which will reuse AppLayout's request if in progress
+        const data = await fetchUserProfile();
+        if (!isMounted) return;
+        
+        if (data) {
           setProfile(data);
           setFirstName(data?.firstName || '');
           setLastName(data?.lastName || '');
+        } else {
+          setError('No profile data available');
         }
       } catch (e) {
-        if (isMounted) {
-          setError(e.message || 'Failed to load profile');
-        }
+        if (!isMounted) return;
+        
+        setError(e.message || 'Failed to load profile');
       } finally {
         if (isMounted) {
           setLoading(false);
         }
       }
     };
+    
     load();
+    
     return () => {
       isMounted = false;
     };
@@ -144,27 +169,26 @@ const ProfilePage = () => {
   // Fetch settings
   useEffect(() => {
     let isMounted = true;
-    const fetchSettings = async () => {
+
+    const loadSettings = async () => {
       setSettingsLoading(true);
       setSettingsError(null);
       try {
-        const response = await fetchWithAuth('/api/v1/user/setting');
-        if (!response.ok) {
-          throw new Error(`Failed to load settings: ${response.status}`);
-        }
-        const data = await response.json();
-        if (isMounted) {
-          setSettings(data);
-          setSettingsFormData({
-            timezone: data.timezone || '',
-            language: data.language || 'english',
-          });
-        }
+        // Use cached fetchUserSettings which prevents duplicate requests
+        const data = await fetchUserSettings();
+        if (!isMounted) return;
+        
+        setSettings(data);
+        setSettingsFormData({
+          timezone: data.timezone || '',
+          language: data.language || 'english',
+          currency: normalizeCurrencyValue(data.currency),
+        });
       } catch (err) {
-        if (isMounted) {
-          console.error('Error fetching settings:', err);
-          setSettingsError(err.message || 'Failed to load settings. Please try again.');
-        }
+        if (!isMounted) return;
+        
+        console.error('Error fetching settings:', err);
+        setSettingsError(err.message || 'Failed to load settings. Please try again.');
       } finally {
         if (isMounted) {
           setSettingsLoading(false);
@@ -172,7 +196,8 @@ const ProfilePage = () => {
       }
     };
 
-    fetchSettings();
+    loadSettings();
+    
     return () => {
       isMounted = false;
     };
@@ -205,10 +230,11 @@ const ProfilePage = () => {
     
     const settingsChanged = 
       settingsFormData.timezone !== (settings?.timezone || '') ||
-      settingsFormData.language !== (settings?.language || 'english');
+      settingsFormData.language !== (settings?.language || 'english') ||
+      settingsFormData.currency !== (settings?.currency || '');
     
     return profileChanged || settingsChanged;
-  }, [firstName, lastName, profile?.firstName, profile?.lastName, settingsFormData.timezone, settingsFormData.language, settings?.timezone, settings?.language]);
+  }, [firstName, lastName, profile?.firstName, profile?.lastName, settingsFormData.timezone, settingsFormData.language, settingsFormData.currency, settings?.timezone, settings?.language, settings?.currency]);
 
   const handleSave = async () => {
     setSaveError('');
@@ -221,7 +247,8 @@ const ProfilePage = () => {
     
     const settingsChanged = 
       settingsFormData.timezone !== (settings?.timezone || '') ||
-      settingsFormData.language !== (settings?.language || 'english');
+      settingsFormData.language !== (settings?.language || 'english') ||
+      settingsFormData.currency !== (settings?.currency || '');
     
     // Validate profile changes
     if (profileChanged && !validate()) {
@@ -270,6 +297,8 @@ const ProfilePage = () => {
         }
         const newProfile = updated || { ...(profile || {}), firstName: body.firstName, lastName: body.lastName };
         setProfile(newProfile);
+        // Clear cache so next fetch gets fresh data
+        clearUserProfileCache();
         // Reset editing states to show pencil icons again
         setEditingFirstName(false);
         setEditingLastName(false);
@@ -291,6 +320,7 @@ const ProfilePage = () => {
           body: JSON.stringify({
             timezone: settingsFormData.timezone.trim(),
             language: settingsFormData.language.trim(),
+            currency: settingsFormData.currency.trim(),
           }),
         });
 
@@ -303,6 +333,8 @@ const ProfilePage = () => {
 
         const updatedData = await response.json();
         setSettings(updatedData);
+        // Clear cache so next fetch gets fresh data
+        clearUserSettingsCache();
       } catch (err) {
         errors.push(err.message || 'Failed to update settings');
       }
@@ -334,6 +366,7 @@ const ProfilePage = () => {
     const newErrors = {
       timezone: '',
       language: '',
+      currency: '',
     };
     let isValid = true;
 
@@ -351,6 +384,17 @@ const ProfilePage = () => {
     } else if (settingsFormData.language.length > 10) {
       newErrors.language = 'Language must be at most 10 characters';
       isValid = false;
+    }
+
+    if (!settingsFormData.currency.trim()) {
+      newErrors.currency = 'Currency is required';
+      isValid = false;
+    } else {
+      const validCurrencyCodes = currencies.map(c => c.code);
+      if (!validCurrencyCodes.includes(settingsFormData.currency)) {
+        newErrors.currency = 'Currency must be one of: RUB, TENGE, USD';
+        isValid = false;
+      }
     }
 
     setSettingsErrors(newErrors);
@@ -553,6 +597,52 @@ const ProfilePage = () => {
                     {settingsErrors.language && (
                       <Typography variant="caption" color="error" sx={{ mt: 0.5, ml: 1.75 }}>
                         {settingsErrors.language}
+                      </Typography>
+                    )}
+                  </FormControl>
+                </Grid>
+
+                <Grid item xs={12} md={6}>
+                  <FormControl fullWidth>
+                    <InputLabel id="currency-label">Currency</InputLabel>
+                    <Select
+                      labelId="currency-label"
+                      id="currency"
+                      value={settingsFormData.currency}
+                      label="Currency"
+                      onChange={(e) => handleSettingsFieldChange('currency', e.target.value)}
+                      error={!!settingsErrors.currency}
+                      disabled={saving || savingSettings}
+                      required
+                      renderValue={(selected) => {
+                        if (!selected) return '';
+                        const currency = currencies.find(c => c.code === selected);
+                        if (!currency) return selected;
+                        // Use a simple approach that Material-UI can reliably render
+                        return (
+                          <span>
+                            <span style={{ fontSize: '1.1rem', fontWeight: 'bold', marginRight: '6px' }}>
+                              {currency.symbol}
+                            </span>
+                            {currency.displayName}
+                          </span>
+                        );
+                      }}
+                    >
+                      {currencies.map((currency) => (
+                        <MenuItem key={currency.code} value={currency.code}>
+                          <ListItemIcon sx={{ minWidth: 32 }}>
+                            <span style={{ fontSize: '1.2rem', fontWeight: 'bold' }}>
+                              {currency.symbol}
+                            </span>
+                          </ListItemIcon>
+                          {currency.displayName}
+                        </MenuItem>
+                      ))}
+                    </Select>
+                    {settingsErrors.currency && (
+                      <Typography variant="caption" color="error" sx={{ mt: 0.5, ml: 1.75 }}>
+                        {settingsErrors.currency}
                       </Typography>
                     )}
                   </FormControl>

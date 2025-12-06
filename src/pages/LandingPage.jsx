@@ -1376,12 +1376,14 @@ const LandingPage = () => {
             setSelectedSessionTypeId(null);
           }, 300);
         }}
-        maxWidth="md"
+        maxWidth="lg"
         fullWidth
         PaperProps={{
           sx: {
-            borderRadius: 3,
-            maxHeight: '90vh',
+            borderRadius: 2,
+            maxHeight: '95vh',
+            display: 'flex',
+            flexDirection: 'column',
           },
         }}
       >
@@ -1390,12 +1392,25 @@ const LandingPage = () => {
             bgcolor: 'primary.main',
             color: 'white',
             display: 'flex',
-            justifyContent: 'space-between',
+            justifyContent: 'center',
             alignItems: 'center',
-            py: 2,
+            py: 2.5,
+            px: 3,
+            position: 'sticky',
+            top: 0,
+            zIndex: 1,
           }}
         >
-          <Typography variant="h5" component="h2" sx={{ fontWeight: 600 }}>
+          <Typography 
+            variant="h5" 
+            component="h2" 
+            sx={{ 
+              fontWeight: 600, 
+              fontSize: { xs: '1.25rem', sm: '1.5rem' },
+              textAlign: 'center',
+              flex: 1,
+            }}
+          >
             Book a Session
           </Typography>
           <IconButton
@@ -1406,68 +1421,108 @@ const LandingPage = () => {
                 setSelectedSessionTypeId(null);
               }, 300);
             }}
-            sx={{ color: 'white' }}
-            size="small"
+            sx={{ 
+              color: 'white',
+              position: 'absolute',
+              right: 8,
+              '&:hover': {
+                bgcolor: 'rgba(255, 255, 255, 0.1)',
+              },
+            }}
+            size="medium"
           >
             <CloseIcon />
           </IconButton>
         </DialogTitle>
-        <DialogContent dividers sx={{ p: 0 }}>
+        <DialogContent 
+          dividers 
+          sx={{ 
+            p: 0,
+            overflow: 'auto',
+            flex: 1,
+            display: 'flex',
+            flexDirection: 'column',
+          }}
+        >
           {/* Session Type Info Card */}
           {selectedSessionType && (
             <Box
               sx={{
-                bgcolor: 'primary.light',
-                color: 'white',
-                p: 3,
-                mb: 3,
+                bgcolor: 'grey.50',
+                borderBottom: 1,
+                borderColor: 'divider',
+                p: { xs: 2.5, sm: 3 },
               }}
             >
-              <Typography variant="h5" component="h3" gutterBottom sx={{ fontWeight: 600 }}>
-                {selectedSessionType.name}
-              </Typography>
-              {selectedSessionType.description && (
-                <Typography variant="body1" sx={{ mb: 2, opacity: 0.95 }}>
-                  {selectedSessionType.description}
+              <Box sx={{ mb: 2 }}>
+                <Typography 
+                  variant="h6" 
+                  component="h3" 
+                  gutterBottom 
+                  sx={{ 
+                    fontWeight: 600,
+                    color: 'text.primary',
+                    mb: 1,
+                  }}
+                >
+                  {selectedSessionType.name}
                 </Typography>
-              )}
-              <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap', mt: 2 }}>
+                {selectedSessionType.description && (
+                  <Typography 
+                    variant="body2" 
+                    sx={{ 
+                      color: 'text.secondary',
+                      lineHeight: 1.6,
+                    }}
+                  >
+                    {selectedSessionType.description}
+                  </Typography>
+                )}
+              </Box>
+              <Box sx={{ display: 'flex', gap: 1.5, flexWrap: 'wrap' }}>
                 <Chip
-                  label={`${selectedSessionType.durationMinutes || 60} minutes`}
+                  label={`${selectedSessionType.durationMinutes || 60} min`}
+                  size="small"
                   sx={{
-                    bgcolor: 'rgba(255, 255, 255, 0.2)',
+                    bgcolor: 'primary.main',
                     color: 'white',
                     fontWeight: 500,
+                    height: 28,
                   }}
                 />
                 {selectedSessionType.prices && selectedSessionType.prices[selectedCurrency] ? (
                   <Chip
                     label={`${selectedSessionType.prices[selectedCurrency]} ${getCurrencySymbol(selectedCurrency)}`}
+                    size="small"
                     sx={{
-                      bgcolor: 'rgba(255, 255, 255, 0.2)',
+                      bgcolor: 'success.main',
                       color: 'white',
-                      fontWeight: 'bold',
-                      fontSize: '1rem',
+                      fontWeight: 600,
+                      height: 28,
+                      fontSize: '0.875rem',
                     }}
                   />
                 ) : selectedSessionType.prices && Object.keys(selectedSessionType.prices).length > 0 ? (
                   <Chip
                     label={`Price not available in ${selectedCurrency}`}
+                    size="small"
                     sx={{
-                      bgcolor: 'rgba(255, 255, 255, 0.2)',
-                      color: 'white',
-                      fontWeight: 'bold',
-                      fontSize: '0.9rem',
+                      bgcolor: 'warning.light',
+                      color: 'text.primary',
+                      fontWeight: 500,
+                      height: 28,
                     }}
                   />
                 ) : selectedSessionType.price ? (
                   <Chip
                     label={`$${selectedSessionType.price}`}
+                    size="small"
                     sx={{
-                      bgcolor: 'rgba(255, 255, 255, 0.2)',
+                      bgcolor: 'success.main',
                       color: 'white',
-                      fontWeight: 'bold',
-                      fontSize: '1rem',
+                      fontWeight: 600,
+                      height: 28,
+                      fontSize: '0.875rem',
                     }}
                   />
                 ) : null}
@@ -1475,8 +1530,16 @@ const LandingPage = () => {
             </Box>
           )}
           {/* Booking Form */}
-          <Box sx={{ px: 3, pb: 3 }}>
-            <BookingPageContent sessionTypeId={selectedSessionTypeId} />
+          <Box 
+            sx={{ 
+              pt: { xs: 1, sm: 1.5 },
+              px: { xs: 2, sm: 3 },
+              pb: { xs: 2, sm: 3 },
+              flex: 1,
+              overflow: 'auto',
+            }}
+          >
+            <BookingPageContent sessionTypeId={selectedSessionTypeId} hideMyBookings={true} />
           </Box>
         </DialogContent>
       </Dialog>

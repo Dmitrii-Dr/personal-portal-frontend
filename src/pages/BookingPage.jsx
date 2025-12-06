@@ -41,8 +41,9 @@ import {
 import { DateCalendar } from '@mui/x-date-pickers/DateCalendar';
 import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
 import { AdapterDayjs } from '@mui/x-date-pickers/AdapterDayjs';
+import AddIcon from '@mui/icons-material/Add';
 
-const BookingPage = ({ sessionTypeId: propSessionTypeId }) => {
+const BookingPage = ({ sessionTypeId: propSessionTypeId, hideMyBookings = false }) => {
   const [selectedDate, setSelectedDate] = useState(dayjs());
   const [availableSlots, setAvailableSlots] = useState([]);
   const [loading, setLoading] = useState(true); // Start with true since we fetch on mount
@@ -58,6 +59,7 @@ const BookingPage = ({ sessionTypeId: propSessionTypeId }) => {
   const [loadingSessionTypes, setLoadingSessionTypes] = useState(!propSessionTypeId); // Only load if no prop provided
   const [sessionTypesError, setSessionTypesError] = useState(null);
   const [userTimezone, setUserTimezone] = useState(null); // User timezone from settings
+  const [userCurrency, setUserCurrency] = useState(null); // User currency from settings
   const [groupedBookings, setGroupedBookings] = useState({});
   const [pastBookings, setPastBookings] = useState([]);
   const [loadingBookings, setLoadingBookings] = useState(true);
@@ -81,6 +83,7 @@ const BookingPage = ({ sessionTypeId: propSessionTypeId }) => {
   const [updatingBooking, setUpdatingBooking] = useState(false);
   const [updateBookingError, setUpdateBookingError] = useState(null);
   const [updateSessionTypeId, setUpdateSessionTypeId] = useState(null); // Matched session type ID for update
+  const [newBookingDialogOpen, setNewBookingDialogOpen] = useState(false);
   const navigate = useNavigate();
   
   const PENDING_BOOKING_KEY = 'pending_booking';
@@ -90,7 +93,7 @@ const BookingPage = ({ sessionTypeId: propSessionTypeId }) => {
     return dayjs(date).format('YYYY-MM-DD');
   };
 
-  // Fetch user settings to get timezone (only when user is logged in)
+  // Fetch user settings to get timezone and currency (only when user is logged in)
   const fetchUserSettings = async () => {
     if (!hasToken) {
       return;
@@ -103,6 +106,9 @@ const BookingPage = ({ sessionTypeId: propSessionTypeId }) => {
         if (data.timezone) {
           setUserTimezone(data.timezone);
         }
+        if (data.currency) {
+          setUserCurrency(data.currency);
+        }
       }
     } catch (err) {
       console.warn('Error fetching user settings:', err);
@@ -110,6 +116,63 @@ const BookingPage = ({ sessionTypeId: propSessionTypeId }) => {
       const browserTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
       setUserTimezone(browserTimezone);
     }
+  };
+
+  // Get currency symbol for display
+  const getCurrencySymbol = (currency) => {
+    if (!currency) return '';
+    const currencyMap = {
+      'Rubles': '₽',
+      'Tenge': '₸',
+      'USD': '$',
+      'USD': '$', // Fallback for typo
+    };
+    return currencyMap[currency] || '';
+  };
+
+  // Format session type display with price in user's currency
+  const formatSessionTypeDisplay = (sessionType) => {
+    const name = sessionType.name || '';
+    const duration = sessionType.durationMinutes || 60;
+    let priceDisplay = '';
+    
+    if (userCurrency && sessionType.prices && sessionType.prices[userCurrency] !== undefined) {
+      const price = sessionType.prices[userCurrency];
+      const symbol = getCurrencySymbol(userCurrency);
+      priceDisplay = `${price}${symbol}`;
+    } else if (sessionType.price !== undefined) {
+      // Fallback to old price field if available
+      priceDisplay = `${sessionType.price}$`;
+    }
+    
+    if (priceDisplay) {
+      return `${name}. ${duration} min. ${priceDisplay}`;
+    } else {
+      return `${name}. ${duration} min`;
+    }
+  };
+
+  // Get first price from sessionPrices object and format it
+  const getBookingPriceDisplay = (sessionPrices) => {
+    if (!sessionPrices || typeof sessionPrices !== 'object') {
+      return null;
+    }
+    
+    // Get the first key-value pair from sessionPrices
+    const currencies = Object.keys(sessionPrices);
+    if (currencies.length === 0) {
+      return null;
+    }
+    
+    const firstCurrency = currencies[0];
+    const price = sessionPrices[firstCurrency];
+    
+    if (price === null || price === undefined) {
+      return null;
+    }
+    
+    const symbol = getCurrencySymbol(firstCurrency);
+    return `${price}${symbol}`;
   };
 
   // Fetch available slots for a given date
@@ -253,13 +316,19 @@ const BookingPage = ({ sessionTypeId: propSessionTypeId }) => {
       return;
     }
 
+    let isMounted = true;
+    const controller = new AbortController();
+
     const fetchSessionTypes = async () => {
       setLoadingSessionTypes(true);
       setSessionTypesError(null);
       try {
         const response = await apiClient.get('/api/v1/public/session/type', {
+          signal: controller.signal,
           timeout: 10000,
         });
+        if (!isMounted) return;
+        
         if (response.data && Array.isArray(response.data)) {
           setSessionTypes(response.data);
           // Set first session type as default if available
@@ -270,14 +339,29 @@ const BookingPage = ({ sessionTypeId: propSessionTypeId }) => {
           setSessionTypes([]);
         }
       } catch (error) {
+        // Don't set error if request was aborted
+        if (error.name === 'AbortError' || error.name === 'CanceledError' || error.code === 'ERR_CANCELED') {
+          return;
+        }
+        
+        if (!isMounted) return;
+        
         console.error('Error fetching session types:', error);
         setSessionTypesError(error.message || 'Failed to load session types');
         setSessionTypes([]);
       } finally {
-        setLoadingSessionTypes(false);
+        if (isMounted) {
+          setLoadingSessionTypes(false);
+        }
       }
     };
+    
     fetchSessionTypes();
+    
+    return () => {
+      isMounted = false;
+      controller.abort();
+    };
   }, [propSessionTypeId]);
 
   // Check if user is logged in on mount and when token changes
@@ -666,6 +750,7 @@ const BookingPage = ({ sessionTypeId: propSessionTypeId }) => {
 
       // Success - close dialog and refresh bookings and slots
       handleDialogClose();
+      setNewBookingDialogOpen(false); // Close new booking dialog
       if (hasToken) {
         await fetchBookings(); // Refresh bookings list when user is logged in
       }
@@ -800,6 +885,26 @@ const BookingPage = ({ sessionTypeId: propSessionTypeId }) => {
     }
   };
 
+  // Check if booking is past (CONFIRMED or PENDING_APPROVAL status with endTimeInstant in the past)
+  const isPastBooking = (booking) => {
+    if (!booking) {
+      return false;
+    }
+    const status = booking.status?.toUpperCase();
+    if (status !== 'CONFIRMED' && status !== 'PENDING_APPROVAL') {
+      return false;
+    }
+    if (!booking.endTimeInstant) {
+      return false;
+    }
+    try {
+      const endTime = dayjs(booking.endTimeInstant);
+      return endTime.isBefore(dayjs());
+    } catch {
+      return false;
+    }
+  };
+
   // Get active bookings (CONFIRMED first, then PENDING_APPROVAL)
   const getActiveBookings = () => {
     const confirmed = groupedBookings.CONFIRMED || [];
@@ -826,12 +931,23 @@ const BookingPage = ({ sessionTypeId: propSessionTypeId }) => {
   return (
     <LocalizationProvider dateAdapter={AdapterDayjs} adapterLocale="en-gb">
       <Box>
-        {/* Show "My Bookings" section only if user is logged in */}
-        {hasToken && (
+        {/* Show "My Bookings" section only if user is logged in and not in dialog/popup */}
+        {hasToken && !hideMyBookings && (
           <>
-            <Typography variant="h4" component="h1" gutterBottom>
-              My Bookings
-            </Typography>
+            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+              <Typography variant="h4" component="h1">
+                My Bookings
+              </Typography>
+              <Button
+                variant="contained"
+                color="primary"
+                onClick={() => setNewBookingDialogOpen(true)}
+                sx={{ textTransform: 'none' }}
+                startIcon={<AddIcon />}
+              >
+                New Booking
+              </Button>
+            </Box>e
 
             {/* Tabs for Active Sessions and Past Sessions */}
             <Box sx={{ borderBottom: 1, borderColor: 'divider', mt: 2 }}>
@@ -864,24 +980,53 @@ const BookingPage = ({ sessionTypeId: propSessionTypeId }) => {
                 {activeTab === 0 && (
                   <Box sx={{ mt: 2 }}>
                     {getActiveBookings().length > 0 ? (
-                      getActiveBookings().map((booking) => (
-                        <Card key={booking.id} sx={{ mb: 2 }}>
-                          <CardContent>
-                            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 1 }}>
-                              <Box>
-                                <Typography variant="h6" component="h2">
-                                  {booking.sessionName || 'Session'}
-                                </Typography>
-                                <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
-                                  {formatInstant(booking.startTimeInstant)} - {formatInstant(booking.endTimeInstant)}
-                                </Typography>
+                      getActiveBookings().map((booking) => {
+                        const isPast = isPastBooking(booking);
+                        return (
+                          <Card 
+                            key={booking.id} 
+                            sx={{ 
+                              mb: 2,
+                              bgcolor: isPast ? 'grey.200' : 'background.paper',
+                            }}
+                          >
+                            <CardContent>
+                              <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 1 }}>
+                                <Box>
+                                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 0.5 }}>
+                                    <Typography variant="h6" component="h2">
+                                      {booking.sessionName || 'Session'}
+                                    </Typography>
+                                    {getBookingPriceDisplay(booking.sessionPrices) && (
+                                      <Chip
+                                        label={getBookingPriceDisplay(booking.sessionPrices)}
+                                        size="small"
+                                        color="primary"
+                                        variant="outlined"
+                                      />
+                                    )}
+                                  </Box>
+                                  <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
+                                    {formatInstant(booking.startTimeInstant)} - {formatInstant(booking.endTimeInstant)}
+                                  </Typography>
+                                </Box>
+                                <Box sx={{ display: 'flex', gap: 1, alignItems: 'center' }}>
+                                  <Chip
+                                    label={booking.status || 'UNKNOWN'}
+                                    color={getStatusColor(booking.status)}
+                                    size="small"
+                                  />
+                                  {isPast && (
+                                    <Tooltip title="Status will be updated soon by administrator">
+                                      <Chip
+                                        label="Past"
+                                        size="small"
+                                        sx={{ cursor: 'help', bgcolor: 'grey.300' }}
+                                      />
+                                    </Tooltip>
+                                  )}
+                                </Box>
                               </Box>
-                              <Chip
-                                label={booking.status || 'UNKNOWN'}
-                                color={getStatusColor(booking.status)}
-                                size="small"
-                              />
-                            </Box>
                             {booking.clientMessage && (
                               <>
                                 <Divider sx={{ my: 1 }} />
@@ -916,7 +1061,7 @@ const BookingPage = ({ sessionTypeId: propSessionTypeId }) => {
                                       color="primary"
                                       size="small"
                                       onClick={() => handleUpdateClick(booking)}
-                                      disabled={updatingBooking}
+                                      disabled={updatingBooking || isPast}
                                       sx={{ textTransform: 'none' }}
                                     >
                                       Update Session Date/Time
@@ -927,7 +1072,7 @@ const BookingPage = ({ sessionTypeId: propSessionTypeId }) => {
                                     color="error"
                                     size="small"
                                     onClick={() => handleCancelClick(booking)}
-                                    disabled={cancelling}
+                                    disabled={cancelling || isPast}
                                     sx={{ textTransform: 'none' }}
                                   >
                                     Cancel Booking
@@ -937,7 +1082,8 @@ const BookingPage = ({ sessionTypeId: propSessionTypeId }) => {
                             </Box>
                           </CardContent>
                         </Card>
-                      ))
+                        );
+                      })
                     ) : (
                       <Alert severity="info" sx={{ mt: 2 }}>
                         No active bookings found.
@@ -970,9 +1116,19 @@ const BookingPage = ({ sessionTypeId: propSessionTypeId }) => {
                           <CardContent>
                             <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 1 }}>
                               <Box>
-                                <Typography variant="h6" component="h2">
-                                  {booking.sessionName || 'Session'}
-                                </Typography>
+                                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 0.5 }}>
+                                  <Typography variant="h6" component="h2">
+                                    {booking.sessionName || 'Session'}
+                                  </Typography>
+                                  {getBookingPriceDisplay(booking.sessionPrices) && (
+                                    <Chip
+                                      label={getBookingPriceDisplay(booking.sessionPrices)}
+                                      size="small"
+                                      color="primary"
+                                      variant="outlined"
+                                    />
+                                  )}
+                                </Box>
                                 <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
                                   {formatInstant(booking.startTimeInstant)} - {formatInstant(booking.endTimeInstant)}
                                 </Typography>
@@ -1010,129 +1166,160 @@ const BookingPage = ({ sessionTypeId: propSessionTypeId }) => {
           </>
         )}
 
-        <Typography variant="h4" component="h1" gutterBottom>
-          Book a Session
-        </Typography>
-
-        {/* Session Type Selection - only show if not provided as prop */}
-        {!propSessionTypeId && (
-          <Box sx={{ mb: 3, mt: 2 }}>
-            {loadingSessionTypes ? (
-              <Box sx={{ display: 'flex', justifyContent: 'center', py: 2 }}>
-                <CircularProgress />
-              </Box>
-            ) : sessionTypesError ? (
-              <Alert severity="error" sx={{ mb: 2 }}>
-                {sessionTypesError}
-              </Alert>
-            ) : sessionTypes.length > 0 ? (
-              <FormControl sx={{ minWidth: 300 }}>
-                <InputLabel>Select Session Type</InputLabel>
-                <Select
-                  value={sessionTypeId || ''}
-                  onChange={(e) => setSessionTypeId(e.target.value)}
-                  label="Select Session Type"
-                >
-                  {sessionTypes.map((st) => (
-                    <MenuItem key={st.id || st.sessionTypeId} value={st.id || st.sessionTypeId}>
-                      {st.name} - ${st.price || 0} ({st.durationMinutes || 60} min)
-                    </MenuItem>
-                  ))}
-                </Select>
-              </FormControl>
-            ) : (
-              <Alert severity="info">
-                No session types available at this time.
-              </Alert>
-            )}
+        {/* New Booking Button - shown when user is not logged in or hideMyBookings is true */}
+        {(!hasToken || hideMyBookings) && (
+          <Box sx={{ display: 'flex', justifyContent: 'flex-end', mb: 2 }}>
+            <Button
+              variant="contained"
+              color="primary"
+              onClick={() => setNewBookingDialogOpen(true)}
+              sx={{ textTransform: 'none' }}
+              startIcon={<AddIcon />}
+            >
+              New Booking
+            </Button>
           </Box>
         )}
 
-        <Grid container spacing={3} sx={{ mt: 2 }}>
-          {/* Left Column - Date Calendar */}
-          <Grid item xs={12} md={6}>
-            <Box
-              sx={{
-                display: 'flex',
-                justifyContent: 'center',
-                border: 1,
-                borderColor: 'divider',
-                borderRadius: 2,
-                p: 2,
-                bgcolor: 'background.paper',
-              }}
-            >
-              <DateCalendar
-                value={selectedDate}
-                onChange={handleDateChange}
-                minDate={dayjs()}
-                sx={{ width: '100%' }}
-                firstDayOfWeek={1}
-              />
-            </Box>
-          </Grid>
-
-          {/* Right Column - Available Slots */}
-          <Grid item xs={12} md={6}>
-            <Typography variant="h6" gutterBottom>
-              Available Times on {formatDateForDisplay(selectedDate)}
-            </Typography>
-
-            {error && (
-              <Alert severity="error" sx={{ mb: 2 }}>
-                {error}
-              </Alert>
-            )}
-
-            {loading ? (
-              <Box
-                sx={{
-                  display: 'flex',
-                  justifyContent: 'center',
-                  alignItems: 'center',
-                  minHeight: 200,
-                }}
-              >
-                <CircularProgress />
-              </Box>
-            ) : availableSlots.length > 0 ? (
-              <List>
-                {availableSlots.map((slot, index) => {
-                  const startTime = slot.startTime 
-                    ? formatTime(slot.startTime) 
-                    : (slot.startTimeInstant ? formatTimeFromInstant(slot.startTimeInstant) : 'N/A');
-                  const endTime = slot.endTime 
-                    ? formatTime(slot.endTime) 
-                    : 'N/A';
-                  
-                  return (
-                    <ListItemButton
-                      key={slot.startTimeInstant || `slot-${index}`}
-                      onClick={() => handleSlotClick(slot)}
-                      sx={{
-                        border: 1,
-                        borderColor: 'divider',
-                        borderRadius: 1,
-                        mb: 1,
-                        '&:hover': {
-                          bgcolor: 'action.hover',
-                        },
-                      }}
+        {/* New Booking Dialog */}
+        <Dialog 
+          open={newBookingDialogOpen} 
+          onClose={() => setNewBookingDialogOpen(false)} 
+          maxWidth="md" 
+          fullWidth
+        >
+          <DialogTitle>Book a Session</DialogTitle>
+          <DialogContent>
+            {/* Session Type Selection - only show if not provided as prop */}
+            {!propSessionTypeId && (
+              <Box sx={{ mb: 3, mt: 2 }}>
+                {loadingSessionTypes ? (
+                  <Box sx={{ display: 'flex', justifyContent: 'center', py: 2 }}>
+                    <CircularProgress />
+                  </Box>
+                ) : sessionTypesError ? (
+                  <Alert severity="error" sx={{ mb: 2 }}>
+                    {sessionTypesError}
+                  </Alert>
+                ) : sessionTypes.length > 0 ? (
+                  <FormControl sx={{ minWidth: 300, width: '100%' }}>
+                    <InputLabel>Select Session Type</InputLabel>
+                    <Select
+                      value={sessionTypeId || ''}
+                      onChange={(e) => setSessionTypeId(e.target.value)}
+                      label="Select Session Type"
                     >
-                      <Typography variant="body1">
-                        {startTime}{endTime !== 'N/A' ? ` - ${endTime}` : ''}
-                      </Typography>
-                    </ListItemButton>
-                  );
-                })}
-              </List>
-            ) : (
-              <Alert severity="info">
-                No available sessions on this day. Please select another day.
-              </Alert>
+                      {sessionTypes.map((st) => (
+                        <MenuItem key={st.id || st.sessionTypeId} value={st.id || st.sessionTypeId}>
+                          {formatSessionTypeDisplay(st)}
+                        </MenuItem>
+                      ))}
+                    </Select>
+                  </FormControl>
+                ) : (
+                  <Alert severity="info">
+                    No session types available at this time.
+                  </Alert>
+                )}
+              </Box>
             )}
-          </Grid>
-        </Grid>
+
+            <Grid container spacing={3} sx={{ mt: propSessionTypeId ? 0 : 2 }}>
+              {/* Left Column - Date Calendar */}
+              <Grid item xs={12} md={6}>
+                <Box
+                  sx={{
+                    display: 'flex',
+                    justifyContent: 'center',
+                    border: 1,
+                    borderColor: 'divider',
+                    borderRadius: 2,
+                    p: 2,
+                    bgcolor: 'background.paper',
+                  }}
+                >
+                  <DateCalendar
+                    value={selectedDate}
+                    onChange={handleDateChange}
+                    minDate={dayjs()}
+                    sx={{ width: '100%' }}
+                    firstDayOfWeek={1}
+                  />
+                </Box>
+              </Grid>
+
+              {/* Right Column - Available Slots */}
+              <Grid item xs={12} md={6}>
+                <Typography variant="h6" gutterBottom>
+                  Available Times on {formatDateForDisplay(selectedDate)}
+                </Typography>
+
+                {error && (
+                  <Alert severity="error" sx={{ mb: 2 }}>
+                    {error}
+                  </Alert>
+                )}
+
+                {loading ? (
+                  <Box
+                    sx={{
+                      display: 'flex',
+                      justifyContent: 'center',
+                      alignItems: 'center',
+                      minHeight: 200,
+                    }}
+                  >
+                    <CircularProgress />
+                  </Box>
+                ) : availableSlots.length > 0 ? (
+                  <List>
+                    {availableSlots.map((slot, index) => {
+                      const startTime = slot.startTime 
+                        ? formatTime(slot.startTime) 
+                        : (slot.startTimeInstant ? formatTimeFromInstant(slot.startTimeInstant) : 'N/A');
+                      const endTime = slot.endTime 
+                        ? formatTime(slot.endTime) 
+                        : 'N/A';
+                      
+                      return (
+                        <ListItemButton
+                          key={slot.startTimeInstant || `slot-${index}`}
+                          onClick={() => handleSlotClick(slot)}
+                          sx={{
+                            border: 1,
+                            borderColor: 'divider',
+                            borderRadius: 1,
+                            mb: 1,
+                            '&:hover': {
+                              bgcolor: 'action.hover',
+                            },
+                          }}
+                        >
+                          <Typography variant="body1">
+                            {startTime}{endTime !== 'N/A' ? ` - ${endTime}` : ''}
+                          </Typography>
+                        </ListItemButton>
+                      );
+                    })}
+                  </List>
+                ) : (
+                  <Alert severity="info">
+                    No available sessions on this day. Please select another day.
+                  </Alert>
+                )}
+              </Grid>
+            </Grid>
+          </DialogContent>
+          <DialogActions>
+            <Button 
+              onClick={() => setNewBookingDialogOpen(false)} 
+              color="inherit"
+              sx={{ textTransform: 'none' }}
+            >
+              Close
+            </Button>
+          </DialogActions>
+        </Dialog>
 
         {/* Booking Confirmation Dialog */}
         <Dialog open={openDialog} onClose={handleDialogClose} maxWidth="sm" fullWidth>

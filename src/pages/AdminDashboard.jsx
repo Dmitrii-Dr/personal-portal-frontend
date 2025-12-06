@@ -26,12 +26,21 @@ import {
   Pagination,
   Paper,
   Popover,
+  List,
+  ListItemButton,
+  Checkbox,
+  FormControlLabel,
+  IconButton,
 } from '@mui/material';
 import dayjs from 'dayjs';
 import utc from 'dayjs/plugin/utc';
 import timezone from 'dayjs/plugin/timezone';
 import FilterAltIcon from '@mui/icons-material/FilterAlt';
 import ClearIcon from '@mui/icons-material/Clear';
+import AddIcon from '@mui/icons-material/Add';
+import AccessTimeIcon from '@mui/icons-material/AccessTime';
+import ArrowUpwardIcon from '@mui/icons-material/ArrowUpward';
+import ArrowDownwardIcon from '@mui/icons-material/ArrowDownward';
 import { DateCalendar } from '@mui/x-date-pickers/DateCalendar';
 import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
 import { AdapterDayjs } from '@mui/x-date-pickers/AdapterDayjs';
@@ -86,6 +95,40 @@ const PastSessions = () => {
       const browserTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
       setUserTimezone(browserTimezone);
     }
+  };
+
+  // Get currency symbol for display
+  const getCurrencySymbol = (currency) => {
+    if (!currency) return '';
+    const currencyMap = {
+      'Rubles': '₽',
+      'Tenge': '₸',
+      'USD': '$',
+    };
+    return currencyMap[currency] || '';
+  };
+
+  // Get first price from sessionPrices object and format it
+  const getBookingPriceDisplay = (sessionPrices) => {
+    if (!sessionPrices || typeof sessionPrices !== 'object') {
+      return null;
+    }
+    
+    // Get the first key-value pair from sessionPrices
+    const currencies = Object.keys(sessionPrices);
+    if (currencies.length === 0) {
+      return null;
+    }
+    
+    const firstCurrency = currencies[0];
+    const price = sessionPrices[firstCurrency];
+    
+    if (price === null || price === undefined) {
+      return null;
+    }
+    
+    const symbol = getCurrencySymbol(firstCurrency);
+    return `${price}${symbol}`;
   };
 
   // Fetch timezone on mount
@@ -645,24 +688,20 @@ const PastSessions = () => {
                           <Typography variant="body1">
                             {booking.sessionName || 'N/A'}
                           </Typography>
+                          {getBookingPriceDisplay(booking.sessionPrices) && (
+                            <Chip
+                              label={getBookingPriceDisplay(booking.sessionPrices)}
+                              size="small"
+                              color="primary"
+                              variant="outlined"
+                              sx={{ 
+                                height: 20, 
+                                fontSize: '0.65rem',
+                                '& .MuiChip-label': { px: 0.75 }
+                              }}
+                            />
+                          )}
                         </Box>
-                        {/* Prices on a new row */}
-                        {booking.sessionPrices && Object.keys(booking.sessionPrices).length > 0 && (
-                          <Stack direction="row" spacing={0.5} sx={{ mt: 0.5, flexWrap: 'wrap', gap: 0.5 }}>
-                            {Object.entries(booking.sessionPrices).map(([currency, price]) => (
-                              <Chip
-                                key={currency}
-                                label={`${currency}: ${price}`}
-                                size="small"
-                                sx={{ 
-                                  height: 20, 
-                                  fontSize: '0.65rem',
-                                  '& .MuiChip-label': { px: 0.75 }
-                                }}
-                              />
-                            ))}
-                          </Stack>
-                        )}
                       </Grid>
                       <Grid item xs={12} sm={6}>
                         <Typography variant="body2" color="text.secondary">
@@ -735,6 +774,43 @@ const AdminDashboard = () => {
   const [loadingTags, setLoadingTags] = useState(false);
   const [selectedTagIds, setSelectedTagIds] = useState([]);
   const [showCreateTagForm, setShowCreateTagForm] = useState(false);
+  
+  // New Booking Dialog State
+  const [newBookingOpen, setNewBookingOpen] = useState(false);
+  const [bookingSessionTypes, setBookingSessionTypes] = useState([]);
+  const [loadingSessionTypes, setLoadingSessionTypes] = useState(false);
+  const [sessionTypesError, setSessionTypesError] = useState(null);
+  const [selectedSessionTypeId, setSelectedSessionTypeId] = useState(null);
+  const [bookingAvailableUsers, setBookingAvailableUsers] = useState([]);
+  const [loadingBookingUsers, setLoadingBookingUsers] = useState(false);
+  const [bookingUsersError, setBookingUsersError] = useState('');
+  const [selectedClientId, setSelectedClientId] = useState('');
+  const [bookingSelectedDate, setBookingSelectedDate] = useState(dayjs());
+  const [bookingAvailableSlots, setBookingAvailableSlots] = useState([]);
+  const [loadingBookingSlots, setLoadingBookingSlots] = useState(false);
+  const [bookingSlotsError, setBookingSlotsError] = useState(null);
+  const [selectedBookingSlot, setSelectedBookingSlot] = useState(null);
+  const [bookingClientMessage, setBookingClientMessage] = useState('');
+  const [submittingBooking, setSubmittingBooking] = useState(false);
+  const [bookingError, setBookingError] = useState(null);
+  const [userTimezone, setUserTimezone] = useState(null);
+  const bookingsRefreshKeyRef = useRef(0);
+  const [showCustomTimePicker, setShowCustomTimePicker] = useState(false);
+  const [customStartTime, setCustomStartTime] = useState(null);
+  const [hourInput, setHourInput] = useState('00');
+  const [minuteInput, setMinuteInput] = useState('00');
+  
+  // Create New Client Dialog State
+  const [createClientOpen, setCreateClientOpen] = useState(false);
+  const [newClientData, setNewClientData] = useState({
+    email: '',
+    firstName: '',
+    lastName: '',
+    timezone: Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC',
+    sendEmailNotification: false,
+  });
+  const [creatingClient, setCreatingClient] = useState(false);
+  const [createClientError, setCreateClientError] = useState(null);
 
   const handleAddPostOpen = () => {
     setAddPostOpen(true);
@@ -895,35 +971,643 @@ const AdminDashboard = () => {
     setActiveTab(newValue);
   };
 
+  // Fetch user timezone
+  useEffect(() => {
+    const fetchTimezone = async () => {
+      try {
+        const data = await fetchUserSettings();
+        if (data && data.timezone) {
+          setUserTimezone(data.timezone);
+        } else {
+          const browserTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+          setUserTimezone(browserTimezone);
+        }
+      } catch (err) {
+        console.warn('Error fetching user timezone:', err);
+        const browserTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+        setUserTimezone(browserTimezone);
+      }
+    };
+    if (getToken()) {
+      fetchTimezone();
+    } else {
+      const browserTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+      setUserTimezone(browserTimezone);
+    }
+  }, []);
+
+  // New Booking Dialog Handlers
+  const handleNewBookingOpen = () => {
+    setNewBookingOpen(true);
+    setSelectedSessionTypeId(null);
+    setSelectedClientId('');
+    setBookingSelectedDate(dayjs());
+    setBookingAvailableSlots([]);
+    setSelectedBookingSlot(null);
+    setBookingClientMessage('');
+    setBookingError(null);
+    setSessionTypesError(null);
+    setBookingSlotsError(null);
+    setBookingUsersError('');
+    setShowCustomTimePicker(false);
+    setCustomStartTime(null);
+    fetchBookingSessionTypes();
+    fetchBookingUsers();
+  };
+
+  const handleNewBookingClose = () => {
+    if (submittingBooking) return;
+    setNewBookingOpen(false);
+    setSelectedSessionTypeId(null);
+    setSelectedClientId('');
+    setBookingSelectedDate(dayjs());
+    setBookingAvailableSlots([]);
+    setSelectedBookingSlot(null);
+    setBookingClientMessage('');
+    setBookingError(null);
+    setShowCustomTimePicker(false);
+    setCustomStartTime(null);
+  };
+
+  const fetchBookingSessionTypes = async () => {
+    setLoadingSessionTypes(true);
+    setSessionTypesError(null);
+    try {
+      const response = await apiClient.get('/api/v1/public/session/type', {
+        timeout: 10000,
+      });
+      if (response.data && Array.isArray(response.data)) {
+        setBookingSessionTypes(response.data);
+      } else {
+        setBookingSessionTypes([]);
+      }
+    } catch (err) {
+      console.error('Error fetching session types:', err);
+      setSessionTypesError(err.message || 'Failed to load session types');
+      setBookingSessionTypes([]);
+    } finally {
+      setLoadingSessionTypes(false);
+    }
+  };
+
+  const fetchBookingUsers = async () => {
+    setLoadingBookingUsers(true);
+    setBookingUsersError('');
+    try {
+      const response = await fetchWithAuth('/api/v1/admin/users');
+      if (!response.ok) {
+        throw new Error(`Failed to load users: ${response.status} ${response.statusText}`);
+      }
+      const users = await response.json();
+      const list = Array.isArray(users) ? users : [];
+      setBookingAvailableUsers(list);
+    } catch (err) {
+      console.error('Error fetching users:', err);
+      setBookingUsersError(err.message || 'Failed to load users');
+      setBookingAvailableUsers([]);
+    } finally {
+      setLoadingBookingUsers(false);
+    }
+  };
+
+  const fetchBookingSlots = async (date, sessionTypeId) => {
+    if (!sessionTypeId) {
+      setBookingAvailableSlots([]);
+      setBookingSlotsError(null);
+      return;
+    }
+
+    setLoadingBookingSlots(true);
+    setBookingSlotsError(null);
+    try {
+      const dateString = dayjs(date).format('YYYY-MM-DD');
+      const timezone = userTimezone || Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC';
+      
+      const response = await apiClient.get('/api/v1/public/booking/available/slot', {
+        params: {
+          sessionTypeId,
+          suggestedDate: dateString,
+          timezone,
+        },
+        timeout: 10000,
+      });
+      
+      if (response.data && response.data.slots && Array.isArray(response.data.slots)) {
+        setBookingAvailableSlots(response.data.slots);
+      } else {
+        setBookingAvailableSlots([]);
+      }
+    } catch (err) {
+      console.error('Error fetching available slots:', err);
+      let errorMessage = 'Failed to load available slots. Please try again later.';
+      if (err.code === 'ECONNABORTED') {
+        errorMessage = 'Request timed out. Please try again.';
+      } else if (err.response) {
+        errorMessage = err.response.data?.message || `Server error: ${err.response.status}`;
+      } else if (err.request) {
+        errorMessage = 'Unable to reach the server. Please check your connection.';
+      } else {
+        errorMessage = err.message || errorMessage;
+      }
+      setBookingSlotsError(errorMessage);
+      setBookingAvailableSlots([]);
+    } finally {
+      setLoadingBookingSlots(false);
+    }
+  };
+
+  // Fetch slots when session type or date changes
+  useEffect(() => {
+    if (selectedSessionTypeId && bookingSelectedDate && userTimezone) {
+      fetchBookingSlots(bookingSelectedDate, selectedSessionTypeId);
+    }
+  }, [selectedSessionTypeId, bookingSelectedDate, userTimezone]);
+
+  const handleBookingDateChange = (newDate) => {
+    setBookingSelectedDate(newDate);
+    setSelectedBookingSlot(null);
+    // Update custom slot if custom time is selected
+    if (showCustomTimePicker && customStartTime) {
+      const combinedDateTime = newDate
+        .hour(customStartTime.hour())
+        .minute(customStartTime.minute())
+        .second(0)
+        .millisecond(0);
+      
+      const customSlot = {
+        startTimeInstant: combinedDateTime.toISOString(),
+        startTime: `${String(customStartTime.hour()).padStart(2, '0')}:${String(customStartTime.minute()).padStart(2, '0')}`,
+      };
+      setSelectedBookingSlot(customSlot);
+    }
+  };
+
+  const handleBookingSlotClick = (slot) => {
+    // Check if selected date is today and slot is in the past
+    const isToday = bookingSelectedDate.isSame(dayjs(), 'day');
+    if (isToday && slot.startTimeInstant) {
+      const slotTime = dayjs(slot.startTimeInstant);
+      if (slotTime.isBefore(dayjs())) {
+        setBookingError('Cannot select a time slot in the past for today');
+        return;
+      }
+    }
+    
+    setBookingError(null);
+    setSelectedBookingSlot(slot);
+    setShowCustomTimePicker(false);
+    setCustomStartTime(null);
+  };
+
+  // Handle create new slot click
+  const handleCreateNewSlotClick = () => {
+    setShowCustomTimePicker(true);
+    setSelectedBookingSlot(null);
+    const defaultTime = dayjs().hour(9).minute(0); // Default to 9:00 AM
+    setCustomStartTime(defaultTime);
+    setHourInput('09');
+    setMinuteInput('00');
+  };
+
+  // Handle custom time selection
+  const handleCustomTimeChange = (newTime) => {
+    setCustomStartTime(newTime);
+    setHourInput(String(newTime.hour()).padStart(2, '0'));
+    setMinuteInput(String(newTime.minute()).padStart(2, '0'));
+    if (newTime && bookingSelectedDate) {
+      // Combine date from calendar with custom time
+      const combinedDateTime = bookingSelectedDate
+        .hour(newTime.hour())
+        .minute(newTime.minute())
+        .second(0)
+        .millisecond(0);
+      
+      // Check if selected date is today and time is in the past
+      const isToday = bookingSelectedDate.isSame(dayjs(), 'day');
+      const isPastTime = isToday && combinedDateTime.isBefore(dayjs());
+      
+      if (isPastTime) {
+        setBookingError('Cannot select a time in the past for today');
+        // Still create the slot object but mark it as invalid
+        const customSlot = {
+          startTimeInstant: combinedDateTime.toISOString(),
+          startTime: `${String(newTime.hour()).padStart(2, '0')}:${String(newTime.minute()).padStart(2, '0')}`,
+        };
+        setSelectedBookingSlot(customSlot);
+        return;
+      }
+      
+      setBookingError(null);
+      
+      // Create a slot-like object with the combined datetime
+      const customSlot = {
+        startTimeInstant: combinedDateTime.toISOString(),
+        startTime: `${String(newTime.hour()).padStart(2, '0')}:${String(newTime.minute()).padStart(2, '0')}`,
+      };
+      setSelectedBookingSlot(customSlot);
+    }
+  };
+
+  // Handle hour increment/decrement
+  const handleHourChange = (increment) => {
+    if (!customStartTime || !bookingSelectedDate) return;
+    
+    let newHour;
+    if (increment) {
+      newHour = (customStartTime.hour() + 1) % 24;
+    } else {
+      newHour = (customStartTime.hour() - 1 + 24) % 24;
+    }
+    
+    const newTime = customStartTime.hour(newHour);
+    handleCustomTimeChange(newTime);
+  };
+
+  // Handle minute increment/decrement
+  const handleMinuteChange = (increment) => {
+    if (!customStartTime || !bookingSelectedDate) return;
+    
+    let newMinute;
+    if (increment) {
+      newMinute = (customStartTime.minute() + 5) % 60;
+    } else {
+      newMinute = (customStartTime.minute() - 5 + 60) % 60;
+    }
+    
+    const newTime = customStartTime.minute(newMinute);
+    handleCustomTimeChange(newTime);
+  };
+
+  // Handle manual hour input change (while typing)
+  const handleHourInputChange = (value) => {
+    // Allow free typing - only update display
+    const numericValue = value.replace(/\D/g, '').slice(0, 2);
+    setHourInput(numericValue || '');
+  };
+
+  // Handle manual hour input blur (when done typing)
+  const handleHourInputBlur = () => {
+    if (!customStartTime || !bookingSelectedDate) return;
+    const hour = parseInt(hourInput, 10);
+    
+    let finalHour;
+    if (isNaN(hour) || hour < 0) {
+      finalHour = 0;
+    } else if (hour > 23) {
+      finalHour = 23;
+    } else {
+      finalHour = hour;
+    }
+    
+    const newTime = customStartTime.hour(finalHour);
+    handleCustomTimeChange(newTime);
+  };
+
+  // Handle manual minute input change (while typing)
+  const handleMinuteInputChange = (value) => {
+    // Allow free typing - only update display
+    const numericValue = value.replace(/\D/g, '').slice(0, 2);
+    setMinuteInput(numericValue || '');
+  };
+
+  // Handle manual minute input blur (when done typing)
+  const handleMinuteInputBlur = () => {
+    if (!customStartTime || !bookingSelectedDate) return;
+    const minute = parseInt(minuteInput, 10);
+    
+    let finalMinute;
+    if (isNaN(minute) || minute < 0) {
+      finalMinute = 0;
+    } else if (minute > 59) {
+      finalMinute = 59;
+    } else {
+      finalMinute = minute;
+    }
+    
+    const newTime = customStartTime.minute(finalMinute);
+    handleCustomTimeChange(newTime);
+  };
+
+  // Handle "Now" button - set to current time
+  const handleSetNow = () => {
+    const now = dayjs();
+    handleCustomTimeChange(now);
+  };
+
+  // Handle "Clear" button
+  const handleClearTime = () => {
+    setCustomStartTime(null);
+    setSelectedBookingSlot(null);
+  };
+
+  const formatTime = (timeString) => {
+    if (!timeString) return 'N/A';
+    try {
+      // Handle LocalTime format (HH:mm:ss or HH:mm)
+      const time = timeString.includes(':') ? timeString.split(':').slice(0, 2).join(':') : timeString;
+      return dayjs(time, 'HH:mm').format('HH:mm');
+    } catch {
+      return timeString;
+    }
+  };
+
+  const formatTimeFromInstant = (instantString) => {
+    if (!instantString) return 'N/A';
+    try {
+      return dayjs(instantString).format('HH:mm');
+    } catch {
+      return instantString;
+    }
+  };
+
+  const formatDateForDisplay = (date) => {
+    return dayjs(date).format('MMMM D, YYYY');
+  };
+
+  // Common timezones with unique UTC offsets (one representative per offset)
+  // Format: { value: timezone, offset: UTC offset, label: display name }
+  const COMMON_TIMEZONES = [
+    { value: 'UTC', offset: '+00:00', label: 'UTC' },
+    { value: 'Europe/London', offset: '+00:00', label: 'Europe/London' },
+    { value: 'Europe/Paris', offset: '+01:00', label: 'Europe/Paris' },
+    { value: 'Europe/Berlin', offset: '+01:00', label: 'Europe/Berlin' },
+    { value: 'Europe/Athens', offset: '+02:00', label: 'Europe/Athens' },
+    { value: 'Europe/Moscow', offset: '+03:00', label: 'Europe/Moscow' },
+    { value: 'Asia/Dubai', offset: '+04:00', label: 'Asia/Dubai' },
+    { value: 'Asia/Tashkent', offset: '+05:00', label: 'Asia/Tashkent' },
+    { value: 'Asia/Kolkata', offset: '+05:30', label: 'Asia/Kolkata' },
+    { value: 'Asia/Dhaka', offset: '+06:00', label: 'Asia/Dhaka' },
+    { value: 'Asia/Bangkok', offset: '+07:00', label: 'Asia/Bangkok' },
+    { value: 'Asia/Singapore', offset: '+08:00', label: 'Asia/Singapore' },
+    { value: 'Asia/Shanghai', offset: '+08:00', label: 'Asia/Shanghai' },
+    { value: 'Asia/Tokyo', offset: '+09:00', label: 'Asia/Tokyo' },
+    { value: 'Australia/Sydney', offset: '+10:00', label: 'Australia/Sydney' },
+    { value: 'Pacific/Auckland', offset: '+12:00', label: 'Pacific/Auckland' },
+    { value: 'America/Honolulu', offset: '-10:00', label: 'America/Honolulu' },
+    { value: 'America/Anchorage', offset: '-09:00', label: 'America/Anchorage' },
+    { value: 'America/Los_Angeles', offset: '-08:00', label: 'America/Los_Angeles' },
+    { value: 'America/Denver', offset: '-07:00', label: 'America/Denver' },
+    { value: 'America/Chicago', offset: '-06:00', label: 'America/Chicago' },
+    { value: 'America/New_York', offset: '-05:00', label: 'America/New_York' },
+    { value: 'America/Caracas', offset: '-04:00', label: 'America/Caracas' },
+    { value: 'America/Sao_Paulo', offset: '-03:00', label: 'America/Sao_Paulo' },
+  ];
+
+  // Group timezones by unique offset and keep only one representative per offset
+  const getUniqueTimezoneOffsets = () => {
+    const offsetMap = new Map();
+    
+    COMMON_TIMEZONES.forEach((tz) => {
+      if (!offsetMap.has(tz.offset)) {
+        offsetMap.set(tz.offset, tz);
+      }
+    });
+    
+    return Array.from(offsetMap.values()).sort((a, b) => {
+      // Sort: UTC first, then positive offsets (highest first), then negative offsets (least negative first)
+      if (a.offset === '+00:00') return -1;
+      if (b.offset === '+00:00') return 1;
+      
+      const offsetA = a.offset;
+      const offsetB = b.offset;
+      
+      // Both positive or both negative
+      if ((offsetA.startsWith('+') && offsetB.startsWith('+')) || 
+          (offsetA.startsWith('-') && offsetB.startsWith('-'))) {
+        return offsetB.localeCompare(offsetA);
+      }
+      
+      // One positive, one negative
+      if (offsetA.startsWith('+')) return -1;
+      return 1;
+    });
+  };
+
+  const handleCreateClientOpen = () => {
+    setCreateClientOpen(true);
+    setNewClientData({
+      email: '',
+      firstName: '',
+      lastName: '',
+      timezone: Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC',
+      sendEmailNotification: false,
+    });
+    setCreateClientError(null);
+  };
+
+  const handleCreateClientClose = () => {
+    if (creatingClient) return;
+    setCreateClientOpen(false);
+    setNewClientData({
+      email: '',
+      firstName: '',
+      lastName: '',
+      timezone: Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC',
+      sendEmailNotification: false,
+    });
+    setCreateClientError(null);
+  };
+
+  const handleCreateClientSubmit = async () => {
+    // Validate form
+    if (!newClientData.email.trim()) {
+      setCreateClientError('Email is required');
+      return;
+    }
+    
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(newClientData.email.trim())) {
+      setCreateClientError('Please enter a valid email address');
+      return;
+    }
+
+    if (!newClientData.timezone || !newClientData.timezone.trim()) {
+      setCreateClientError('Timezone is required');
+      return;
+    }
+
+    if (newClientData.timezone.length > 50) {
+      setCreateClientError('Timezone must be at most 50 characters');
+      return;
+    }
+
+    if (newClientData.firstName && newClientData.firstName.length > 100) {
+      setCreateClientError('First name must be at most 100 characters');
+      return;
+    }
+
+    if (newClientData.lastName && newClientData.lastName.length > 100) {
+      setCreateClientError('Last name must be at most 100 characters');
+      return;
+    }
+
+    setCreatingClient(true);
+    setCreateClientError(null);
+
+    try {
+      // Create user via admin API - CreateUserAdminRequest
+      const payload = {
+        email: newClientData.email.trim(),
+        firstName: newClientData.firstName.trim() || undefined,
+        lastName: newClientData.lastName.trim() || undefined,
+        timezone: newClientData.timezone.trim(),
+        sendEmailNotification: newClientData.sendEmailNotification || false,
+      };
+
+      const response = await fetchWithAuth('/api/v1/admin/user/registry', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(payload),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(
+          errorData.message || `Failed to create client: ${response.status} ${response.statusText}`
+        );
+      }
+
+      // UserResponse: { id, email, firstName, lastName, createdAt, updatedAt }
+      const createdUser = await response.json();
+      
+      // Refresh users list
+      await fetchBookingUsers();
+      
+      // Select the newly created user
+      if (createdUser && createdUser.id) {
+        setSelectedClientId(createdUser.id);
+      }
+
+      // Close dialog
+      handleCreateClientClose();
+    } catch (err) {
+      console.error('Error creating client:', err);
+      setCreateClientError(err.message || 'Failed to create client. Please try again.');
+    } finally {
+      setCreatingClient(false);
+    }
+  };
+
+  const handleSubmitBooking = async () => {
+    if (!selectedSessionTypeId) {
+      setBookingError('Please select a session type');
+      return;
+    }
+    if (!selectedClientId) {
+      setBookingError('Please select a client');
+      return;
+    }
+    if (!selectedBookingSlot || !selectedBookingSlot.startTimeInstant) {
+      setBookingError('Please select a time slot or create a custom time');
+      return;
+    }
+
+    // Check if there's a past time error
+    if (bookingError) {
+      return; // Don't submit if there's an error
+    }
+
+    // Double-check if selected time is in the past (for today)
+    const isToday = bookingSelectedDate.isSame(dayjs(), 'day');
+    if (isToday && selectedBookingSlot.startTimeInstant) {
+      const slotTime = dayjs(selectedBookingSlot.startTimeInstant);
+      if (slotTime.isBefore(dayjs())) {
+        setBookingError('Cannot select a time in the past for today');
+        return;
+      }
+    }
+
+    setSubmittingBooking(true);
+    setBookingError(null);
+
+    try {
+      const payload = {
+        sessionTypeId: selectedSessionTypeId,
+        startTimeInstant: selectedBookingSlot.startTimeInstant,
+        clientMessage: bookingClientMessage.trim() || undefined,
+      };
+
+      if (selectedClientId) {
+        payload.userId = selectedClientId;
+      }
+
+      const response = await apiClient.post('/api/v1/admin/session/booking', payload, {
+        timeout: 10000,
+      });
+
+      if (!response || (response.status && response.status >= 400)) {
+        throw new Error('Failed to create booking');
+      }
+
+      // Refresh bookings by updating key to force BookingsManagement remount
+      bookingsRefreshKeyRef.current += 1;
+
+      // Success - close dialog
+      handleNewBookingClose();
+    } catch (err) {
+      console.error('Error creating booking:', err);
+      let errorMessage = 'Failed to create booking. Please try again.';
+      
+      if (err.code === 'ECONNABORTED') {
+        errorMessage = 'Request timed out. Please try again.';
+      } else if (err.response) {
+        errorMessage = err.response.data?.message || `Server error: ${err.response.status}`;
+      } else if (err.request) {
+        errorMessage = 'Unable to reach the server. Please check your connection.';
+      } else {
+        errorMessage = err.message || errorMessage;
+      }
+      
+      setBookingError(errorMessage);
+    } finally {
+      setSubmittingBooking(false);
+    }
+  };
+
   return (
-    <Box>
-      <Box sx={{ mb: 3 }}>
-        <Typography variant="h4" component="h1">
-          Admin Dashboard
-        </Typography>
-      </Box>
+    <LocalizationProvider dateAdapter={AdapterDayjs}>
+      <Box>
+        <Box sx={{ mb: 3 }}>
+          <Typography variant="h4" component="h1">
+            Admin Dashboard
+          </Typography>
+        </Box>
 
-      <Divider sx={{ my: 4 }} />
+        <Divider sx={{ my: 4 }} />
 
-      {/* Sessions Tabs */}
-      <Box sx={{ mb: 4 }}>
-        <Tabs value={activeTab} onChange={handleTabChange} sx={{ mb: 3 }}>
-          <Tab label="Active Sessions" />
-          <Tab label="Past Sessions" />
-        </Tabs>
-
-        {activeTab === 0 && (
-          <Box>
-            <BookingsManagement />
+        {/* Sessions Tabs */}
+        <Box sx={{ mb: 4 }}>
+          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+            <Tabs value={activeTab} onChange={handleTabChange}>
+              <Tab label="Active Sessions" />
+              <Tab label="Past Sessions" />
+            </Tabs>
+            {activeTab === 0 && (
+              <Button
+                variant="contained"
+                startIcon={<AddIcon />}
+                onClick={handleNewBookingOpen}
+                sx={{ textTransform: 'none' }}
+              >
+                New Booking
+              </Button>
+            )}
           </Box>
-        )}
 
-        {activeTab === 1 && (
-          <Box>
-            <PastSessions />
-          </Box>
-        )}
-      </Box>
+          {activeTab === 0 && (
+            <Box>
+              <BookingsManagement key={bookingsRefreshKeyRef.current} />
+            </Box>
+          )}
+
+          {activeTab === 1 && (
+            <Box>
+              <PastSessions />
+            </Box>
+          )}
+        </Box>
 
       <Divider sx={{ my: 4 }} />
 
@@ -1152,7 +1836,726 @@ const AdminDashboard = () => {
           </Button>
         </DialogActions>
       </Dialog>
+
+      {/* New Booking Dialog */}
+      <Dialog open={newBookingOpen} onClose={handleNewBookingClose} maxWidth="md" fullWidth>
+        <DialogTitle>Book a Session</DialogTitle>
+        <DialogContent>
+          {bookingError && (
+            <Alert severity="error" sx={{ mb: 2 }} onClose={() => setBookingError(null)}>
+              {bookingError}
+            </Alert>
+          )}
+
+          <Grid container spacing={2} sx={{ mt: 1 }}>
+            {/* Session Type Selection */}
+            <Grid item xs={12}>
+              <FormControl fullWidth required>
+                <InputLabel>Session Type *</InputLabel>
+                <Select
+                  value={selectedSessionTypeId || ''}
+                  onChange={(e) => {
+                    setSelectedSessionTypeId(e.target.value);
+                    setSelectedBookingSlot(null);
+                    setBookingAvailableSlots([]);
+                  }}
+                  label="Session Type *"
+                  disabled={submittingBooking || loadingSessionTypes}
+                >
+                  {loadingSessionTypes && (
+                    <MenuItem disabled>
+                      <CircularProgress size={16} sx={{ mr: 1 }} /> Loading session types...
+                    </MenuItem>
+                  )}
+                  {!loadingSessionTypes &&
+                    bookingSessionTypes.map((st) => (
+                      <MenuItem key={st.id || st.sessionTypeId} value={st.id || st.sessionTypeId}>
+                        {st.name} - ${st.price || 0} ({st.durationMinutes || 60} min)
+                      </MenuItem>
+                    ))}
+                </Select>
+              </FormControl>
+              {sessionTypesError && (
+                <Alert severity="error" sx={{ mt: 1 }}>
+                  {sessionTypesError}
+                </Alert>
+              )}
+            </Grid>
+
+            {/* Client Selection */}
+            <Grid item xs={12}>
+              <FormControl fullWidth>
+                <InputLabel>Client</InputLabel>
+                <Select
+                  value={selectedClientId}
+                  onChange={(e) => {
+                    const value = e.target.value;
+                    // Ignore the special create new value
+                    if (value !== '__create_new__') {
+                      setSelectedClientId(value);
+                    }
+                  }}
+                  label="Client"
+                  disabled={submittingBooking || loadingBookingUsers}
+                  renderValue={(selected) => {
+                    if (!selected) return '';
+                    const user = bookingAvailableUsers.find((u) => u.id === selected);
+                    return user ? userFullName(user) : selected;
+                  }}
+                >
+                  {loadingBookingUsers && (
+                    <MenuItem disabled>
+                      <CircularProgress size={16} sx={{ mr: 1 }} /> Loading users...
+                    </MenuItem>
+                  )}
+                  {!loadingBookingUsers &&
+                    bookingAvailableUsers.map((user) => (
+                      <MenuItem key={user.id} value={user.id}>
+                        {userFullName(user)}
+                      </MenuItem>
+                    ))}
+                  <MenuItem 
+                    value="__create_new__"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleCreateClientOpen();
+                    }}
+                    sx={{ fontStyle: 'italic', color: 'primary.main', borderTop: '1px solid', borderColor: 'divider', mt: 0.5 }}
+                  >
+                    + Create new client
+                  </MenuItem>
+                </Select>
+              </FormControl>
+              {bookingUsersError && (
+                <Alert severity="error" sx={{ mt: 1 }}>
+                  {bookingUsersError}
+                </Alert>
+              )}
+            </Grid>
+
+            {/* Date and Time Selection */}
+            <Grid item xs={12} md={6}>
+              <Box
+                sx={{
+                  display: 'flex',
+                  justifyContent: 'center',
+                  border: 1,
+                  borderColor: 'divider',
+                  borderRadius: 2,
+                  p: 2,
+                  bgcolor: 'background.paper',
+                  opacity: selectedSessionTypeId ? 1 : 0.6,
+                  pointerEvents: selectedSessionTypeId ? 'auto' : 'none',
+                }}
+              >
+                <DateCalendar
+                  value={bookingSelectedDate}
+                  onChange={handleBookingDateChange}
+                  minDate={dayjs()}
+                  sx={{ width: '100%' }}
+                  firstDayOfWeek={1}
+                  disabled={!selectedSessionTypeId}
+                />
+              </Box>
+              {!selectedSessionTypeId && (
+                <Typography variant="body2" color="text.secondary" sx={{ mt: 1, textAlign: 'center' }}>
+                  Please select a session type to enable date selection
+                </Typography>
+              )}
+            </Grid>
+
+            <Grid item xs={12} md={6}>
+              <Typography variant="h6" gutterBottom>
+                Available Times on {formatDateForDisplay(bookingSelectedDate)}
+              </Typography>
+
+              {!selectedSessionTypeId ? (
+                <Alert severity="info">
+                  Please select a session type to view available time slots.
+                </Alert>
+              ) : (
+                <>
+                  {bookingSlotsError && (
+                    <Alert severity="error" sx={{ mb: 2 }}>
+                      {bookingSlotsError}
+                    </Alert>
+                  )}
+
+                  {loadingBookingSlots ? (
+                    <Box
+                      sx={{
+                        display: 'flex',
+                        justifyContent: 'center',
+                        alignItems: 'center',
+                        minHeight: 200,
+                      }}
+                    >
+                      <CircularProgress />
+                    </Box>
+                  ) : bookingAvailableSlots.length > 0 ? (
+                    <List>
+                      {bookingAvailableSlots.map((slot, index) => {
+                        const startTime = slot.startTime 
+                          ? formatTime(slot.startTime) 
+                          : (slot.startTimeInstant ? formatTimeFromInstant(slot.startTimeInstant) : 'N/A');
+                        const endTime = slot.endTime 
+                          ? formatTime(slot.endTime) 
+                          : 'N/A';
+                        const isSelected = selectedBookingSlot?.startTimeInstant === slot.startTimeInstant && !showCustomTimePicker;
+                        
+                        // Check if slot is in the past (only for today)
+                        const isToday = bookingSelectedDate.isSame(dayjs(), 'day');
+                        const isPastSlot = isToday && slot.startTimeInstant && dayjs(slot.startTimeInstant).isBefore(dayjs());
+                        const isDisabled = isPastSlot;
+                        
+                        return (
+                          <ListItemButton
+                            key={slot.startTimeInstant || `slot-${index}`}
+                            onClick={() => !isDisabled && handleBookingSlotClick(slot)}
+                            selected={isSelected}
+                            disabled={isDisabled}
+                            sx={{
+                              border: 1,
+                              borderColor: isSelected ? 'primary.main' : (isDisabled ? 'error.light' : 'divider'),
+                              borderRadius: 1,
+                              mb: 1,
+                              bgcolor: isSelected ? 'action.selected' : (isDisabled ? 'action.disabledBackground' : 'transparent'),
+                              opacity: isDisabled ? 0.5 : 1,
+                              '&:hover': {
+                                bgcolor: isDisabled ? 'action.disabledBackground' : 'action.hover',
+                              },
+                              '&.Mui-disabled': {
+                                opacity: 0.5,
+                              },
+                            }}
+                          >
+                            <Typography variant="body1" color={isDisabled ? 'text.disabled' : 'text.primary'}>
+                              {startTime}{endTime !== 'N/A' ? ` - ${endTime}` : ''}
+                              {isDisabled && ' (Past)'}
+                            </Typography>
+                          </ListItemButton>
+                        );
+                      })}
+                      {/* Create new slot option */}
+                      <ListItemButton
+                        onClick={handleCreateNewSlotClick}
+                        selected={showCustomTimePicker}
+                        sx={{
+                          border: 1,
+                          borderColor: showCustomTimePicker ? 'primary.main' : 'divider',
+                          borderStyle: 'dashed',
+                          borderRadius: 1,
+                          mb: 1,
+                          bgcolor: showCustomTimePicker ? 'action.selected' : 'transparent',
+                          '&:hover': {
+                            bgcolor: 'action.hover',
+                          },
+                        }}
+                      >
+                        <Typography variant="body1" sx={{ fontStyle: 'italic' }}>
+                          + Create new slot
+                        </Typography>
+                      </ListItemButton>
+                      {/* Custom time picker */}
+                      {showCustomTimePicker && (
+                        <Box 
+                          sx={{ 
+                            mt: 1, 
+                            p: 2, 
+                            border: 2, 
+                            borderColor: 'primary.main', 
+                            borderRadius: 2, 
+                            bgcolor: 'background.paper',
+                            boxShadow: 2
+                          }}
+                        >
+                          <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+                            Enter time
+                          </Typography>
+                          <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 1, mb: 2 }}>
+                            {/* Hours */}
+                            <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+                              <IconButton 
+                                size="small" 
+                                onClick={() => handleHourChange(true)}
+                                sx={{ mb: 0.5 }}
+                              >
+                                <ArrowUpwardIcon fontSize="small" />
+                              </IconButton>
+                              <TextField
+                                value={hourInput}
+                                onChange={(e) => handleHourInputChange(e.target.value)}
+                                onFocus={(e) => e.target.select()}
+                                onBlur={handleHourInputBlur}
+                                inputProps={{
+                                  style: {
+                                    textAlign: 'center',
+                                    fontSize: '2rem',
+                                    fontWeight: 'bold',
+                                    padding: '16px',
+                                  },
+                                  maxLength: 2,
+                                }}
+                                autoComplete="off"
+                                sx={{
+                                  width: 80,
+                                  '& .MuiOutlinedInput-root': {
+                                    border: 1,
+                                    borderColor: 'divider',
+                                    borderRadius: 1,
+                                    bgcolor: 'grey.100',
+                                    '&:hover': {
+                                      borderColor: 'primary.main',
+                                    },
+                                    '&.Mui-focused': {
+                                      borderColor: 'primary.main',
+                                      bgcolor: 'grey.100',
+                                    },
+                                    '& fieldset': {
+                                      border: 'none',
+                                    },
+                                  },
+                                }}
+                              />
+                              <IconButton 
+                                size="small" 
+                                onClick={() => handleHourChange(false)}
+                                sx={{ mt: 0.5 }}
+                              >
+                                <ArrowDownwardIcon fontSize="small" />
+                              </IconButton>
+                            </Box>
+                            
+                            <Typography variant="h4" sx={{ mx: 1 }}>
+                              :
+                            </Typography>
+                            
+                            {/* Minutes */}
+                            <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+                              <IconButton 
+                                size="small" 
+                                onClick={() => handleMinuteChange(true)}
+                                sx={{ mb: 0.5 }}
+                              >
+                                <ArrowUpwardIcon fontSize="small" />
+                              </IconButton>
+                              <TextField
+                                value={minuteInput}
+                                onChange={(e) => handleMinuteInputChange(e.target.value)}
+                                onFocus={(e) => e.target.select()}
+                                onBlur={handleMinuteInputBlur}
+                                inputProps={{
+                                  style: {
+                                    textAlign: 'center',
+                                    fontSize: '2rem',
+                                    fontWeight: 'bold',
+                                    padding: '16px',
+                                  },
+                                  maxLength: 2,
+                                }}
+                                autoComplete="off"
+                                sx={{
+                                  width: 80,
+                                  '& .MuiOutlinedInput-root': {
+                                    border: 1,
+                                    borderColor: 'divider',
+                                    borderRadius: 1,
+                                    bgcolor: 'grey.100',
+                                    '&:hover': {
+                                      borderColor: 'primary.main',
+                                    },
+                                    '&.Mui-focused': {
+                                      borderColor: 'primary.main',
+                                      bgcolor: 'grey.100',
+                                    },
+                                    '& fieldset': {
+                                      border: 'none',
+                                    },
+                                  },
+                                }}
+                              />
+                              <IconButton 
+                                size="small" 
+                                onClick={() => handleMinuteChange(false)}
+                                sx={{ mt: 0.5 }}
+                              >
+                                <ArrowDownwardIcon fontSize="small" />
+                              </IconButton>
+                            </Box>
+                          </Box>
+                          
+                          {/* Now and Clear buttons */}
+                          <Box sx={{ display: 'flex', justifyContent: 'space-between', gap: 1 }}>
+                            <Button
+                              size="small"
+                              onClick={handleSetNow}
+                              sx={{ color: 'primary.main', textTransform: 'none' }}
+                            >
+                              Now
+                            </Button>
+                            <Button
+                              size="small"
+                              onClick={handleClearTime}
+                              sx={{ color: 'primary.main', textTransform: 'none' }}
+                            >
+                              Clear
+                            </Button>
+                          </Box>
+                        </Box>
+                      )}
+                    </List>
+                  ) : (
+                    <>
+                      <Alert severity="info" sx={{ mb: 2 }}>
+                        No available sessions on this day. Please select another day.
+                      </Alert>
+                      {/* Create new slot option even when no slots available */}
+                      <ListItemButton
+                        onClick={handleCreateNewSlotClick}
+                        selected={showCustomTimePicker}
+                        sx={{
+                          border: 1,
+                          borderColor: showCustomTimePicker ? 'primary.main' : 'divider',
+                          borderStyle: 'dashed',
+                          borderRadius: 1,
+                          bgcolor: showCustomTimePicker ? 'action.selected' : 'transparent',
+                          '&:hover': {
+                            bgcolor: 'action.hover',
+                          },
+                        }}
+                      >
+                        <Typography variant="body1" sx={{ fontStyle: 'italic' }}>
+                          + Create new slot
+                        </Typography>
+                      </ListItemButton>
+                      {/* Custom time picker */}
+                      {showCustomTimePicker && (
+                        <Box 
+                          sx={{ 
+                            mt: 1, 
+                            p: 2, 
+                            border: 2, 
+                            borderColor: 'primary.main', 
+                            borderRadius: 2, 
+                            bgcolor: 'background.paper',
+                            boxShadow: 2
+                          }}
+                        >
+                          <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+                            Enter time
+                          </Typography>
+                          <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 1, mb: 2 }}>
+                            {/* Hours */}
+                            <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+                              <IconButton 
+                                size="small" 
+                                onClick={() => handleHourChange(true)}
+                                sx={{ mb: 0.5 }}
+                              >
+                                <ArrowUpwardIcon fontSize="small" />
+                              </IconButton>
+                              <TextField
+                                value={hourInput}
+                                onChange={(e) => handleHourInputChange(e.target.value)}
+                                onFocus={(e) => e.target.select()}
+                                onBlur={handleHourInputBlur}
+                                inputProps={{
+                                  style: {
+                                    textAlign: 'center',
+                                    fontSize: '2rem',
+                                    fontWeight: 'bold',
+                                    padding: '16px',
+                                  },
+                                  maxLength: 2,
+                                }}
+                                autoComplete="off"
+                                sx={{
+                                  width: 80,
+                                  '& .MuiOutlinedInput-root': {
+                                    border: 1,
+                                    borderColor: 'divider',
+                                    borderRadius: 1,
+                                    bgcolor: 'grey.100',
+                                    '&:hover': {
+                                      borderColor: 'primary.main',
+                                    },
+                                    '&.Mui-focused': {
+                                      borderColor: 'primary.main',
+                                      bgcolor: 'grey.100',
+                                    },
+                                    '& fieldset': {
+                                      border: 'none',
+                                    },
+                                  },
+                                }}
+                              />
+                              <IconButton 
+                                size="small" 
+                                onClick={() => handleHourChange(false)}
+                                sx={{ mt: 0.5 }}
+                              >
+                                <ArrowDownwardIcon fontSize="small" />
+                              </IconButton>
+                            </Box>
+                            
+                            <Typography variant="h4" sx={{ mx: 1 }}>
+                              :
+                            </Typography>
+                            
+                            {/* Minutes */}
+                            <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+                              <IconButton 
+                                size="small" 
+                                onClick={() => handleMinuteChange(true)}
+                                sx={{ mb: 0.5 }}
+                              >
+                                <ArrowUpwardIcon fontSize="small" />
+                              </IconButton>
+                              <TextField
+                                value={minuteInput}
+                                onChange={(e) => handleMinuteInputChange(e.target.value)}
+                                onFocus={(e) => e.target.select()}
+                                onBlur={handleMinuteInputBlur}
+                                inputProps={{
+                                  style: {
+                                    textAlign: 'center',
+                                    fontSize: '2rem',
+                                    fontWeight: 'bold',
+                                    padding: '16px',
+                                  },
+                                  maxLength: 2,
+                                }}
+                                autoComplete="off"
+                                sx={{
+                                  width: 80,
+                                  '& .MuiOutlinedInput-root': {
+                                    border: 1,
+                                    borderColor: 'divider',
+                                    borderRadius: 1,
+                                    bgcolor: 'grey.100',
+                                    '&:hover': {
+                                      borderColor: 'primary.main',
+                                    },
+                                    '&.Mui-focused': {
+                                      borderColor: 'primary.main',
+                                      bgcolor: 'grey.100',
+                                    },
+                                    '& fieldset': {
+                                      border: 'none',
+                                    },
+                                  },
+                                }}
+                              />
+                              <IconButton 
+                                size="small" 
+                                onClick={() => handleMinuteChange(false)}
+                                sx={{ mt: 0.5 }}
+                              >
+                                <ArrowDownwardIcon fontSize="small" />
+                              </IconButton>
+                            </Box>
+                          </Box>
+                          
+                          {/* Now and Clear buttons */}
+                          <Box sx={{ display: 'flex', justifyContent: 'space-between', gap: 1 }}>
+                            <Button
+                              size="small"
+                              onClick={handleSetNow}
+                              sx={{ color: 'primary.main', textTransform: 'none' }}
+                            >
+                              Now
+                            </Button>
+                            <Button
+                              size="small"
+                              onClick={handleClearTime}
+                              sx={{ color: 'primary.main', textTransform: 'none' }}
+                            >
+                              Clear
+                            </Button>
+                          </Box>
+                        </Box>
+                      )}
+                    </>
+                  )}
+                </>
+              )}
+            </Grid>
+
+            {/* Client Message */}
+            <Grid item xs={12}>
+              <TextField
+                fullWidth
+                multiline
+                rows={4}
+                label="Message (Optional)"
+                placeholder="Add any additional notes or questions..."
+                value={bookingClientMessage}
+                onChange={(e) => {
+                  const value = e.target.value;
+                  if (value.length <= 2000) {
+                    setBookingClientMessage(value);
+                  }
+                }}
+                disabled={submittingBooking}
+                error={bookingClientMessage.length > 2000}
+                helperText={
+                  bookingClientMessage.length > 2000
+                    ? 'Message must be 2000 characters or less'
+                    : `${bookingClientMessage.length}/2000 characters`
+                }
+              />
+            </Grid>
+          </Grid>
+        </DialogContent>
+        <DialogActions>
+          <Button
+            onClick={handleNewBookingClose}
+            sx={{ textTransform: 'none' }}
+            disabled={submittingBooking}
+          >
+            Cancel
+          </Button>
+          <Button
+            onClick={handleSubmitBooking}
+            variant="contained"
+            sx={{ textTransform: 'none' }}
+            disabled={
+              submittingBooking ||
+              !selectedSessionTypeId ||
+              !selectedClientId ||
+              (!selectedBookingSlot && !(customStartTime && bookingSelectedDate)) ||
+              !!bookingError
+            }
+          >
+            {submittingBooking ? (
+              <>
+                <CircularProgress size={16} sx={{ mr: 1 }} />
+                Creating...
+              </>
+            ) : (
+              'Create Booking'
+            )}
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Create New Client Dialog */}
+      <Dialog open={createClientOpen} onClose={handleCreateClientClose} maxWidth="sm" fullWidth>
+        <DialogTitle>Create New Client</DialogTitle>
+        <DialogContent>
+          {createClientError && (
+            <Alert severity="error" sx={{ mb: 2 }} onClose={() => setCreateClientError(null)}>
+              {createClientError}
+            </Alert>
+          )}
+
+          <Grid container spacing={2} sx={{ mt: 1 }}>
+            <Grid item xs={12}>
+              <TextField
+                autoFocus
+                fullWidth
+                label="Email *"
+                type="email"
+                value={newClientData.email}
+                onChange={(e) => {
+                  setNewClientData((prev) => ({ ...prev, email: e.target.value }));
+                  setCreateClientError(null);
+                }}
+                required
+                disabled={creatingClient}
+                error={!!createClientError && createClientError.includes('email')}
+              />
+            </Grid>
+
+            <Grid item xs={12}>
+              <TextField
+                fullWidth
+                label="First Name"
+                value={newClientData.firstName}
+                onChange={(e) => {
+                  setNewClientData((prev) => ({ ...prev, firstName: e.target.value }));
+                }}
+                disabled={creatingClient}
+                inputProps={{ maxLength: 100 }}
+              />
+            </Grid>
+
+            <Grid item xs={12}>
+              <TextField
+                fullWidth
+                label="Last Name"
+                value={newClientData.lastName}
+                onChange={(e) => {
+                  setNewClientData((prev) => ({ ...prev, lastName: e.target.value }));
+                }}
+                disabled={creatingClient}
+                inputProps={{ maxLength: 100 }}
+              />
+            </Grid>
+
+            <Grid item xs={12}>
+              <FormControl fullWidth>
+                <InputLabel>Timezone</InputLabel>
+                <Select
+                  value={newClientData.timezone}
+                  onChange={(e) => {
+                    setNewClientData((prev) => ({ ...prev, timezone: e.target.value }));
+                  }}
+                  label="Timezone"
+                  disabled={creatingClient}
+                >
+                  {getUniqueTimezoneOffsets().map((tz) => (
+                    <MenuItem key={tz.value} value={tz.value}>
+                      {tz.label} ({tz.offset})
+                    </MenuItem>
+                  ))}
+                </Select>
+              </FormControl>
+            </Grid>
+
+            <Grid item xs={12}>
+              <FormControlLabel
+                control={
+                  <Checkbox
+                    checked={newClientData.sendEmailNotification}
+                    onChange={(e) => {
+                      setNewClientData((prev) => ({ ...prev, sendEmailNotification: e.target.checked }));
+                    }}
+                    disabled={creatingClient}
+                  />
+                }
+                label="Send email notification"
+              />
+            </Grid>
+          </Grid>
+        </DialogContent>
+        <DialogActions>
+          <Button
+            onClick={handleCreateClientClose}
+            sx={{ textTransform: 'none' }}
+            disabled={creatingClient}
+          >
+            Cancel
+          </Button>
+          <Button
+            onClick={handleCreateClientSubmit}
+            variant="contained"
+            sx={{ textTransform: 'none' }}
+            disabled={creatingClient || !newClientData.email.trim()}
+          >
+            {creatingClient ? (
+              <>
+                <CircularProgress size={16} sx={{ mr: 1 }} />
+                Creating...
+              </>
+            ) : (
+              'Create Client'
+            )}
+          </Button>
+        </DialogActions>
+      </Dialog>
     </Box>
+    </LocalizationProvider>
   );
 };
 

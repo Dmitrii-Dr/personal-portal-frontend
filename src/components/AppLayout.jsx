@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
-import { fetchWithAuth, getToken, removeToken, decodeToken, isTokenExpired } from '../utils/api';
+import { fetchWithAuth, getToken, removeToken, decodeToken, isTokenExpired, fetchUserProfile, clearUserProfileCache } from '../utils/api';
 import {
   AppBar,
   Toolbar,
@@ -72,12 +72,13 @@ const AppLayout = ({ children }) => {
   // Fetch user profile
   const lastFetchedTokenRef = useRef(null);
   const isFetchingRef = useRef(false);
-  const fetchUserProfile = useCallback(async () => {
+  const loadUserProfile = useCallback(async () => {
     const token = getToken();
     if (!token) {
       setUserProfile(null);
       lastFetchedTokenRef.current = null;
       isFetchingRef.current = false;
+      clearUserProfileCache();
       return;
     }
 
@@ -89,17 +90,21 @@ const AppLayout = ({ children }) => {
     isFetchingRef.current = true;
     setProfileLoading(true);
     try {
-      const response = await fetchWithAuth('/api/v1/user/profile');
-      if (!response.ok) {
-        throw new Error(`Failed to load profile: ${response.status}`);
-      }
-      const data = await response.json();
+      const data = await fetchUserProfile();
+      if (!isFetchingRef.current) return; // Component unmounted or another fetch started
+      
       setUserProfile(data);
       lastFetchedTokenRef.current = token;
+      // Dispatch event so other components can reuse this data
+      if (data) {
+        window.dispatchEvent(new CustomEvent('user-profile-loaded', { detail: data }));
+      }
     } catch (error) {
       console.error('Error fetching user profile:', error);
-      setUserProfile(null);
-      lastFetchedTokenRef.current = null;
+      if (isFetchingRef.current) {
+        setUserProfile(null);
+        lastFetchedTokenRef.current = null;
+      }
     } finally {
       setProfileLoading(false);
       isFetchingRef.current = false;
@@ -150,6 +155,22 @@ const AppLayout = ({ children }) => {
     return '';
   };
 
+  // Listen for profile requests from other components
+  useEffect(() => {
+    const handleProfileRequest = () => {
+      // If profile is already loaded, dispatch it immediately
+      if (userProfile) {
+        window.dispatchEvent(new CustomEvent('user-profile-loaded', { detail: userProfile }));
+      }
+    };
+
+    window.addEventListener('request-user-profile', handleProfileRequest);
+
+    return () => {
+      window.removeEventListener('request-user-profile', handleProfileRequest);
+    };
+  }, [userProfile]);
+
   // Check token on mount and listen for storage changes
   useEffect(() => {
     const checkToken = () => {
@@ -165,7 +186,7 @@ const AppLayout = ({ children }) => {
       
       setHasToken(tokenExists);
       if (tokenExists) {
-        fetchUserProfile();
+        loadUserProfile();
       } else {
         setUserProfile(null);
       }
@@ -202,7 +223,7 @@ const AppLayout = ({ children }) => {
       window.removeEventListener('auth-changed', handleLogin);
       window.removeEventListener('token-expired', handleTokenExpired);
     };
-  }, [fetchUserProfile]);
+  }, [loadUserProfile]);
 
   const handleLogout = () => {
     removeToken();

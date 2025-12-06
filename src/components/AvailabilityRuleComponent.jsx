@@ -86,15 +86,20 @@ const AvailabilityRuleComponent = () => {
   const [dateToAnchorEl, setDateToAnchorEl] = useState(null);
 
   // Fetch active availability rules
-  const fetchRules = async () => {
+  const fetchRules = async (signal = null) => {
     setLoading(true);
     setError(null);
     try {
       const response = await apiClient.get('/api/v1/admin/booking/availability/rule/active', {
+        signal,
         timeout: 10000,
       });
       setRules(Array.isArray(response.data) ? response.data : []);
     } catch (err) {
+      // Don't set error if request was aborted
+      if (err.name === 'AbortError' || err.name === 'CanceledError' || err.code === 'ERR_CANCELED') {
+        return;
+      }
       console.error('Error fetching availability rules:', err);
       let errorMessage = 'Failed to load availability rules.';
       if (err.response?.status === 401) {
@@ -111,7 +116,19 @@ const AvailabilityRuleComponent = () => {
   };
 
   useEffect(() => {
-    fetchRules();
+    let isMounted = true;
+    const controller = new AbortController();
+
+    const loadRules = async () => {
+      await fetchRules(controller.signal);
+    };
+
+    loadRules();
+
+    return () => {
+      isMounted = false;
+      controller.abort();
+    };
   }, []);
 
   // Format helpers

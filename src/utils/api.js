@@ -194,6 +194,68 @@ export const fetchAdminGroupedBookings = async (status = null) => {
   return response.data;
 };
 
+// Cache for user profile to prevent duplicate requests
+let userProfileCache = null;
+let userProfilePromise = null;
+let userProfileToken = null;
+
+// Fetch user profile with caching
+// Note: We don't use abort signals for shared requests to prevent one component
+// from canceling a request that other components are waiting for
+export const fetchUserProfile = async () => {
+  const token = getToken();
+  
+  // If no token, clear cache and return null
+  if (!token) {
+    userProfileCache = null;
+    userProfileToken = null;
+    userProfilePromise = null;
+    return null;
+  }
+
+  // Return cached data if available and token matches
+  if (userProfileCache !== null && userProfileToken === token) {
+    return userProfileCache;
+  }
+
+  // Return existing promise if request is in flight for the same token
+  if (userProfilePromise && userProfileToken === token) {
+    return userProfilePromise;
+  }
+
+  // Create new request (without abort signal to allow sharing between components)
+  userProfileToken = token;
+  userProfilePromise = (async () => {
+    try {
+      const response = await fetchWithAuth('/api/v1/user/profile');
+      if (response.ok) {
+        const data = await response.json();
+        userProfileCache = data;
+        return data;
+      } else {
+        throw new Error(`Failed to fetch user profile: ${response.status}`);
+      }
+    } catch (error) {
+      // Clear promise on error so it can be retried
+      userProfilePromise = null;
+      userProfileToken = null;
+      throw error;
+    } finally {
+      // Clear promise after completion (success or error)
+      userProfilePromise = null;
+    }
+  })();
+
+  return userProfilePromise;
+};
+
+// Clear user profile cache (useful when profile is updated)
+export const clearUserProfileCache = () => {
+  userProfileCache = null;
+  userProfilePromise = null;
+  userProfileToken = null;
+};
+
 // Cache for user settings to prevent duplicate requests
 let userSettingsCache = null;
 let userSettingsPromise = null;
