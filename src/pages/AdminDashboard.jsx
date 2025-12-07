@@ -30,7 +30,9 @@ import {
   ListItemButton,
   Checkbox,
   FormControlLabel,
+  Switch,
   IconButton,
+  Snackbar,
 } from '@mui/material';
 import dayjs from 'dayjs';
 import utc from 'dayjs/plugin/utc';
@@ -793,6 +795,7 @@ const AdminDashboard = () => {
   const [bookingClientMessage, setBookingClientMessage] = useState('');
   const [submittingBooking, setSubmittingBooking] = useState(false);
   const [bookingError, setBookingError] = useState(null);
+  const [successMessage, setSuccessMessage] = useState(null);
   const [userTimezone, setUserTimezone] = useState(null);
   const bookingsRefreshKeyRef = useRef(0);
   const [showCustomTimePicker, setShowCustomTimePicker] = useState(false);
@@ -807,7 +810,7 @@ const AdminDashboard = () => {
     firstName: '',
     lastName: '',
     timezone: Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC',
-    sendEmailNotification: false,
+    emailNotificationEnabled: false,
   });
   const [creatingClient, setCreatingClient] = useState(false);
   const [createClientError, setCreateClientError] = useState(null);
@@ -1390,7 +1393,7 @@ const AdminDashboard = () => {
       firstName: '',
       lastName: '',
       timezone: Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC',
-      sendEmailNotification: false,
+      emailNotificationEnabled: false,
     });
     setCreateClientError(null);
   };
@@ -1403,7 +1406,7 @@ const AdminDashboard = () => {
       firstName: '',
       lastName: '',
       timezone: Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC',
-      sendEmailNotification: false,
+      emailNotificationEnabled: false,
     });
     setCreateClientError(null);
   };
@@ -1451,7 +1454,7 @@ const AdminDashboard = () => {
         firstName: newClientData.firstName.trim() || undefined,
         lastName: newClientData.lastName.trim() || undefined,
         timezone: newClientData.timezone.trim(),
-        sendEmailNotification: newClientData.sendEmailNotification || false,
+        emailNotificationEnabled: newClientData.emailNotificationEnabled || false,
       };
 
       const response = await fetchWithAuth('/api/v1/admin/user/registry', {
@@ -1544,7 +1547,8 @@ const AdminDashboard = () => {
       // Refresh bookings by updating key to force BookingsManagement remount
       bookingsRefreshKeyRef.current += 1;
 
-      // Success - close dialog
+      // Success - close dialog and show notification
+      setSuccessMessage('Booking created successfully!');
       handleNewBookingClose();
     } catch (err) {
       console.error('Error creating booking:', err);
@@ -2516,15 +2520,15 @@ const AdminDashboard = () => {
             <Grid item xs={12}>
               <FormControlLabel
                 control={
-                  <Checkbox
-                    checked={newClientData.sendEmailNotification}
+                  <Switch
+                    checked={newClientData.emailNotificationEnabled}
                     onChange={(e) => {
-                      setNewClientData((prev) => ({ ...prev, sendEmailNotification: e.target.checked }));
+                      setNewClientData((prev) => ({ ...prev, emailNotificationEnabled: e.target.checked }));
                     }}
                     disabled={creatingClient}
                   />
                 }
-                label="Send email notification"
+                label="Send Notification"
               />
             </Grid>
           </Grid>
@@ -2554,6 +2558,18 @@ const AdminDashboard = () => {
           </Button>
         </DialogActions>
       </Dialog>
+        {/* Success Snackbar */}
+        <Snackbar
+          open={!!successMessage}
+          autoHideDuration={6000}
+          onClose={() => setSuccessMessage(null)}
+          anchorOrigin={{ vertical: 'top', horizontal: 'right' }}
+          sx={{ mt: { xs: 8, sm: 9, md: 10 } }}
+        >
+          <Alert onClose={() => setSuccessMessage(null)} severity="success" sx={{ width: '100%' }}>
+            {successMessage}
+          </Alert>
+        </Snackbar>
     </Box>
     </LocalizationProvider>
   );

@@ -17,6 +17,8 @@ import {
   Select,
   MenuItem,
   ListItemIcon,
+  Switch,
+  FormControlLabel,
 } from '@mui/material';
 import EditIcon from '@mui/icons-material/Edit';
 
@@ -101,6 +103,7 @@ const ProfilePage = () => {
     timezone: '',
     language: '',
     currency: '',
+    emailNotificationEnabled: false,
   });
   const [settingsErrors, setSettingsErrors] = useState({
     timezone: '',
@@ -183,6 +186,7 @@ const ProfilePage = () => {
           timezone: data.timezone || '',
           language: data.language || 'english',
           currency: normalizeCurrencyValue(data.currency),
+          emailNotificationEnabled: data.emailNotificationEnabled !== undefined ? data.emailNotificationEnabled : true,
         });
       } catch (err) {
         if (!isMounted) return;
@@ -231,10 +235,11 @@ const ProfilePage = () => {
     const settingsChanged = 
       settingsFormData.timezone !== (settings?.timezone || '') ||
       settingsFormData.language !== (settings?.language || 'english') ||
-      settingsFormData.currency !== (settings?.currency || '');
+      settingsFormData.currency !== (settings?.currency || '') ||
+      settingsFormData.emailNotificationEnabled !== (settings?.emailNotificationEnabled ?? true);
     
     return profileChanged || settingsChanged;
-  }, [firstName, lastName, profile?.firstName, profile?.lastName, settingsFormData.timezone, settingsFormData.language, settingsFormData.currency, settings?.timezone, settings?.language, settings?.currency]);
+  }, [firstName, lastName, profile?.firstName, profile?.lastName, settingsFormData.timezone, settingsFormData.language, settingsFormData.currency, settingsFormData.emailNotificationEnabled, settings?.timezone, settings?.language, settings?.currency, settings?.emailNotificationEnabled]);
 
   const handleSave = async () => {
     setSaveError('');
@@ -248,7 +253,8 @@ const ProfilePage = () => {
     const settingsChanged = 
       settingsFormData.timezone !== (settings?.timezone || '') ||
       settingsFormData.language !== (settings?.language || 'english') ||
-      settingsFormData.currency !== (settings?.currency || '');
+      settingsFormData.currency !== (settings?.currency || '') ||
+      settingsFormData.emailNotificationEnabled !== (settings?.emailNotificationEnabled ?? true);
     
     // Validate profile changes
     if (profileChanged && !validate()) {
@@ -321,6 +327,7 @@ const ProfilePage = () => {
             timezone: settingsFormData.timezone.trim(),
             language: settingsFormData.language.trim(),
             currency: settingsFormData.currency.trim(),
+            emailNotificationEnabled: settingsFormData.emailNotificationEnabled,
           }),
         });
 
@@ -646,6 +653,22 @@ const ProfilePage = () => {
                       </Typography>
                     )}
                   </FormControl>
+                </Grid>
+
+                <Grid item xs={12}>
+                  <FormControlLabel
+                    control={
+                      <Switch
+                        checked={settingsFormData.emailNotificationEnabled}
+                        onChange={(e) => handleSettingsFieldChange('emailNotificationEnabled', e.target.checked)}
+                        disabled={saving || savingSettings}
+                      />
+                    }
+                    label="Email Notification"
+                  />
+                  <Typography variant="caption" color="text.secondary" sx={{ mt: 0.5, display: 'block' }}>
+                    Receive email notifications about your bookings and account updates.
+                  </Typography>
                 </Grid>
               </Grid>
             ) : null}

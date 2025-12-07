@@ -37,6 +37,7 @@ import {
   Tabs,
   Tab,
   Tooltip,
+  Snackbar,
 } from '@mui/material';
 import { DateCalendar } from '@mui/x-date-pickers/DateCalendar';
 import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
@@ -84,6 +85,7 @@ const BookingPage = ({ sessionTypeId: propSessionTypeId, hideMyBookings = false 
   const [updateBookingError, setUpdateBookingError] = useState(null);
   const [updateSessionTypeId, setUpdateSessionTypeId] = useState(null); // Matched session type ID for update
   const [newBookingDialogOpen, setNewBookingDialogOpen] = useState(false);
+  const [successMessage, setSuccessMessage] = useState(null);
   const navigate = useNavigate();
   
   const PENDING_BOOKING_KEY = 'pending_booking';
@@ -751,6 +753,7 @@ const BookingPage = ({ sessionTypeId: propSessionTypeId, hideMyBookings = false 
       // Success - close dialog and refresh bookings and slots
       handleDialogClose();
       setNewBookingDialogOpen(false); // Close new booking dialog
+      setSuccessMessage('Booking created successfully!');
       if (hasToken) {
         await fetchBookings(); // Refresh bookings list when user is logged in
       }
@@ -807,6 +810,7 @@ const BookingPage = ({ sessionTypeId: propSessionTypeId, hideMyBookings = false 
       if (response && response.status < 400) {
         // Success - remove pending booking and refresh
         sessionStorage.removeItem(PENDING_BOOKING_KEY);
+        setSuccessMessage('Booking created successfully!');
         if (hasToken) {
           await fetchBookings();
         }
@@ -947,7 +951,7 @@ const BookingPage = ({ sessionTypeId: propSessionTypeId, hideMyBookings = false 
               >
                 New Booking
               </Button>
-            </Box>e
+            </Box>
 
             {/* Tabs for Active Sessions and Past Sessions */}
             <Box sx={{ borderBottom: 1, borderColor: 'divider', mt: 2 }}>
@@ -1660,6 +1664,19 @@ const BookingPage = ({ sessionTypeId: propSessionTypeId, hideMyBookings = false 
             </Button>
           </DialogActions>
         </Dialog>
+
+        {/* Success Snackbar */}
+        <Snackbar
+          open={!!successMessage}
+          autoHideDuration={6000}
+          onClose={() => setSuccessMessage(null)}
+          anchorOrigin={{ vertical: 'top', horizontal: 'right' }}
+          sx={{ mt: { xs: 8, sm: 9, md: 10 } }}
+        >
+          <Alert onClose={() => setSuccessMessage(null)} severity="success" sx={{ width: '100%' }}>
+            {successMessage}
+          </Alert>
+        </Snackbar>
       </Box>
     </LocalizationProvider>
   );
