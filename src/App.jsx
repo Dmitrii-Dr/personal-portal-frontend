@@ -15,6 +15,7 @@ import AdminHomePage from './pages/AdminHomePage';
 import AdminGalleryPage from './pages/AdminGalleryPage';
 import AboutMePage from './pages/AboutMePage';
 import SessionsConfigurationPage from './pages/SessionsConfigurationPage';
+import ResetPasswordPage from './pages/ResetPasswordPage';
 import AdminRoute from './components/AdminRoute';
 import AdminRedirect from './components/AdminRedirect';
 import ErrorBoundary from './components/ErrorBoundary';
@@ -668,6 +669,7 @@ function App() {
                 <Route path="/booking" element={<BookingPage />} />
                 <Route path="/login" element={<LoginPage />} />
                 <Route path="/signup" element={<SignUpPage />} />
+                <Route path="/reset-password" element={<ResetPasswordPage />} />
                 <Route path="/profile" element={<ProfilePage />} />
                 <Route path="/about-me" element={<AboutMePage />} />
                 <Route path="/admin" element={<AdminPage />} />

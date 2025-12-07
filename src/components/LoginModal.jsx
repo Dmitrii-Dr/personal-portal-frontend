@@ -16,16 +16,21 @@ import {
 
 const LoginModal = ({ open, onClose, onSwitchToSignUp }) => {
   const navigate = useNavigate();
+  const [showForgotPassword, setShowForgotPassword] = useState(false);
   const [formData, setFormData] = useState({
     email: '',
     password: '',
   });
+  const [forgotPasswordEmail, setForgotPasswordEmail] = useState('');
   const [errors, setErrors] = useState({
     email: '',
     password: '',
   });
+  const [forgotPasswordError, setForgotPasswordError] = useState('');
   const [loading, setLoading] = useState(false);
+  const [forgotPasswordLoading, setForgotPasswordLoading] = useState(false);
   const [submitError, setSubmitError] = useState('');
+  const [forgotPasswordSuccess, setForgotPasswordSuccess] = useState(false);
 
   const validateEmail = (email) => {
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -138,98 +143,237 @@ const LoginModal = ({ open, onClose, onSwitchToSignUp }) => {
   };
 
   const handleClose = () => {
-    if (!loading) {
+    if (!loading && !forgotPasswordLoading) {
       setFormData({ email: '', password: '' });
       setErrors({ email: '', password: '' });
       setSubmitError('');
+      setShowForgotPassword(false);
+      setForgotPasswordEmail('');
+      setForgotPasswordError('');
+      setForgotPasswordSuccess(false);
       onClose();
     }
   };
 
+  const handleForgotPasswordSubmit = async (e) => {
+    e.preventDefault();
+    setForgotPasswordError('');
+    setForgotPasswordSuccess(false);
+
+    if (!forgotPasswordEmail.trim()) {
+      setForgotPasswordError('Email is required');
+      return;
+    }
+
+    if (!validateEmail(forgotPasswordEmail)) {
+      setForgotPasswordError('Email must be valid');
+      return;
+    }
+
+    setForgotPasswordLoading(true);
+
+    try {
+      const response = await fetch('/api/v1/auth/forgot-password', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          email: forgotPasswordEmail.trim(),
+        }),
+      });
+
+      if (response.status === 200) {
+        setForgotPasswordSuccess(true);
+      } else {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(
+          errorData.message ||
+            `Failed to send password reset email: ${response.status} ${response.statusText}`
+        );
+      }
+    } catch (error) {
+      console.error('Error sending password reset email:', error);
+      setForgotPasswordError(error.message || 'Failed to send password reset email. Please try again.');
+    } finally {
+      setForgotPasswordLoading(false);
+    }
+  };
+
+  const handleBackToLogin = () => {
+    setShowForgotPassword(false);
+    setForgotPasswordEmail('');
+    setForgotPasswordError('');
+    setForgotPasswordSuccess(false);
+  };
+
   return (
     <Dialog open={open} onClose={handleClose} maxWidth="sm" fullWidth>
-      <DialogTitle>Login</DialogTitle>
+      <DialogTitle>{showForgotPassword ? 'Forgot Password' : 'Login'}</DialogTitle>
       <DialogContent>
-        <DialogContentText sx={{ mb: 2 }}>
-          Sign in to your account
-        </DialogContentText>
-
-        {submitError && (
-          <Alert severity="error" sx={{ mb: 2 }}>
-            {submitError}
-          </Alert>
-        )}
-
-        <Box component="form" onSubmit={handleSubmit} noValidate>
-          <TextField
-            fullWidth
-            id="email"
-            name="email"
-            label="Email"
-            type="email"
-            value={formData.email}
-            onChange={handleChange}
-            error={!!errors.email}
-            helperText={errors.email}
-            margin="normal"
-            required
-            autoComplete="email"
-            disabled={loading}
-          />
-
-          <TextField
-            fullWidth
-            id="password"
-            name="password"
-            label="Password"
-            type="password"
-            value={formData.password}
-            onChange={handleChange}
-            error={!!errors.password}
-            helperText={errors.password}
-            margin="normal"
-            required
-            autoComplete="current-password"
-            disabled={loading}
-          />
-
-          <Button
-            type="submit"
-            fullWidth
-            variant="contained"
-            color="primary"
-            sx={{ mt: 3, mb: 2 }}
-            disabled={loading}
-          >
-            {loading ? (
-              <>
-                <CircularProgress size={20} sx={{ mr: 1 }} />
-                Logging in...
-              </>
-            ) : (
-              'Login'
-            )}
-          </Button>
-
-          <Box sx={{ textAlign: 'center' }}>
-            <DialogContentText variant="body2">
-              Don't have an account?{' '}
-              <MuiLink
-                component="button"
-                type="button"
-                onClick={() => {
-                  handleClose();
-                  if (onSwitchToSignUp) {
-                    onSwitchToSignUp();
-                  }
-                }}
-                sx={{ textDecoration: 'none', cursor: 'pointer' }}
-              >
-                Sign up
-              </MuiLink>
+        {showForgotPassword ? (
+          <>
+            <DialogContentText sx={{ mb: 2 }}>
+              Enter your email address and we'll send you a link to reset your password.
             </DialogContentText>
-          </Box>
-        </Box>
+
+            {forgotPasswordSuccess && (
+              <Alert severity="success" sx={{ mb: 2 }}>
+                Password reset email has been sent. Please check your inbox.
+              </Alert>
+            )}
+
+            {forgotPasswordError && (
+              <Alert severity="error" sx={{ mb: 2 }}>
+                {forgotPasswordError}
+              </Alert>
+            )}
+
+            <Box component="form" onSubmit={handleForgotPasswordSubmit} noValidate>
+              <TextField
+                fullWidth
+                id="forgot-password-email"
+                name="forgot-password-email"
+                label="Email"
+                type="email"
+                value={forgotPasswordEmail}
+                onChange={(e) => {
+                  setForgotPasswordEmail(e.target.value);
+                  setForgotPasswordError('');
+                }}
+                error={!!forgotPasswordError && !forgotPasswordSuccess}
+                helperText={forgotPasswordError && !forgotPasswordSuccess ? forgotPasswordError : ''}
+                margin="normal"
+                required
+                autoComplete="email"
+                disabled={forgotPasswordLoading || forgotPasswordSuccess}
+              />
+
+              <Button
+                type="submit"
+                fullWidth
+                variant="contained"
+                color="primary"
+                sx={{ mt: 3, mb: 2 }}
+                disabled={forgotPasswordLoading || forgotPasswordSuccess}
+              >
+                {forgotPasswordLoading ? (
+                  <>
+                    <CircularProgress size={20} sx={{ mr: 1 }} />
+                    Sending...
+                  </>
+                ) : (
+                  'Send Reset Link'
+                )}
+              </Button>
+
+              <Box sx={{ textAlign: 'center' }}>
+                <MuiLink
+                  component="button"
+                  type="button"
+                  onClick={handleBackToLogin}
+                  sx={{ textDecoration: 'none', cursor: 'pointer' }}
+                >
+                  Back to Login
+                </MuiLink>
+              </Box>
+            </Box>
+          </>
+        ) : (
+          <>
+            <DialogContentText sx={{ mb: 2 }}>
+              Sign in to your account
+            </DialogContentText>
+
+            {submitError && (
+              <Alert severity="error" sx={{ mb: 2 }}>
+                {submitError}
+              </Alert>
+            )}
+
+            <Box component="form" onSubmit={handleSubmit} noValidate>
+              <TextField
+                fullWidth
+                id="email"
+                name="email"
+                label="Email"
+                type="email"
+                value={formData.email}
+                onChange={handleChange}
+                error={!!errors.email}
+                helperText={errors.email}
+                margin="normal"
+                required
+                autoComplete="email"
+                disabled={loading}
+              />
+
+              <TextField
+                fullWidth
+                id="password"
+                name="password"
+                label="Password"
+                type="password"
+                value={formData.password}
+                onChange={handleChange}
+                error={!!errors.password}
+                helperText={errors.password}
+                margin="normal"
+                required
+                autoComplete="current-password"
+                disabled={loading}
+              />
+
+              <Box sx={{ textAlign: 'right', mt: 1 }}>
+                <MuiLink
+                  component="button"
+                  type="button"
+                  onClick={() => setShowForgotPassword(true)}
+                  sx={{ textDecoration: 'none', cursor: 'pointer', fontSize: '0.875rem' }}
+                >
+                  Forgot password?
+                </MuiLink>
+              </Box>
+
+              <Button
+                type="submit"
+                fullWidth
+                variant="contained"
+                color="primary"
+                sx={{ mt: 3, mb: 2 }}
+                disabled={loading}
+              >
+                {loading ? (
+                  <>
+                    <CircularProgress size={20} sx={{ mr: 1 }} />
+                    Logging in...
+                  </>
+                ) : (
+                  'Login'
+                )}
+              </Button>
+
+              <Box sx={{ textAlign: 'center' }}>
+                <DialogContentText variant="body2">
+                  Don't have an account?{' '}
+                  <MuiLink
+                    component="button"
+                    type="button"
+                    onClick={() => {
+                      handleClose();
+                      if (onSwitchToSignUp) {
+                        onSwitchToSignUp();
+                      }
+                    }}
+                    sx={{ textDecoration: 'none', cursor: 'pointer' }}
+                  >
+                    Sign up
+                  </MuiLink>
+                </DialogContentText>
+              </Box>
+            </Box>
+          </>
+        )}
       </DialogContent>
     </Dialog>
   );
