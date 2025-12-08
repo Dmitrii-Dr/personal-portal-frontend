@@ -1,5 +1,29 @@
 import React from 'react';
 import { Box, Typography, Alert, Button } from '@mui/material';
+import { useTranslation } from 'react-i18next';
+
+const ErrorDisplay = ({ error, onReload }) => {
+  const { t } = useTranslation();
+  return (
+    <Box sx={{ p: 3 }}>
+      <Alert severity="error" sx={{ mb: 2 }}>
+        <Typography variant="h6" gutterBottom>
+          {t('common.error')}
+        </Typography>
+        <Typography variant="body2">
+          {error?.message || t('pages.errorBoundary.unexpectedError')}
+        </Typography>
+        <Button
+          onClick={onReload}
+          sx={{ mt: 2 }}
+          variant="contained"
+        >
+          {t('pages.errorBoundary.reloadPage')}
+        </Button>
+      </Alert>
+    </Box>
+  );
+};
 
 class ErrorBoundary extends React.Component {
   constructor(props) {
@@ -15,30 +39,14 @@ class ErrorBoundary extends React.Component {
     console.error('Error caught by boundary:', error, errorInfo);
   }
 
+  handleReload = () => {
+    this.setState({ hasError: false, error: null });
+    window.location.reload();
+  };
+
   render() {
     if (this.state.hasError) {
-      return (
-        <Box sx={{ p: 3 }}>
-          <Alert severity="error" sx={{ mb: 2 }}>
-            <Typography variant="h6" gutterBottom>
-              Something went wrong
-            </Typography>
-            <Typography variant="body2">
-              {this.state.error?.message || 'An unexpected error occurred'}
-            </Typography>
-            <Button
-              onClick={() => {
-                this.setState({ hasError: false, error: null });
-                window.location.reload();
-              }}
-              sx={{ mt: 2 }}
-              variant="contained"
-            >
-              Reload Page
-            </Button>
-          </Alert>
-        </Box>
-      );
+      return <ErrorDisplay error={this.state.error} onReload={this.handleReload} />;
     }
 
     return this.props.children;

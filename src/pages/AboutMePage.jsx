@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useTranslation } from 'react-i18next';
 import {
   Box,
   Typography,
@@ -9,6 +10,7 @@ import {
 import apiClient from '../utils/api';
 
 const AboutMePage = () => {
+  const { t } = useTranslation();
   const [message, setMessage] = useState('');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -54,7 +56,7 @@ const AboutMePage = () => {
             textAlign: 'center',
           }}
         >
-          About Me
+          {t('landing.about.title')}
         </Typography>
 
         {loading ? (

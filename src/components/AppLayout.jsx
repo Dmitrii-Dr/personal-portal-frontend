@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { fetchWithAuth, getToken, removeToken, decodeToken, isTokenExpired, fetchUserProfile, clearUserProfileCache } from '../utils/api';
 import {
   AppBar,
@@ -30,10 +31,12 @@ import LoginIcon from '@mui/icons-material/Login';
 import HomeIcon from '@mui/icons-material/Home';
 import BookOnlineIcon from '@mui/icons-material/BookOnline';
 import PersonIcon from '@mui/icons-material/Person';
+import LanguageIcon from '@mui/icons-material/Language';
 import LoginModal from './LoginModal';
 import SignUpModal from './SignUpModal';
 
 const AppLayout = ({ children }) => {
+  const { t, i18n } = useTranslation();
   const navigate = useNavigate();
   const location = useLocation();
   const [hasToken, setHasToken] = useState(false);
@@ -48,6 +51,8 @@ const AppLayout = ({ children }) => {
   const [scrolled, setScrolled] = useState(false);
   const [userMenuAnchorEl, setUserMenuAnchorEl] = useState(null);
   const userMenuOpen = Boolean(userMenuAnchorEl);
+  const [languageMenuAnchorEl, setLanguageMenuAnchorEl] = useState(null);
+  const languageMenuOpen = Boolean(languageMenuAnchorEl);
 
   // Check if current route is an admin route
   const isAdminRoute = location.pathname.startsWith('/admin');
@@ -334,6 +339,20 @@ const AppLayout = ({ children }) => {
     }
   };
 
+  // Handle language menu
+  const handleLanguageMenuOpen = (event) => {
+    setLanguageMenuAnchorEl(event.currentTarget);
+  };
+
+  const handleLanguageMenuClose = () => {
+    setLanguageMenuAnchorEl(null);
+  };
+
+  const handleLanguageChange = (lang) => {
+    i18n.changeLanguage(lang);
+    handleLanguageMenuClose();
+  };
+
   // Check URL for login/signup redirects
   useEffect(() => {
     if (location.pathname === '/login' && !isAdminRoute) {
@@ -379,7 +398,7 @@ const AppLayout = ({ children }) => {
           setAboutMeData(data);
         } catch (error) {
           console.error('Error fetching about me:', error);
-          setAboutMeError(error.message || 'Failed to load about me information');
+          setAboutMeError(error.message || t('common.error'));
         } finally {
           setAboutMeLoading(false);
         }
@@ -403,7 +422,7 @@ const AppLayout = ({ children }) => {
         <Toolbar sx={{ minHeight: { xs: 56, sm: 64 }, position: 'relative' }}>
           {/* Home Icon - Top Left */}
           {!isAdminRoute && (
-            <Tooltip title="Home" arrow>
+            <Tooltip title={t('navigation.home')} arrow>
               <IconButton
                 onClick={isLandingPage ? () => scrollToSection('hero') : () => navigate('/')}
                 color="inherit"
@@ -461,7 +480,7 @@ const AppLayout = ({ children }) => {
                     },
                   }}
                 >
-                  Dashboard
+                  {t('navigation.dashboard')}
                 </Button>
                 <Button
                   component={Link}
@@ -481,7 +500,7 @@ const AppLayout = ({ children }) => {
                     },
                   }}
                 >
-                  Home Page
+                  {t('navigation.homePage')}
                 </Button>
                 <Button
                   component={Link}
@@ -501,7 +520,7 @@ const AppLayout = ({ children }) => {
                     },
                   }}
                 >
-                  Blog
+                  {t('navigation.blog')}
                 </Button>
                 <Button
                   component={Link}
@@ -521,7 +540,7 @@ const AppLayout = ({ children }) => {
                     },
                   }}
                 >
-                  Sessions
+                  {t('navigation.sessions')}
                 </Button>
                 <Button
                   component={Link}
@@ -541,7 +560,7 @@ const AppLayout = ({ children }) => {
                     },
                   }}
                 >
-                  Gallery
+                  {t('navigation.gallery')}
                 </Button>
               </>
             )}
@@ -569,7 +588,7 @@ const AppLayout = ({ children }) => {
                         },
                       }}
                     >
-                      About me
+                      {t('navigation.about')}
                     </Button>
                     <Button
                       onClick={() => scrollToSection('services')}
@@ -588,7 +607,7 @@ const AppLayout = ({ children }) => {
                         },
                       }}
                     >
-                      Services
+                      {t('navigation.services')}
                     </Button>
                     <Button
                       onClick={() => scrollToSection('blog')}
@@ -607,7 +626,7 @@ const AppLayout = ({ children }) => {
                         },
                       }}
                     >
-                      Blog
+                      {t('navigation.blog')}
                     </Button>
                     <Button
                       onClick={() => scrollToSection('testimonials')}
@@ -626,7 +645,7 @@ const AppLayout = ({ children }) => {
                         },
                       }}
                     >
-                      Testimonials
+                      {t('navigation.testimonials')}
                     </Button>
                     <Button
                       onClick={() => scrollToSection('contact')}
@@ -645,7 +664,7 @@ const AppLayout = ({ children }) => {
                         },
                       }}
                     >
-                      Contact
+                      {t('navigation.contact')}
                     </Button>
                   </>
                 ) : (
@@ -668,7 +687,7 @@ const AppLayout = ({ children }) => {
                         },
                       }}
                 >
-                  Home
+                  {t('navigation.home')}
                 </Button>
                 <Button
                   onClick={handleAboutMeOpen}
@@ -687,7 +706,7 @@ const AppLayout = ({ children }) => {
                         },
                       }}
                 >
-                  About me
+                  {t('navigation.about')}
                 </Button>
                   </>
                 )}
@@ -697,8 +716,54 @@ const AppLayout = ({ children }) => {
             </Stack>
           </Box>
 
-          {/* Right side: User menu and Login button */}
+          {/* Right side: Language selector, User menu and Login button */}
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+            {/* Language Selector */}
+            <Tooltip title={i18n.language === 'ru' ? 'Русский' : 'English'} arrow>
+              <IconButton
+                onClick={handleLanguageMenuOpen}
+                color="inherit"
+                size="medium"
+                aria-label="language selector"
+                sx={{ 
+                  transition: 'all 0.2s ease-in-out',
+                  '&:hover': {
+                    bgcolor: 'rgba(255, 255, 255, 0.1)',
+                    transform: 'scale(1.1)',
+                  },
+                }}
+              >
+                <LanguageIcon />
+              </IconButton>
+            </Tooltip>
+            <Menu
+              anchorEl={languageMenuAnchorEl}
+              open={languageMenuOpen}
+              onClose={handleLanguageMenuClose}
+              disableScrollLock
+              anchorOrigin={{
+                vertical: 'bottom',
+                horizontal: 'right',
+              }}
+              transformOrigin={{
+                vertical: 'top',
+                horizontal: 'right',
+              }}
+            >
+              <MenuItem 
+                onClick={() => handleLanguageChange('ru')}
+                selected={i18n.language === 'ru'}
+              >
+                <ListItemText>Русский</ListItemText>
+              </MenuItem>
+              <MenuItem 
+                onClick={() => handleLanguageChange('en')}
+                selected={i18n.language === 'en'}
+              >
+                <ListItemText>English</ListItemText>
+              </MenuItem>
+            </Menu>
+
             {/* User menu - only show on non-admin routes when logged in */}
             {hasToken && !isAdminRoute && (
               <>
@@ -715,7 +780,7 @@ const AppLayout = ({ children }) => {
                       {getUserFullName()}
                     </Typography>
                   )}
-                  <Tooltip title="Account" arrow>
+                  <Tooltip title={t('navigation.account')} arrow>
                     <Box
                       sx={{
                         position: 'relative',
@@ -794,20 +859,20 @@ const AppLayout = ({ children }) => {
                     <ListItemIcon>
                       <PersonIcon fontSize="small" />
                     </ListItemIcon>
-                    <ListItemText>My Profile</ListItemText>
+                    <ListItemText>{t('userMenu.myProfile')}</ListItemText>
                   </MenuItem>
                   <MenuItem onClick={() => handleUserMenuClick('/booking')}>
                     <ListItemIcon>
                       <BookOnlineIcon fontSize="small" />
                     </ListItemIcon>
-                    <ListItemText>My Bookings</ListItemText>
+                    <ListItemText>{t('userMenu.myBookings')}</ListItemText>
                   </MenuItem>
                   <Divider />
                   <MenuItem onClick={() => handleUserMenuClick('logout')}>
                     <ListItemIcon>
                       <LogoutIcon fontSize="small" />
                     </ListItemIcon>
-                    <ListItemText>Logout</ListItemText>
+                    <ListItemText>{t('navigation.logout')}</ListItemText>
                   </MenuItem>
                 </Menu>
               </>
@@ -829,7 +894,7 @@ const AppLayout = ({ children }) => {
                       {getUserFullName()}
                     </Typography>
                   )}
-                  <Tooltip title="Admin Account" arrow>
+                  <Tooltip title={t('navigation.adminAccount')} arrow>
                     <Box
                       sx={{
                         position: 'relative',
@@ -908,14 +973,14 @@ const AppLayout = ({ children }) => {
                     <ListItemIcon>
                       <PersonIcon fontSize="small" />
                     </ListItemIcon>
-                    <ListItemText>My Profile</ListItemText>
+                    <ListItemText>{t('userMenu.myProfile')}</ListItemText>
                   </MenuItem>
                   <Divider />
                   <MenuItem onClick={() => handleUserMenuClick('logout')}>
                     <ListItemIcon>
                       <LogoutIcon fontSize="small" />
                     </ListItemIcon>
-                    <ListItemText>Logout</ListItemText>
+                    <ListItemText>{t('navigation.logout')}</ListItemText>
                   </MenuItem>
                 </Menu>
               </>
@@ -923,7 +988,7 @@ const AppLayout = ({ children }) => {
 
             {/* Login Icon Button - only show if not logged in and not on admin route */}
             {!hasToken && !isAdminRoute && (
-              <Tooltip title="Login" arrow>
+              <Tooltip title={t('navigation.login')} arrow>
                 <IconButton
                   onClick={handleLoginClick}
                   color="inherit"
@@ -971,7 +1036,7 @@ const AppLayout = ({ children }) => {
         maxWidth="md"
         fullWidth
       >
-        <DialogTitle>About Me</DialogTitle>
+        <DialogTitle>{t('dialog.aboutMe')}</DialogTitle>
         <DialogContent>
           {aboutMeLoading && (
             <Box

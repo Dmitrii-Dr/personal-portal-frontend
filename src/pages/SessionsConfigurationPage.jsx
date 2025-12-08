@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { useTranslation } from 'react-i18next';
 import { fetchWithAuth } from '../utils/api';
 import apiClient from '../utils/api';
 import { getCachedSlots, setCachedSlots } from '../utils/bookingSlotCache';
@@ -115,6 +116,8 @@ const getTimezoneWithOffset = (timezone) => {
 };
 
 const SessionsConfigurationPage = () => {
+  const { t } = useTranslation();
+  
   // Session types state
   const [sessionTypes, setSessionTypes] = useState([]);
   const [loadingSessionTypes, setLoadingSessionTypes] = useState(false);
@@ -274,7 +277,7 @@ const SessionsConfigurationPage = () => {
       }
     } catch (err) {
       console.error('Error fetching available slots:', err);
-      setSlotsError(err.message || 'Failed to load available slots');
+      setSlotsError(err.message || t('admin.sessionConfiguration.failedToLoadSlots'));
       setAvailableSlots([]);
     } finally {
       setLoadingSlots(false);
@@ -352,7 +355,7 @@ const SessionsConfigurationPage = () => {
       });
 
       if (hasInvalidPrice) {
-        setError('All prices must be valid numbers greater than or equal to 0');
+        setError(t('admin.sessionConfiguration.allPricesMustBeValid'));
         return;
       }
 
@@ -379,7 +382,7 @@ const SessionsConfigurationPage = () => {
       });
 
       if (!response.ok) {
-        throw new Error(`Failed to save session type: ${response.status}`);
+        throw new Error(t('admin.sessionConfiguration.failedToSave'));
       }
 
       // Refresh session types
@@ -399,12 +402,12 @@ const SessionsConfigurationPage = () => {
       handleCloseSessionTypeDialog();
     } catch (err) {
       console.error('Error saving session type:', err);
-      setError(err.message || 'Failed to save session type');
+      setError(err.message || t('admin.sessionConfiguration.failedToSave'));
     }
   };
 
   const handleDeleteSessionType = async (sessionType) => {
-    if (!window.confirm(`Are you sure you want to delete "${sessionType.name}"?`)) {
+    if (!window.confirm(t('admin.sessionConfiguration.confirmDelete', { name: sessionType.name }))) {
       return;
     }
 
@@ -417,7 +420,7 @@ const SessionsConfigurationPage = () => {
       );
 
       if (!response.ok) {
-        throw new Error(`Failed to delete: ${response.status}`);
+        throw new Error(t('admin.sessionConfiguration.failedToDelete'));
       }
 
       // Refresh session types
@@ -435,7 +438,7 @@ const SessionsConfigurationPage = () => {
       }
     } catch (err) {
       console.error('Error deleting session type:', err);
-      setError(err.message || 'Failed to delete session type');
+      setError(err.message || t('admin.sessionConfiguration.failedToDelete'));
     }
   };
 
@@ -463,7 +466,7 @@ const SessionsConfigurationPage = () => {
   return (
     <Box>
       <Typography variant="h4" component="h1" gutterBottom>
-        Sessions Configuration
+        {t('admin.sessionConfiguration.title')}
       </Typography>
 
       {error && (
@@ -480,14 +483,14 @@ const SessionsConfigurationPage = () => {
               <Card>
                 <CardContent>
                   <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
-                    <Typography variant="h6">Session Types</Typography>
+                    <Typography variant="h6">{t('admin.sessionConfiguration.sessionTypes')}</Typography>
                     <Button
                       variant="contained"
                       startIcon={<AddIcon />}
                       onClick={() => handleOpenSessionTypeDialog()}
                       sx={{ textTransform: 'none' }}
                     >
-                      Add Session Type
+                      {t('admin.sessionConfiguration.addSessionType')}
                     </Button>
                   </Box>
 
@@ -510,7 +513,7 @@ const SessionsConfigurationPage = () => {
                                 )}
                                 <Box sx={{ display: 'flex', gap: 1, mt: 0.5, flexWrap: 'wrap' }}>
                                   <Chip 
-                                    label={sessionType.active !== false ? 'Active' : 'Inactive'} 
+                                    label={sessionType.active !== false ? t('admin.sessionConfiguration.active') : t('admin.sessionConfiguration.inactive')} 
                                     size="small" 
                                     color={sessionType.active !== false ? 'success' : 'default'}
                                   />
@@ -552,7 +555,7 @@ const SessionsConfigurationPage = () => {
                     </List>
                   ) : (
                     <Typography variant="body2" color="text.secondary">
-                      No session types found. Add one to get started.
+                      {t('admin.sessionConfiguration.noSessionTypesFound')}
                     </Typography>
                   )}
                 </CardContent>
@@ -591,16 +594,16 @@ const SessionsConfigurationPage = () => {
               <Card>
                 <CardContent>
                   <Typography variant="h6" gutterBottom>
-                    Available Slots (View Only)
+                    {t('admin.sessionConfiguration.availableSlots')}
                   </Typography>
                   <Box sx={{ display: 'flex', gap: 2, mb: 2 }}>
                     <FormControl sx={{ minWidth: 200 }}>
-                      <InputLabel id="session-type-select-label">Session Type</InputLabel>
+                      <InputLabel id="session-type-select-label">{t('admin.sessionConfiguration.sessionType')}</InputLabel>
                       <Select
                         labelId="session-type-select-label"
                         value={selectedSessionTypeId || ''}
                         onChange={(e) => setSelectedSessionTypeId(e.target.value)}
-                        label="Session Type"
+                        label={t('admin.sessionConfiguration.sessionType')}
                       >
                         {sessionTypes.map((st) => (
                           <MenuItem key={st.id || st.sessionTypeId} value={st.id || st.sessionTypeId}>
@@ -610,11 +613,11 @@ const SessionsConfigurationPage = () => {
                       </Select>
                     </FormControl>
                     <FormControl sx={{ minWidth: 300 }}>
-                      <InputLabel>Timezone</InputLabel>
+                      <InputLabel>{t('admin.sessionConfiguration.timezone')}</InputLabel>
                       <Select
                         value={selectedTimezone || ''}
                         onChange={(e) => setSelectedTimezone(e.target.value)}
-                        label="Timezone"
+                        label={t('admin.sessionConfiguration.timezone')}
                       >
                         {(() => {
                           // Get all timezones, including user's timezone if not in the list
@@ -647,7 +650,7 @@ const SessionsConfigurationPage = () => {
 
                     <Grid item xs={12} md={6}>
                       <Typography variant="subtitle1" gutterBottom>
-                        Available Times on {dayjs(selectedDate).format('MMMM D, YYYY')}
+                        {t('admin.sessionConfiguration.availableTimesOn', { date: dayjs(selectedDate).format('MMMM D, YYYY') })}
                       </Typography>
 
                       {slotsError && (
@@ -682,14 +685,14 @@ const SessionsConfigurationPage = () => {
                               >
                                 <ListItemText
                                   primary={startTime}
-                                  secondary={endTime !== 'N/A' ? `Ends at ${endTime}` : null}
+                                  secondary={endTime !== 'N/A' ? t('admin.sessionConfiguration.endsAt', { time: endTime }) : null}
                                 />
                               </ListItem>
                             );
                           })}
                         </List>
                       ) : (
-                        <Alert severity="info">No available slots on this day.</Alert>
+                        <Alert severity="info">{t('admin.sessionConfiguration.noAvailableSlots')}</Alert>
                       )}
                     </Grid>
                   </Grid>
@@ -702,11 +705,11 @@ const SessionsConfigurationPage = () => {
 
       {/* Session Type Dialog */}
       <Dialog open={sessionTypeDialogOpen} onClose={handleCloseSessionTypeDialog} maxWidth="sm" fullWidth>
-        <DialogTitle>{editingSessionType ? 'Edit Session Type' : 'Add Session Type'}</DialogTitle>
+        <DialogTitle>{editingSessionType ? t('admin.sessionConfiguration.editSessionType') : t('admin.sessionConfiguration.addSessionType')}</DialogTitle>
         <DialogContent>
           <TextField
             fullWidth
-            label="Name"
+            label={t('admin.sessionConfiguration.name')}
             value={sessionTypeForm.name}
             onChange={(e) => setSessionTypeForm({ ...sessionTypeForm, name: e.target.value })}
             margin="normal"
@@ -714,7 +717,7 @@ const SessionsConfigurationPage = () => {
           />
           <TextField
             fullWidth
-            label="Description"
+            label={t('admin.sessionConfiguration.description')}
             multiline
             rows={3}
             value={sessionTypeForm.description}
@@ -723,7 +726,7 @@ const SessionsConfigurationPage = () => {
           />
           <TextField
             fullWidth
-            label="Duration (minutes)"
+            label={t('admin.sessionConfiguration.durationMinutes')}
             type="number"
             value={sessionTypeForm.durationMinutes}
             onChange={(e) =>
@@ -734,7 +737,7 @@ const SessionsConfigurationPage = () => {
           />
           <TextField
             fullWidth
-            label="Buffer (minutes)"
+            label={t('admin.sessionConfiguration.bufferMinutes')}
             type="number"
             value={sessionTypeForm.bufferMinutes || 0}
             onChange={(e) =>
@@ -752,15 +755,15 @@ const SessionsConfigurationPage = () => {
                 }
               />
             }
-            label="Active (can be used for new bookings)"
+            label={t('admin.sessionConfiguration.activeCanBeUsed')}
             sx={{ mt: 2 }}
           />
           <Typography variant="subtitle2" sx={{ mt: 2, mb: 1 }}>
-            Prices
+            {t('admin.sessionConfiguration.prices')}
           </Typography>
           <TextField
             fullWidth
-            label="Price (Rubles)"
+            label={t('admin.sessionConfiguration.priceRubles')}
             type="number"
             value={sessionTypeForm.prices?.Rubles ?? 0}
             onChange={(e) => {
@@ -779,7 +782,7 @@ const SessionsConfigurationPage = () => {
           />
           <TextField
             fullWidth
-            label="Price (Tenge)"
+            label={t('admin.sessionConfiguration.priceTenge')}
             type="number"
             value={sessionTypeForm.prices?.Tenge ?? 0}
             onChange={(e) => {
@@ -798,7 +801,7 @@ const SessionsConfigurationPage = () => {
           />
           <TextField
             fullWidth
-            label="Price (USD)"
+            label={t('admin.sessionConfiguration.priceUSD')}
             type="number"
             value={sessionTypeForm.prices?.USD ?? 0}
             onChange={(e) => {
@@ -818,10 +821,10 @@ const SessionsConfigurationPage = () => {
         </DialogContent>
         <DialogActions>
           <Button onClick={handleCloseSessionTypeDialog} sx={{ textTransform: 'none' }}>
-            Cancel
+            {t('admin.sessionConfiguration.cancel')}
           </Button>
           <Button onClick={handleSaveSessionType} variant="contained" sx={{ textTransform: 'none' }}>
-            Save
+            {t('admin.sessionConfiguration.save')}
           </Button>
         </DialogActions>
       </Dialog>

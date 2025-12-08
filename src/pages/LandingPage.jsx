@@ -1,5 +1,6 @@
 import React, { useRef, useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import {
   Box,
   Typography,
@@ -67,6 +68,7 @@ const areAllPricesZero = (prices) => {
 };
 
 const LandingPage = () => {
+  const { t } = useTranslation();
   const navigate = useNavigate();
   const heroRef = useRef(null);
   const aboutRef = useRef(null);
@@ -460,7 +462,7 @@ const LandingPage = () => {
               },
             }}
           >
-            Book a Session
+            {t('landing.hero.bookSession')}
           </Button>
         </Container>
       </Box>
@@ -503,7 +505,7 @@ const LandingPage = () => {
                       fontFamily: 'sans-serif',
                     }}
                   >
-                    ABOUT ME
+                    {t('landing.about.title')}
                   </Typography>
                 </Box>
 
@@ -558,7 +560,7 @@ const LandingPage = () => {
                         fontFamily: 'sans-serif',
                       }}
                     >
-                      Content will be provided soon.
+                      {t('landing.about.contentSoon')}
                     </Typography>
                   </Box>
                 )}
@@ -582,7 +584,7 @@ const LandingPage = () => {
                       },
                     }}
                   >
-                    Read More
+                    {t('landing.about.readMore')}
                   </Button>
                   <Button
                     variant="outlined"
@@ -602,7 +604,7 @@ const LandingPage = () => {
                       },
                     }}
                   >
-                    Free Consultation
+                    {t('landing.about.freeConsultation')}
                   </Button>
                 </Box>
               </Box>
@@ -626,7 +628,7 @@ const LandingPage = () => {
                   <Box
                     component="img"
                     src={aboutImageUrl}
-                    alt="About Me"
+                    alt={t('landing.about.alt')}
                     sx={{
                       width: '100%',
                       height: '100%',
@@ -733,7 +735,7 @@ const LandingPage = () => {
                       fontFamily: 'sans-serif',
                     }}
                   >
-                    MY EDUCATION
+                    {t('landing.education.title')}
                   </Typography>
                 </Box>
 
@@ -797,7 +799,7 @@ const LandingPage = () => {
             gutterBottom
             sx={{ mb: 2, fontWeight: 600 }}
           >
-            Services & Pricing
+            {t('landing.services.title')}
           </Typography>
           <Typography
             variant="body1"
@@ -806,7 +808,7 @@ const LandingPage = () => {
             paragraph
             sx={{ mb: 4 }}
           >
-            Choose the service package that best fits your needs
+            {t('landing.services.description')}
           </Typography>
 
           {loadingSessionTypes ? (
@@ -971,7 +973,7 @@ const LandingPage = () => {
                                   {sessionType.name}
                                 </Typography>
                                 <Chip
-                                  label={`${sessionType.durationMinutes || 60} min`}
+                                  label={`${sessionType.durationMinutes || 60} ${t('landing.booking.min')}`}
                                   size="small"
                                   color="primary"
                                   variant="outlined"
@@ -998,7 +1000,7 @@ const LandingPage = () => {
                               <Box sx={{ mb: 1, mt: 'auto' }}>
                                 {sessionType.prices && areAllPricesZero(sessionType.prices) ? (
                                   <Typography variant="h4" component="span" color="primary" sx={{ fontSize: '1.75rem' }}>
-                                    Free
+                                    {t('landing.booking.free')}
                                   </Typography>
                                 ) : sessionType.prices && sessionType.prices[selectedCurrency] ? (
                                   <Typography variant="h4" component="span" color="primary" sx={{ fontSize: '1.75rem' }}>
@@ -1033,7 +1035,7 @@ const LandingPage = () => {
                                 }}
                                 sx={{ textTransform: 'none' }}
                               >
-                                Book Now
+                                {t('landing.services.bookNow')}
                               </Button>
                             </CardActions>
                           </Card>
@@ -1116,7 +1118,7 @@ const LandingPage = () => {
                 mb: 3,
               }}
             >
-              BLOG
+              {t('landing.blog.title')}
             </Typography>
           </Box>
 
@@ -1202,7 +1204,7 @@ const LandingPage = () => {
                                 }}
                                 sx={{ textTransform: 'none' }}
                               >
-                                Read More
+                                {t('landing.blog.readMore')}
                               </Button>
                             </CardActions>
                           </Card>
@@ -1229,19 +1231,19 @@ const LandingPage = () => {
                         },
                       }}
                     >
-                      View All Articles
+                      {t('landing.blog.viewAllArticles')}
                     </Button>
                   </Box>
                 </>
               ) : (
                 <Alert severity="info" sx={{ mt: 2 }}>
-                  No articles available at this time.
+                  {t('landing.blog.noArticlesAvailable')}
                 </Alert>
               )}
             </>
           ) : (
             <Alert severity="info" sx={{ mt: 2 }}>
-              No blog articles configured.
+              {t('landing.blog.noBlogConfigured')}
             </Alert>
           )}
         </Container>
@@ -1284,7 +1286,7 @@ const LandingPage = () => {
                   mb: 3,
                 }}
               >
-                TESTIMONIALS
+                {t('landing.testimonials.title')}
               </Typography>
             </Box>
 
@@ -1494,7 +1496,7 @@ const LandingPage = () => {
               flex: 1,
             }}
           >
-            Book a Session
+            {t('landing.booking.title')}
           </Typography>
           <IconButton
             onClick={() => {
@@ -1564,7 +1566,7 @@ const LandingPage = () => {
               </Box>
               <Box sx={{ display: 'flex', gap: 1.5, flexWrap: 'wrap' }}>
                 <Chip
-                  label={`${selectedSessionType.durationMinutes || 60} min`}
+                  label={`${selectedSessionType.durationMinutes || 60} ${t('landing.booking.min')}`}
                   size="small"
                   sx={{
                     bgcolor: 'primary.main',
@@ -1575,7 +1577,7 @@ const LandingPage = () => {
                 />
                 {selectedSessionType.prices && areAllPricesZero(selectedSessionType.prices) ? (
                   <Chip
-                    label="Free"
+                    label={t('landing.booking.free')}
                     size="small"
                     sx={{
                       bgcolor: 'success.main',
@@ -1662,7 +1664,7 @@ const LandingPage = () => {
               fontSize: { xs: '1.5rem', md: '2rem' },
             }}
           >
-            Connect With Me
+            {t('landing.contact.connectWithMe')}
           </Typography>
           <Typography
             variant="body1"
@@ -1673,7 +1675,7 @@ const LandingPage = () => {
               fontSize: { xs: '0.9rem', md: '1rem' },
             }}
           >
-            Follow me on social media or reach out directly
+            {t('landing.contact.followDescription')}
           </Typography>
           
           {/* Social Links */}

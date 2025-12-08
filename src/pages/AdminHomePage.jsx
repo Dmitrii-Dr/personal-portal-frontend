@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useTranslation } from 'react-i18next';
 import { fetchWithAuth } from '../utils/api';
 import apiClient from '../utils/api';
 import { loadImageWithCache } from '../utils/imageCache';
@@ -39,6 +40,7 @@ import FacebookIcon from '@mui/icons-material/Facebook';
 import YouTubeIcon from '@mui/icons-material/YouTube';
 
 const AdminHomePage = () => {
+  const { t } = useTranslation();
   const [welcomeData, setWelcomeData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -180,7 +182,7 @@ const AdminHomePage = () => {
         }
       } catch (err) {
         console.error('Error fetching welcome data:', err);
-        setError(err.message || 'Failed to load welcome data');
+        setError(err.message || t('admin.home.failedToLoadWelcomeData'));
       } finally {
         setLoading(false);
       }
@@ -204,7 +206,7 @@ const AdminHomePage = () => {
         }
       } catch (err) {
         console.error('Error fetching articles:', err);
-        setArticlesError(err.message || 'Failed to load articles');
+        setArticlesError(err.message || t('admin.home.failedToLoadArticles'));
         setAvailableArticles([]);
       } finally {
         setLoadingArticles(false);
@@ -237,7 +239,7 @@ const AdminHomePage = () => {
 
       if (invalidArticleIds.length > 0) {
         // Show error message above Blog section
-        const errorMessage = `Invalid article ID(s) found: ${invalidArticleIds.join(', ')}. These articles are not available and will be cleared.`;
+        const errorMessage = t('admin.home.invalidArticleIds', { ids: invalidArticleIds.join(', ') });
         setInvalidArticleIdsError(errorMessage);
         
         // Clear invalid article IDs - keep only valid ones
@@ -299,7 +301,7 @@ const AdminHomePage = () => {
 
     // Validate file type
     if (!file.type.startsWith('image/')) {
-      setError('Please select an image file');
+      setError(t('admin.home.pleaseSelectImageFile'));
       return;
     }
 
@@ -472,7 +474,7 @@ const AdminHomePage = () => {
   // Contact links handlers
   const handleAddContactLink = () => {
     if (!newContactLink.value.trim()) {
-      setError('Please enter a contact value/URL');
+      setError(t('admin.home.pleaseEnterContactValue'));
       return;
     }
     
@@ -521,7 +523,7 @@ const AdminHomePage = () => {
 
   const handleUpdateContactLink = () => {
     if (!newContactLink.value.trim()) {
-      setError('Please enter a contact value/URL');
+      setError(t('admin.home.pleaseEnterContactValue'));
       return;
     }
     
@@ -626,7 +628,7 @@ const AdminHomePage = () => {
       {/* Header */}
       <Box sx={{ p: 2, bgcolor: 'background.paper', borderBottom: 1, borderColor: 'divider' }}>
         <Typography variant="h4" component="h1" gutterBottom>
-          Home Page Management
+          {t('admin.home.title')}
         </Typography>
       </Box>
 
@@ -704,7 +706,7 @@ const AdminHomePage = () => {
                   '&:hover': { bgcolor: 'rgba(255, 255, 255, 0.3)' },
                 }}
               >
-                {uploadingWelcomeImage ? 'Uploading...' : welcomeImageUrl ? 'Change Image' : 'Upload Image'}
+                {uploadingWelcomeImage ? t('admin.home.uploading') : welcomeImageUrl ? t('admin.home.changeImage') : t('admin.home.uploadImage')}
               </Button>
             </label>
           </Box>
@@ -716,7 +718,7 @@ const AdminHomePage = () => {
             rows={3}
             value={welcomeMessage}
             onChange={(e) => setWelcomeMessage(e.target.value)}
-            placeholder="Welcome Message"
+            placeholder={t('admin.home.welcomeMessage')}
             sx={{
               mb: 3,
               '& .MuiInputBase-input': {
@@ -775,7 +777,7 @@ const AdminHomePage = () => {
                       fontFamily: 'sans-serif',
                     }}
                   >
-                    ABOUT ME
+                    {t('landing.about.title')}
                   </Typography>
                 </Box>
 
@@ -785,7 +787,7 @@ const AdminHomePage = () => {
                   rows={8}
                   value={aboutMeContent}
                   onChange={(e) => setAboutMeContent(e.target.value)}
-                  placeholder="About Me Content"
+                  placeholder={t('admin.home.aboutMeContent')}
                   sx={{
                     '& .MuiInputBase-input': {
                       fontSize: { xs: '0.95rem', md: '1rem' },
@@ -818,7 +820,7 @@ const AdminHomePage = () => {
                     <Box
                       component="img"
                       src={aboutImageUrl}
-                      alt="About Me"
+                      alt={t('landing.about.alt')}
                       sx={{
                         width: '100%',
                         height: '100%',
@@ -867,7 +869,7 @@ const AdminHomePage = () => {
                       disabled={uploadingAboutImage}
                       sx={{ textTransform: 'none' }}
                     >
-                      {uploadingAboutImage ? 'Uploading...' : aboutImageUrl ? 'Change' : 'Upload Image'}
+                      {uploadingAboutImage ? t('admin.home.uploading') : aboutImageUrl ? t('admin.home.change') : t('admin.home.uploadImage')}
                     </Button>
                   </label>
                 </Box>
@@ -957,7 +959,7 @@ const AdminHomePage = () => {
                       disabled={uploadingEducationImage}
                       sx={{ textTransform: 'none' }}
                     >
-                      {uploadingEducationImage ? 'Uploading...' : educationImageUrl ? 'Change' : 'Upload Image'}
+                      {uploadingEducationImage ? t('admin.home.uploading') : educationImageUrl ? t('admin.home.change') : t('admin.home.uploadImage')}
                     </Button>
                   </label>
                 </Box>
@@ -988,7 +990,7 @@ const AdminHomePage = () => {
                       fontFamily: 'sans-serif',
                     }}
                   >
-                    MY EDUCATION
+                    {t('admin.home.myEducation')}
                   </Typography>
                 </Box>
 
@@ -998,7 +1000,7 @@ const AdminHomePage = () => {
                   rows={6}
                   value={educationContent}
                   onChange={(e) => setEducationContent(e.target.value)}
-                  placeholder="Education Content"
+                  placeholder={t('admin.home.educationContent')}
                   sx={{
                     '& .MuiInputBase-input': {
                       fontSize: { xs: '0.95rem', md: '1rem' },
@@ -1044,7 +1046,7 @@ const AdminHomePage = () => {
                 mb: 3,
               }}
             >
-              TESTIMONIALS
+              {t('admin.home.testimonials')}
             </Typography>
           </Box>
 
@@ -1056,8 +1058,8 @@ const AdminHomePage = () => {
               rows={4}
               value={reviewMessage}
               onChange={(e) => setReviewMessage(e.target.value)}
-              placeholder="Review/Testimonials Message"
-              label="Review Message"
+              placeholder={t('admin.home.reviewMessagePlaceholder')}
+              label={t('admin.home.reviewMessage')}
               sx={{
                 '& .MuiInputBase-input': {
                   fontSize: { xs: '0.95rem', md: '1rem' },
@@ -1071,7 +1073,7 @@ const AdminHomePage = () => {
           {/* Review Images Section */}
           <Box sx={{ mb: 3 }}>
             <Typography variant="h6" component="h3" sx={{ mb: 2 }}>
-              Review Images
+              {t('admin.home.reviewImages')}
             </Typography>
             
             {/* Upload Button */}
@@ -1097,7 +1099,7 @@ const AdminHomePage = () => {
                   disabled={uploadingReviewImage}
                   sx={{ textTransform: 'none' }}
                 >
-                  {uploadingReviewImage ? 'Uploading...' : 'Upload Review Image'}
+                  {uploadingReviewImage ? t('admin.home.uploading') : t('admin.home.uploadReviewImage')}
                 </Button>
               </label>
             </Box>
@@ -1116,7 +1118,7 @@ const AdminHomePage = () => {
                       <Box
                         component="img"
                         src={imageUrl}
-                        alt={`Review ${index + 1}`}
+                        alt={`${t('admin.home.reviewImages')} ${index + 1}`}
                         sx={{
                           width: '100%',
                           height: '200px',
@@ -1162,7 +1164,7 @@ const AdminHomePage = () => {
                 }}
               >
                 <Typography variant="body2" color="text.secondary">
-                  No review images uploaded yet. Click "Upload Review Image" to add images.
+                  {t('admin.home.noReviewImages')}
                 </Typography>
               </Box>
             )}
@@ -1201,13 +1203,13 @@ const AdminHomePage = () => {
                 mb: 3,
               }}
             >
-              BLOG
+              {t('admin.home.blog')}
             </Typography>
             <Typography
               variant="body1"
               sx={{ mb: 4, opacity: 0.8 }}
             >
-              Select up to 3 articles to display in the Blog section on the landing page.
+              {t('admin.home.blogDescription')}
             </Typography>
           </Box>
 
@@ -1237,13 +1239,13 @@ const AdminHomePage = () => {
                   <Card sx={{ height: '100%' }}>
                     <CardContent>
                       <Typography variant="h6" gutterBottom>
-                        Article {index + 1}
+                        {t('admin.home.article')} {index + 1}
                       </Typography>
                       <FormControl fullWidth sx={{ mt: 2 }}>
-                        <InputLabel>Select Article</InputLabel>
+                        <InputLabel>{t('admin.home.selectArticle')}</InputLabel>
                         <Select
                           value={welcomeArticleIds[index] || ''}
-                          label="Select Article"
+                          label={t('admin.home.selectArticle')}
                           onChange={(e) => {
                             const newArticleIds = [...welcomeArticleIds];
                             if (e.target.value) {
@@ -1256,7 +1258,7 @@ const AdminHomePage = () => {
                           }}
                         >
                           <MenuItem value="">
-                            <em>None</em>
+                            <em>{t('admin.home.none')}</em>
                           </MenuItem>
                           {availableArticles.map((article) => {
                             // Don't show articles that are already selected in other slots
@@ -1267,8 +1269,8 @@ const AdminHomePage = () => {
                                 value={article.articleId}
                                 disabled={isSelected}
                               >
-                                {article.title || 'Untitled'}
-                                {isSelected && ' (Already selected)'}
+                                {article.title || t('pages.article.untitled')}
+                                {isSelected && ` (${t('admin.home.alreadySelected')})`}
                               </MenuItem>
                             );
                           })}
@@ -1289,7 +1291,7 @@ const AdminHomePage = () => {
                               return (
                                 <>
                                   <Typography variant="subtitle2" color="text.secondary" gutterBottom>
-                                    Preview:
+                                    {t('admin.home.preview')}
                                   </Typography>
                                   <Typography variant="body2" sx={{ fontStyle: 'italic', color: 'text.secondary' }}>
                                     {preview}...
@@ -1342,14 +1344,13 @@ const AdminHomePage = () => {
                 mb: 3,
               }}
             >
-              Contact Links
+              {t('admin.home.contactLinks')}
             </Typography>
             <Typography
               variant="body1"
               sx={{ mb: 4, opacity: 0.9 }}
             >
-              Manage your social media and contact links that appear in the footer of the landing page.
-              You can add multiple links for the same platform (e.g., personal Telegram and channel).
+              {t('admin.home.contactLinksDescription')}
             </Typography>
           </Box>
 
@@ -1357,15 +1358,15 @@ const AdminHomePage = () => {
           <Card sx={{ mb: 4, bgcolor: 'rgba(255, 255, 255, 0.1)', color: 'white' }}>
             <CardContent>
               <Typography variant="h6" gutterBottom sx={{ color: 'white', mb: 3 }}>
-                {editingContactIndex !== null ? 'Edit Contact Link' : 'Add New Contact Link'}
+                {editingContactIndex !== null ? t('admin.home.editContactLink') : t('admin.home.addNewContactLink')}
               </Typography>
               <Grid container spacing={2}>
                 <Grid item xs={12} sm={4}>
                   <FormControl fullWidth>
-                    <InputLabel sx={{ color: 'rgba(255, 255, 255, 0.7)' }}>Platform</InputLabel>
+                    <InputLabel sx={{ color: 'rgba(255, 255, 255, 0.7)' }}>{t('admin.home.platform')}</InputLabel>
                     <Select
                       value={newContactLink.platform}
-                      label="Platform"
+                      label={t('admin.home.platform')}
                       onChange={(e) =>
                         setNewContactLink({ ...newContactLink, platform: e.target.value })
                       }
@@ -1398,12 +1399,12 @@ const AdminHomePage = () => {
                     fullWidth
                     label={
                       newContactLink.platform === 'Email'
-                        ? 'Email Address'
+                        ? t('admin.home.emailAddress')
                         : newContactLink.platform === 'Phone'
-                        ? 'Phone Number'
+                        ? t('admin.home.phoneNumber')
                         : newContactLink.platform === 'WhatsApp'
-                        ? 'WhatsApp Number or URL'
-                        : 'URL or Value'
+                        ? t('admin.home.whatsappNumberOrUrl')
+                        : t('admin.home.urlOrValue')
                     }
                     value={newContactLink.value}
                     onChange={(e) =>
@@ -1411,12 +1412,12 @@ const AdminHomePage = () => {
                     }
                     placeholder={
                       newContactLink.platform === 'Email'
-                        ? 'example@email.com'
+                        ? t('admin.home.emailPlaceholder')
                         : newContactLink.platform === 'Phone'
-                        ? '+1234567890'
+                        ? t('admin.home.phonePlaceholder')
                         : newContactLink.platform === 'WhatsApp'
-                        ? '+1234567890 or https://wa.me/...'
-                        : 'https://...'
+                        ? t('admin.home.whatsappPlaceholder')
+                        : t('admin.home.urlPlaceholder')
                     }
                     sx={{
                       '& .MuiInputLabel-root': {
@@ -1440,12 +1441,12 @@ const AdminHomePage = () => {
                 <Grid item xs={12} sm={3}>
                   <TextField
                     fullWidth
-                    label="Description (Optional)"
+                    label={t('admin.home.descriptionOptional')}
                     value={newContactLink.description}
                     onChange={(e) =>
                       setNewContactLink({ ...newContactLink, description: e.target.value })
                     }
-                    placeholder="e.g., Personal Account, Channel"
+                    placeholder={t('admin.home.descriptionPlaceholder')}
                     sx={{
                       '& .MuiInputLabel-root': {
                         color: 'rgba(255, 255, 255, 0.7)',
@@ -1483,7 +1484,7 @@ const AdminHomePage = () => {
                             },
                           }}
                         >
-                          Save
+                          {t('admin.home.save')}
                         </Button>
                         <Button
                           variant="outlined"
@@ -1500,7 +1501,7 @@ const AdminHomePage = () => {
                             },
                           }}
                         >
-                          Cancel
+                          {t('admin.home.cancel')}
                         </Button>
                       </>
                     ) : (
@@ -1518,7 +1519,7 @@ const AdminHomePage = () => {
                           },
                         }}
                       >
-                        Add
+                        {t('admin.home.add')}
                       </Button>
                     )}
                   </Stack>
@@ -1776,7 +1777,7 @@ const AdminHomePage = () => {
               }}
             >
               <Typography variant="body2">
-                No contact links added yet. Use the form above to add your first contact link.
+                {t('admin.home.noContactLinks')}
               </Typography>
             </Paper>
           )}
@@ -1792,7 +1793,7 @@ const AdminHomePage = () => {
         )}
         {saveSuccess && (
           <Alert severity="success" sx={{ mb: 2 }}>
-            Changes saved successfully!
+            {t('admin.home.changesSavedSuccess')}
           </Alert>
         )}
         <Button
@@ -1804,10 +1805,10 @@ const AdminHomePage = () => {
           {saving ? (
             <>
               <CircularProgress size={20} sx={{ mr: 1 }} />
-              Saving...
+              {t('admin.home.saving')}
             </>
           ) : (
-            'Save Changes'
+            t('admin.home.saveChanges')
           )}
         </Button>
       </Box>

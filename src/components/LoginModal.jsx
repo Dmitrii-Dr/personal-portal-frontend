@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { setToken, getRolesFromToken } from '../utils/api';
 import {
   Dialog,
@@ -15,6 +16,7 @@ import {
 } from '@mui/material';
 
 const LoginModal = ({ open, onClose, onSwitchToSignUp }) => {
+  const { t } = useTranslation();
   const navigate = useNavigate();
   const [showForgotPassword, setShowForgotPassword] = useState(false);
   const [formData, setFormData] = useState({
@@ -61,15 +63,15 @@ const LoginModal = ({ open, onClose, onSwitchToSignUp }) => {
     let isValid = true;
 
     if (!formData.email.trim()) {
-      newErrors.email = 'Email is required';
+      newErrors.email = t('auth.emailRequired');
       isValid = false;
     } else if (!validateEmail(formData.email)) {
-      newErrors.email = 'Email must be valid';
+      newErrors.email = t('auth.emailInvalid');
       isValid = false;
     }
 
     if (!formData.password.trim()) {
-      newErrors.password = 'Password is required';
+      newErrors.password = t('auth.passwordRequired');
       isValid = false;
     }
 
@@ -136,7 +138,7 @@ const LoginModal = ({ open, onClose, onSwitchToSignUp }) => {
       }
     } catch (error) {
       console.error('Error logging in:', error);
-      setSubmitError(error.message || 'Failed to login. Please try again.');
+      setSubmitError(error.message || t('auth.loginFailed'));
     } finally {
       setLoading(false);
     }
@@ -161,12 +163,12 @@ const LoginModal = ({ open, onClose, onSwitchToSignUp }) => {
     setForgotPasswordSuccess(false);
 
     if (!forgotPasswordEmail.trim()) {
-      setForgotPasswordError('Email is required');
+      setForgotPasswordError(t('auth.emailRequired'));
       return;
     }
 
     if (!validateEmail(forgotPasswordEmail)) {
-      setForgotPasswordError('Email must be valid');
+      setForgotPasswordError(t('auth.emailInvalid'));
       return;
     }
 
@@ -194,7 +196,7 @@ const LoginModal = ({ open, onClose, onSwitchToSignUp }) => {
       }
     } catch (error) {
       console.error('Error sending password reset email:', error);
-      setForgotPasswordError(error.message || 'Failed to send password reset email. Please try again.');
+      setForgotPasswordError(error.message || t('auth.loginFailed'));
     } finally {
       setForgotPasswordLoading(false);
     }
@@ -209,17 +211,17 @@ const LoginModal = ({ open, onClose, onSwitchToSignUp }) => {
 
   return (
     <Dialog open={open} onClose={handleClose} maxWidth="sm" fullWidth>
-      <DialogTitle>{showForgotPassword ? 'Forgot Password' : 'Login'}</DialogTitle>
+      <DialogTitle>{showForgotPassword ? t('auth.forgotPasswordTitle') : t('auth.login')}</DialogTitle>
       <DialogContent>
         {showForgotPassword ? (
           <>
             <DialogContentText sx={{ mb: 2 }}>
-              Enter your email address and we'll send you a link to reset your password.
+              {t('auth.forgotPasswordDescription')}
             </DialogContentText>
 
             {forgotPasswordSuccess && (
               <Alert severity="success" sx={{ mb: 2 }}>
-                Password reset email has been sent. Please check your inbox.
+                {t('auth.passwordResetSent')}
               </Alert>
             )}
 
@@ -234,7 +236,7 @@ const LoginModal = ({ open, onClose, onSwitchToSignUp }) => {
                 fullWidth
                 id="forgot-password-email"
                 name="forgot-password-email"
-                label="Email"
+                label={t('auth.email')}
                 type="email"
                 value={forgotPasswordEmail}
                 onChange={(e) => {
@@ -260,10 +262,10 @@ const LoginModal = ({ open, onClose, onSwitchToSignUp }) => {
                 {forgotPasswordLoading ? (
                   <>
                     <CircularProgress size={20} sx={{ mr: 1 }} />
-                    Sending...
+                    {t('auth.sending')}
                   </>
                 ) : (
-                  'Send Reset Link'
+                  t('auth.sendResetLink')
                 )}
               </Button>
 
@@ -274,7 +276,7 @@ const LoginModal = ({ open, onClose, onSwitchToSignUp }) => {
                   onClick={handleBackToLogin}
                   sx={{ textDecoration: 'none', cursor: 'pointer' }}
                 >
-                  Back to Login
+                  {t('auth.backToLogin')}
                 </MuiLink>
               </Box>
             </Box>
@@ -282,7 +284,7 @@ const LoginModal = ({ open, onClose, onSwitchToSignUp }) => {
         ) : (
           <>
             <DialogContentText sx={{ mb: 2 }}>
-              Sign in to your account
+              {t('auth.signIn')}
             </DialogContentText>
 
             {submitError && (
@@ -296,7 +298,7 @@ const LoginModal = ({ open, onClose, onSwitchToSignUp }) => {
                 fullWidth
                 id="email"
                 name="email"
-                label="Email"
+                label={t('auth.email')}
                 type="email"
                 value={formData.email}
                 onChange={handleChange}
@@ -312,7 +314,7 @@ const LoginModal = ({ open, onClose, onSwitchToSignUp }) => {
                 fullWidth
                 id="password"
                 name="password"
-                label="Password"
+                label={t('auth.password')}
                 type="password"
                 value={formData.password}
                 onChange={handleChange}
@@ -331,7 +333,7 @@ const LoginModal = ({ open, onClose, onSwitchToSignUp }) => {
                   onClick={() => setShowForgotPassword(true)}
                   sx={{ textDecoration: 'none', cursor: 'pointer', fontSize: '0.875rem' }}
                 >
-                  Forgot password?
+                  {t('auth.forgotPassword')}
                 </MuiLink>
               </Box>
 
@@ -346,16 +348,16 @@ const LoginModal = ({ open, onClose, onSwitchToSignUp }) => {
                 {loading ? (
                   <>
                     <CircularProgress size={20} sx={{ mr: 1 }} />
-                    Logging in...
+                    {t('auth.loggingIn')}
                   </>
                 ) : (
-                  'Login'
+                  t('auth.login')
                 )}
               </Button>
 
               <Box sx={{ textAlign: 'center' }}>
                 <DialogContentText variant="body2">
-                  Don't have an account?{' '}
+                  {t('auth.dontHaveAccount')}{' '}
                   <MuiLink
                     component="button"
                     type="button"
@@ -367,7 +369,7 @@ const LoginModal = ({ open, onClose, onSwitchToSignUp }) => {
                     }}
                     sx={{ textDecoration: 'none', cursor: 'pointer' }}
                   >
-                    Sign up
+                    {t('auth.signUp')}
                   </MuiLink>
                 </DialogContentText>
               </Box>

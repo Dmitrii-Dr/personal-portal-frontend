@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useTranslation } from 'react-i18next';
 import apiClient from '../utils/api';
 import {
   Box,
@@ -43,23 +44,25 @@ import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
 import { AdapterDayjs } from '@mui/x-date-pickers/AdapterDayjs';
 import dayjs from 'dayjs';
 
-const DAYS_OF_WEEK = [
-  { value: 'MONDAY', label: 'Monday' },
-  { value: 'TUESDAY', label: 'Tuesday' },
-  { value: 'WEDNESDAY', label: 'Wednesday' },
-  { value: 'THURSDAY', label: 'Thursday' },
-  { value: 'FRIDAY', label: 'Friday' },
-  { value: 'SATURDAY', label: 'Saturday' },
-  { value: 'SUNDAY', label: 'Sunday' },
-];
-
-const STATUS_OPTIONS = [
-  { value: 'ACTIVE', label: 'Active' },
-  { value: 'INACTIVE', label: 'Inactive' },
-  { value: 'ARCHIVED', label: 'Archived' },
-];
-
 const AvailabilityRuleComponent = () => {
+  const { t } = useTranslation();
+  
+  const DAYS_OF_WEEK = [
+    { value: 'MONDAY', label: t('admin.sessionConfiguration.availabilityRules.monday') },
+    { value: 'TUESDAY', label: t('admin.sessionConfiguration.availabilityRules.tuesday') },
+    { value: 'WEDNESDAY', label: t('admin.sessionConfiguration.availabilityRules.wednesday') },
+    { value: 'THURSDAY', label: t('admin.sessionConfiguration.availabilityRules.thursday') },
+    { value: 'FRIDAY', label: t('admin.sessionConfiguration.availabilityRules.friday') },
+    { value: 'SATURDAY', label: t('admin.sessionConfiguration.availabilityRules.saturday') },
+    { value: 'SUNDAY', label: t('admin.sessionConfiguration.availabilityRules.sunday') },
+  ];
+
+  const STATUS_OPTIONS = [
+    { value: 'ACTIVE', label: t('admin.sessionConfiguration.availabilityRules.active') },
+    { value: 'INACTIVE', label: t('admin.sessionConfiguration.availabilityRules.inactive') },
+    { value: 'ARCHIVED', label: t('admin.sessionConfiguration.availabilityRules.archived') },
+  ];
+  
   const [rules, setRules] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
@@ -101,9 +104,9 @@ const AvailabilityRuleComponent = () => {
         return;
       }
       console.error('Error fetching availability rules:', err);
-      let errorMessage = 'Failed to load availability rules.';
+      let errorMessage = t('admin.sessionConfiguration.availabilityRules.failedToLoad');
       if (err.response?.status === 401) {
-        errorMessage = 'Unauthorized. Please log in again.';
+        errorMessage = t('admin.sessionConfiguration.availabilityRules.unauthorized');
       } else if (err.response?.data?.message) {
         errorMessage = err.response.data.message;
       } else if (err.message) {
@@ -133,7 +136,7 @@ const AvailabilityRuleComponent = () => {
 
   // Format helpers
   const formatDaysOfWeek = (days) => {
-    if (!Array.isArray(days) || days.length === 0) return 'None';
+    if (!Array.isArray(days) || days.length === 0) return t('admin.sessionConfiguration.availabilityRules.none');
     const dayLabels = days.map((day) => {
       const dayObj = DAYS_OF_WEEK.find((d) => d.value === day);
       return dayObj ? dayObj.label.substring(0, 3) : day;
@@ -311,15 +314,15 @@ const AvailabilityRuleComponent = () => {
     const errors = {};
 
     if (!formData.daysOfWeek || formData.daysOfWeek.length === 0) {
-      errors.daysOfWeek = 'At least one day of week must be selected';
+      errors.daysOfWeek = t('admin.sessionConfiguration.availabilityRules.atLeastOneDay');
     }
 
     if (!formData.availableStartTime || formData.availableStartTime.trim() === '') {
-      errors.availableStartTime = 'Start time is required';
+      errors.availableStartTime = t('admin.sessionConfiguration.availabilityRules.startTimeRequired');
     }
 
     if (!formData.availableEndTime || formData.availableEndTime.trim() === '') {
-      errors.availableEndTime = 'End time is required';
+      errors.availableEndTime = t('admin.sessionConfiguration.availabilityRules.endTimeRequired');
     }
 
     if (formData.availableStartTime && formData.availableEndTime) {
@@ -330,22 +333,22 @@ const AvailabilityRuleComponent = () => {
         const startMinutes = parseInt(startParts[0], 10) * 60 + parseInt(startParts[1], 10);
         const endMinutes = parseInt(endParts[0], 10) * 60 + parseInt(endParts[1], 10);
         if (endMinutes <= startMinutes) {
-          errors.availableEndTime = 'End time must be after start time';
+          errors.availableEndTime = t('admin.sessionConfiguration.availabilityRules.endTimeAfterStart');
         }
       }
     }
 
     if (!formData.ruleStartDate) {
-      errors.ruleStartDate = 'Start date is required';
+      errors.ruleStartDate = t('admin.sessionConfiguration.availabilityRules.startDateRequired');
     }
 
     if (!formData.ruleEndDate) {
-      errors.ruleEndDate = 'End date is required';
+      errors.ruleEndDate = t('admin.sessionConfiguration.availabilityRules.endDateRequired');
     }
 
     if (formData.ruleStartDate && formData.ruleEndDate) {
       if (formData.ruleEndDate.isBefore(formData.ruleStartDate)) {
-        errors.ruleEndDate = 'End date must be after or equal to start date';
+        errors.ruleEndDate = t('admin.sessionConfiguration.availabilityRules.endDateAfterStart');
       }
     }
 
@@ -389,25 +392,25 @@ const AvailabilityRuleComponent = () => {
           `/api/v1/admin/booking/availability/rule/${editingRule.id}`,
           payload
         );
-        setSuccessMessage('Availability rule updated successfully');
+        setSuccessMessage(t('admin.sessionConfiguration.availabilityRules.updatedSuccessfully'));
       } else {
         // Create new rule
         response = await apiClient.post(
           '/api/v1/admin/booking/availability/rule',
           payload
         );
-        setSuccessMessage('Availability rule created successfully');
+        setSuccessMessage(t('admin.sessionConfiguration.availabilityRules.createdSuccessfully'));
       }
 
       handleCloseDialog();
       fetchRules();
     } catch (err) {
       console.error('Error saving availability rule:', err);
-      let errorMessage = 'Failed to save availability rule.';
+      let errorMessage = t('admin.sessionConfiguration.availabilityRules.failedToSave');
       if (err.response?.status === 400) {
-        errorMessage = err.response.data?.message || 'Validation error. Please check your input.';
+        errorMessage = err.response.data?.message || t('admin.sessionConfiguration.availabilityRules.validationError');
       } else if (err.response?.status === 401) {
-        errorMessage = 'Unauthorized. Please log in again.';
+        errorMessage = t('admin.sessionConfiguration.availabilityRules.unauthorized');
       } else if (err.response?.data?.message) {
         errorMessage = err.response.data.message;
       } else if (err.message) {
@@ -438,14 +441,14 @@ const AvailabilityRuleComponent = () => {
 
     try {
       await apiClient.delete(`/api/v1/admin/booking/availability/rule/${ruleToDelete.id}`);
-      setSuccessMessage('Availability rule deleted successfully');
+      setSuccessMessage(t('admin.sessionConfiguration.availabilityRules.deletedSuccessfully'));
       handleCloseDeleteDialog();
       fetchRules();
     } catch (err) {
       console.error('Error deleting availability rule:', err);
-      let errorMessage = 'Failed to delete availability rule.';
+      let errorMessage = t('admin.sessionConfiguration.availabilityRules.failedToDelete');
       if (err.response?.status === 401) {
-        errorMessage = 'Unauthorized. Please log in again.';
+        errorMessage = t('admin.sessionConfiguration.availabilityRules.unauthorized');
       } else if (err.response?.data?.message) {
         errorMessage = err.response.data.message;
       } else if (err.message) {
@@ -460,14 +463,14 @@ const AvailabilityRuleComponent = () => {
   return (
     <Box>
       <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
-        <Typography variant="h6">Availability Rules</Typography>
+        <Typography variant="h6">{t('admin.sessionConfiguration.availabilityRules.title')}</Typography>
         <Button
           variant="contained"
           startIcon={<AddIcon />}
           onClick={() => handleOpenDialog()}
           sx={{ textTransform: 'none' }}
         >
-          Add Rule
+          {t('admin.sessionConfiguration.availabilityRules.addRule')}
         </Button>
       </Box>
 
@@ -486,13 +489,13 @@ const AvailabilityRuleComponent = () => {
           <Table>
             <TableHead>
               <TableRow>
-                <TableCell>ID</TableCell>
-                <TableCell>Days of Week</TableCell>
-                <TableCell>Time Range</TableCell>
-                <TableCell>Date Range</TableCell>
-                <TableCell>Status</TableCell>
-                <TableCell>Timezone</TableCell>
-                <TableCell align="right">Actions</TableCell>
+                <TableCell>{t('admin.sessionConfiguration.availabilityRules.id')}</TableCell>
+                <TableCell>{t('admin.sessionConfiguration.availabilityRules.daysOfWeek')}</TableCell>
+                <TableCell>{t('admin.sessionConfiguration.availabilityRules.timeRange')}</TableCell>
+                <TableCell>{t('admin.sessionConfiguration.availabilityRules.dateRange')}</TableCell>
+                <TableCell>{t('admin.sessionConfiguration.availabilityRules.status')}</TableCell>
+                <TableCell>{t('admin.sessionConfiguration.availabilityRules.timezone')}</TableCell>
+                <TableCell align="right">{t('admin.sessionConfiguration.availabilityRules.actions')}</TableCell>
               </TableRow>
             </TableHead>
             <TableBody>
@@ -515,7 +518,7 @@ const AvailabilityRuleComponent = () => {
                   </TableCell>
                   <TableCell>
                     <Chip
-                      label={rule.ruleStatus}
+                      label={STATUS_OPTIONS.find(s => s.value === rule.ruleStatus)?.label || rule.ruleStatus}
                       color={getStatusColor(rule.ruleStatus)}
                       size="small"
                     />
@@ -543,12 +546,12 @@ const AvailabilityRuleComponent = () => {
           </Table>
         </TableContainer>
       ) : (
-        <Alert severity="info">No availability rules found. Create one to get started.</Alert>
+        <Alert severity="info">{t('admin.sessionConfiguration.availabilityRules.noRulesFound')}</Alert>
       )}
 
       {/* Create/Edit Dialog */}
       <Dialog open={dialogOpen} onClose={handleCloseDialog} maxWidth="md" fullWidth>
-        <DialogTitle>{editingRule ? 'Edit Availability Rule' : 'Create Availability Rule'}</DialogTitle>
+        <DialogTitle>{editingRule ? t('admin.sessionConfiguration.availabilityRules.editRule') : t('admin.sessionConfiguration.availabilityRules.createRule')}</DialogTitle>
         <DialogContent>
           {error && (
             <Alert severity="error" sx={{ mb: 2 }} onClose={() => setError(null)}>
@@ -558,7 +561,7 @@ const AvailabilityRuleComponent = () => {
 
           {formData.ruleStatus === 'ACTIVE' && (
             <Alert severity="warning" sx={{ mb: 2 }}>
-              This rule will be validated for overlaps with existing ACTIVE rules.
+              {t('admin.sessionConfiguration.availabilityRules.willBeValidated')}
             </Alert>
           )}
 
@@ -569,7 +572,7 @@ const AvailabilityRuleComponent = () => {
                 <Box sx={{ display: 'flex', gap: 1, alignItems: 'flex-end' }}>
                     <Box sx={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 0 }}>
                       <MuiInputLabel htmlFor="date-from" sx={{ px: 0.5, fontSize: '0.875rem', mb: 0.5, lineHeight: 1.2 }}>
-                        Rule Start Date *
+                        {t('admin.sessionConfiguration.availabilityRules.ruleStartDate')}
                       </MuiInputLabel>
                       <Box>
                         <Button
@@ -593,7 +596,7 @@ const AvailabilityRuleComponent = () => {
                         >
                           {formData.ruleStartDate
                             ? formData.ruleStartDate.format('MMM D, YYYY')
-                            : 'Pick a date'}
+                            : t('admin.sessionConfiguration.availabilityRules.pickADate')}
                         </Button>
                         <Popover
                           open={dateFromPopoverOpen}
@@ -635,7 +638,7 @@ const AvailabilityRuleComponent = () => {
                         htmlFor="time-from"
                         sx={{ px: 0.5, fontSize: '0.875rem', mb: 0.5, visibility: 'hidden', height: '20px', lineHeight: 1.2 }}
                       >
-                        Start Time
+                        {t('admin.sessionConfiguration.availabilityRules.startTime')}
                       </MuiInputLabel>
                       <TextField
                         type="time"
@@ -670,7 +673,7 @@ const AvailabilityRuleComponent = () => {
                 <Box sx={{ display: 'flex', gap: 1, alignItems: 'flex-end' }}>
                     <Box sx={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 0 }}>
                       <MuiInputLabel htmlFor="date-to" sx={{ px: 0.5, fontSize: '0.875rem', mb: 0.5, lineHeight: 1.2 }}>
-                        Rule End Date *
+                        {t('admin.sessionConfiguration.availabilityRules.ruleEndDate')}
                       </MuiInputLabel>
                       <Box>
                         <Button
@@ -694,7 +697,7 @@ const AvailabilityRuleComponent = () => {
                         >
                           {formData.ruleEndDate
                             ? formData.ruleEndDate.format('MMM D, YYYY')
-                            : 'Pick a date'}
+                            : t('admin.sessionConfiguration.availabilityRules.pickADate')}
                         </Button>
                         <Popover
                           open={dateToPopoverOpen}
@@ -736,7 +739,7 @@ const AvailabilityRuleComponent = () => {
                         htmlFor="time-to"
                         sx={{ px: 0.5, fontSize: '0.875rem', mb: 0.5, visibility: 'hidden', height: '20px', lineHeight: 1.2 }}
                       >
-                        End Time
+                        {t('admin.sessionConfiguration.availabilityRules.endTime')}
                       </MuiInputLabel>
                       <TextField
                         type="time"
@@ -770,7 +773,7 @@ const AvailabilityRuleComponent = () => {
               {/* Row 2: Days of Week and Rule Status */}
               <Grid item xs={12} sm={6}>
                 <FormControl fullWidth required error={!!formErrors.daysOfWeek}>
-                  <InputLabel>Days of Week *</InputLabel>
+                  <InputLabel>{t('admin.sessionConfiguration.availabilityRules.daysOfWeekLabel')}</InputLabel>
                   <Select
                     multiple
                     value={formData.daysOfWeek}
@@ -781,7 +784,7 @@ const AvailabilityRuleComponent = () => {
                         setFormErrors((prev) => ({ ...prev, daysOfWeek: '' }));
                       }
                     }}
-                    label="Days of Week *"
+                    label={t('admin.sessionConfiguration.availabilityRules.daysOfWeekLabel')}
                     renderValue={(selected) => {
                       if (!selected || selected.length === 0) return '';
                       return selected
@@ -809,11 +812,11 @@ const AvailabilityRuleComponent = () => {
 
               <Grid item xs={12} sm={6}>
                 <FormControl fullWidth required>
-                  <InputLabel>Rule Status *</InputLabel>
+                  <InputLabel>{t('admin.sessionConfiguration.availabilityRules.ruleStatus')}</InputLabel>
                   <Select
                     value={formData.ruleStatus}
                     onChange={handleStatusChange}
-                    label="Rule Status *"
+                    label={t('admin.sessionConfiguration.availabilityRules.ruleStatus')}
                   >
                     {STATUS_OPTIONS.map((status) => (
                       <MenuItem key={status.value} value={status.value}>
@@ -828,7 +831,7 @@ const AvailabilityRuleComponent = () => {
         </DialogContent>
         <DialogActions>
           <Button onClick={handleCloseDialog} sx={{ textTransform: 'none' }} disabled={submitting}>
-            Cancel
+            {t('admin.sessionConfiguration.availabilityRules.cancel')}
           </Button>
           <Button
             onClick={handleSubmit}
@@ -839,10 +842,10 @@ const AvailabilityRuleComponent = () => {
             {submitting ? (
               <>
                 <CircularProgress size={16} sx={{ mr: 1 }} />
-                {editingRule ? 'Updating...' : 'Creating...'}
+                {editingRule ? t('admin.sessionConfiguration.availabilityRules.updating') : t('admin.sessionConfiguration.availabilityRules.creating')}
               </>
             ) : (
-              editingRule ? 'Update Rule' : 'Create Rule'
+              editingRule ? t('admin.sessionConfiguration.availabilityRules.updateRule') : t('admin.sessionConfiguration.availabilityRules.createRule')
             )}
           </Button>
         </DialogActions>
@@ -850,27 +853,27 @@ const AvailabilityRuleComponent = () => {
 
       {/* Delete Confirmation Dialog */}
       <Dialog open={deleteDialogOpen} onClose={handleCloseDeleteDialog}>
-        <DialogTitle>Delete Availability Rule</DialogTitle>
+        <DialogTitle>{t('admin.sessionConfiguration.availabilityRules.deleteRule')}</DialogTitle>
         <DialogContent>
           <Typography>
-            Are you sure you want to delete this availability rule?
+            {t('admin.sessionConfiguration.availabilityRules.confirmDelete')}
           </Typography>
           {ruleToDelete && (
             <Box sx={{ mt: 2, p: 2, bgcolor: 'action.hover', borderRadius: 1 }}>
               <Typography variant="body2">
-                <strong>Days:</strong> {formatDaysOfWeek(ruleToDelete.daysOfWeek)}
+                <strong>{t('admin.sessionConfiguration.availabilityRules.days')}</strong> {formatDaysOfWeek(ruleToDelete.daysOfWeek)}
               </Typography>
               <Typography variant="body2">
-                <strong>Time:</strong> {formatTime(ruleToDelete.availableStartTime)} -{' '}
+                <strong>{t('admin.sessionConfiguration.availabilityRules.time')}</strong> {formatTime(ruleToDelete.availableStartTime)} -{' '}
                 {formatTime(ruleToDelete.availableEndTime)}
               </Typography>
               <Typography variant="body2">
-                <strong>Date Range:</strong> {formatDate(ruleToDelete.ruleStartDate)} -{' '}
+                <strong>{t('admin.sessionConfiguration.availabilityRules.dateRangeLabel')}</strong> {formatDate(ruleToDelete.ruleStartDate)} -{' '}
                 {formatDate(ruleToDelete.ruleEndDate)}
               </Typography>
               {ruleToDelete.ruleStatus === 'ACTIVE' && (
                 <Alert severity="warning" sx={{ mt: 1 }}>
-                  This will remove availability for the specified days and times.
+                  {t('admin.sessionConfiguration.availabilityRules.willRemoveAvailability')}
                 </Alert>
               )}
             </Box>
@@ -882,7 +885,7 @@ const AvailabilityRuleComponent = () => {
             sx={{ textTransform: 'none' }}
             disabled={deleting}
           >
-            Cancel
+            {t('admin.sessionConfiguration.availabilityRules.cancel')}
           </Button>
           <Button
             onClick={handleConfirmDelete}
@@ -894,10 +897,10 @@ const AvailabilityRuleComponent = () => {
             {deleting ? (
               <>
                 <CircularProgress size={16} sx={{ mr: 1 }} />
-                Deleting...
+                {t('admin.sessionConfiguration.availabilityRules.deleting')}
               </>
             ) : (
-              'Delete'
+              t('admin.sessionConfiguration.availabilityRules.delete')
             )}
           </Button>
         </DialogActions>

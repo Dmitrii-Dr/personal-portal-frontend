@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { useTranslation } from 'react-i18next';
 import apiClient from '../utils/api';
 import { loadImageWithCache, loadThumbnailWithCache, clearCachedImage } from '../utils/imageCache';
 import {
@@ -31,6 +32,7 @@ import CheckBoxIcon from '@mui/icons-material/CheckBox';
 import CheckBoxOutlineBlankIcon from '@mui/icons-material/CheckBoxOutlineBlank';
 
 const AdminGalleryPage = () => {
+  const { t } = useTranslation();
   const theme = useTheme();
   const isXs = useMediaQuery(theme.breakpoints.only('xs'));
   const isSm = useMediaQuery(theme.breakpoints.only('sm'));
@@ -171,16 +173,16 @@ const AdminGalleryPage = () => {
         
         if (!isMounted) return;
 
-        let errorMessage = 'Failed to load gallery images. Please try again later.';
+        let errorMessage = t('admin.gallery.failedToLoad');
 
         if (err.code === 'ECONNABORTED') {
-          errorMessage = 'Request timed out. Please try again.';
+          errorMessage = t('admin.gallery.requestTimeout');
         } else if (err.response) {
           errorMessage =
             err.response.data?.message ||
             `Server error: ${err.response.status}`;
         } else if (err.request) {
-          errorMessage = 'Unable to reach the server. Please check your connection.';
+          errorMessage = t('admin.gallery.unableToReachServer');
         } else {
           errorMessage = err.message || errorMessage;
         }
@@ -216,7 +218,7 @@ const AdminGalleryPage = () => {
     // Open dialog immediately with thumbnail or loading state
     setSelectedImage({
       url: thumbnailUrls[item.mediaId] || null,
-      altText: item.altText || item.fileUrl || 'Gallery image',
+      altText: item.altText || item.fileUrl || t('admin.gallery.galleryImage'),
       createdAt: item.createdAt,
       fileType: item.fileType,
       mediaId: item.mediaId,
@@ -267,7 +269,7 @@ const AdminGalleryPage = () => {
 
     // Validate file type
     if (!file.type.startsWith('image/')) {
-      setError('Please select an image file');
+      setError(t('admin.gallery.pleaseSelectImageFile'));
       return;
     }
 
@@ -289,10 +291,10 @@ const AdminGalleryPage = () => {
       });
 
       if (!uploadResponse.data || !uploadResponse.data.mediaId) {
-        throw new Error('Failed to upload image: No mediaId returned');
+        throw new Error(t('admin.gallery.failedToUpload'));
       }
 
-      setSuccessMessage('Image uploaded successfully!');
+      setSuccessMessage(t('admin.gallery.imageUploadedSuccessfully'));
       
       // Refresh the current page to show the new image
       // Reset to first page if we're not already there
@@ -316,12 +318,12 @@ const AdminGalleryPage = () => {
       }
     } catch (err) {
       console.error('Error uploading image:', err);
-      let errorMessage = 'Failed to upload image. Please try again.';
+      let errorMessage = t('admin.gallery.failedToUpload');
       
       if (err.response) {
         errorMessage = err.response.data?.message || `Server error: ${err.response.status}`;
       } else if (err.request) {
-        errorMessage = 'Unable to reach the server. Please check your connection.';
+        errorMessage = t('admin.gallery.unableToReachServer');
       } else {
         errorMessage = err.message || errorMessage;
       }
@@ -422,7 +424,7 @@ const AdminGalleryPage = () => {
       }
 
       if (succeeded.length > 0) {
-        setSuccessMessage(`Successfully deleted ${succeeded.length} image(s).`);
+        setSuccessMessage(t('admin.gallery.successfullyDeleted', { count: succeeded.length }));
       }
 
       // Close dialog and reset selection
@@ -480,7 +482,7 @@ const AdminGalleryPage = () => {
       }
     } catch (err) {
       console.error('Error deleting images:', err);
-      setError('Failed to delete images. Please try again.');
+      setError(t('admin.gallery.failedToDelete'));
     } finally {
       setDeleting(false);
     }
@@ -533,12 +535,14 @@ const AdminGalleryPage = () => {
           <PhotoLibraryIcon sx={{ fontSize: 32, color: 'primary.main' }} />
           <Box>
             <Typography variant="h4" component="h1">
-              Gallery
+              {t('admin.gallery.gallery')}
             </Typography>
             <Typography variant="body2" color="text.secondary">
               {totalElements > 0
-                ? `Total: ${totalElements} image${totalElements !== 1 ? 's' : ''}`
-                : 'No images uploaded yet'}
+                ? totalElements === 1
+                  ? t('admin.gallery.totalImages', { count: totalElements })
+                  : t('admin.gallery.totalImagesPlural', { count: totalElements })
+                : t('admin.gallery.noImagesYet')}
             </Typography>
           </Box>
         </Box>
@@ -562,7 +566,7 @@ const AdminGalleryPage = () => {
                   },
                 }}
               >
-                Cancel
+                {t('admin.gallery.cancel')}
               </Button>
               <Button
                 variant="outlined"
@@ -594,8 +598,8 @@ const AdminGalleryPage = () => {
                 }}
               >
                 {selectedMediaIds.size > 0
-                  ? `Delete (${selectedMediaIds.size})`
-                  : 'Delete'}
+                  ? t('admin.gallery.deleteWithCount', { count: selectedMediaIds.size })
+                  : t('admin.gallery.delete')}
               </Button>
             </>
           ) : (
@@ -618,7 +622,7 @@ const AdminGalleryPage = () => {
                   },
                 }}
               >
-                Select
+                {t('admin.gallery.select')}
               </Button>
               <Button
                 variant="outlined"
@@ -642,7 +646,7 @@ const AdminGalleryPage = () => {
                   },
                 }}
               >
-                {uploading ? 'Uploading...' : 'Upload'}
+                {uploading ? t('admin.gallery.uploading') : t('admin.gallery.upload')}
               </Button>
               <input
                 ref={fileInputRef}
@@ -680,7 +684,7 @@ const AdminGalleryPage = () => {
         </Grid>
       ) : mediaItems.length === 0 ? (
         <Alert severity="info" sx={{ mt: 3 }}>
-          No images found in the gallery. Upload images to see them here.
+          {t('admin.gallery.noImagesFound')}
         </Alert>
       ) : (
         <>
@@ -741,7 +745,7 @@ const AdminGalleryPage = () => {
                     <CardMedia
                       component="img"
                       image={thumbnailUrls[item.mediaId]}
-                      alt={item.altText || item.fileUrl || 'Gallery image'}
+                      alt={item.altText || item.fileUrl || t('admin.gallery.galleryImage')}
                       sx={{
                         height: 120,
                         objectFit: 'cover',
@@ -762,7 +766,7 @@ const AdminGalleryPage = () => {
                       }}
                     >
                       <Typography variant="caption" color="text.secondary">
-                        Failed to load
+                        {t('admin.gallery.failedToLoadImage')}
                       </Typography>
                     </Box>
                   )}
@@ -777,7 +781,7 @@ const AdminGalleryPage = () => {
                         mb: 0.25,
                       }}
                     >
-                      {item.fileUrl || 'Untitled'}
+                      {item.fileUrl || t('admin.gallery.untitled')}
                     </Typography>
                     <Typography 
                       variant="caption" 
@@ -833,7 +837,7 @@ const AdminGalleryPage = () => {
               alignItems: 'center',
             }}
           >
-            <Typography variant="h6">Image Preview</Typography>
+            <Typography variant="h6">{t('admin.gallery.imagePreview')}</Typography>
             <IconButton onClick={handleCloseDialog} size="small">
               <CloseIcon />
             </IconButton>
@@ -872,10 +876,10 @@ const AdminGalleryPage = () => {
                     }}
                   />
                   <Typography variant="body2" color="text.secondary">
-                    <strong>Type:</strong> {selectedImage.fileType || 'N/A'}
+                    <strong>{t('admin.gallery.type')}</strong> {selectedImage.fileType || 'N/A'}
                   </Typography>
                   <Typography variant="body2" color="text.secondary">
-                    <strong>Uploaded:</strong> {formatDate(selectedImage.createdAt)}
+                    <strong>{t('admin.gallery.uploaded')}</strong> {formatDate(selectedImage.createdAt)}
                   </Typography>
                 </>
               )}
@@ -886,15 +890,17 @@ const AdminGalleryPage = () => {
 
       {/* Delete Confirmation Dialog */}
       <Dialog open={deleteDialogOpen} onClose={handleCancelDelete}>
-        <DialogTitle>Delete Images</DialogTitle>
+        <DialogTitle>{t('admin.gallery.deleteImages')}</DialogTitle>
         <DialogContent>
           <Typography>
-            Are you sure you want to delete {selectedMediaIds.size} image{selectedMediaIds.size !== 1 ? 's' : ''}? This action cannot be undone.
+            {selectedMediaIds.size === 1
+              ? t('admin.gallery.confirmDelete', { count: selectedMediaIds.size })
+              : t('admin.gallery.confirmDeletePlural', { count: selectedMediaIds.size })}
           </Typography>
         </DialogContent>
         <DialogActions>
           <Button onClick={handleCancelDelete} disabled={deleting}>
-            Cancel
+            {t('admin.gallery.cancel')}
           </Button>
           <Button
             onClick={handleConfirmDelete}
@@ -903,7 +909,7 @@ const AdminGalleryPage = () => {
             disabled={deleting}
             startIcon={deleting ? <CircularProgress size={20} /> : <DeleteIcon />}
           >
-            {deleting ? 'Deleting...' : 'Delete'}
+            {deleting ? t('admin.gallery.deleting') : t('admin.gallery.delete')}
           </Button>
         </DialogActions>
       </Dialog>

@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useTranslation } from 'react-i18next';
 import apiClient from '../utils/api';
 import {
   Box,
@@ -40,6 +41,7 @@ import { AdapterDayjs } from '@mui/x-date-pickers/AdapterDayjs';
 import dayjs from 'dayjs';
 
 const AvailabilityOverrideComponent = () => {
+  const { t } = useTranslation();
   const [overrides, setOverrides] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
@@ -81,9 +83,9 @@ const AvailabilityOverrideComponent = () => {
         return;
       }
       console.error('Error fetching availability overrides:', err);
-      let errorMessage = 'Failed to load availability overrides.';
+      let errorMessage = t('admin.sessionConfiguration.availabilityOverrides.failedToLoad');
       if (err.response?.status === 401) {
-        errorMessage = 'Unauthorized. Please log in again.';
+        errorMessage = t('admin.sessionConfiguration.availabilityOverrides.unauthorized');
       } else if (err.response?.data?.message) {
         errorMessage = err.response.data.message;
       } else if (err.message) {
@@ -185,8 +187,17 @@ const AvailabilityOverrideComponent = () => {
     }
   };
 
+  const getStatusLabel = (status) => {
+    if (!status) return '';
+    const statusMap = {
+      'ACTIVE': t('admin.sessionConfiguration.availabilityOverrides.active'),
+      'ARCHIVED': t('admin.sessionConfiguration.availabilityOverrides.archived'),
+    };
+    return statusMap[status] || status;
+  };
+
   const getTypeLabel = (isAvailable) => {
-    return isAvailable ? 'Extend' : 'Reduce';
+    return isAvailable ? t('admin.sessionConfiguration.availabilityOverrides.extend') : t('admin.sessionConfiguration.availabilityOverrides.reduce');
   };
 
   const getTypeColor = (isAvailable) => {
@@ -454,22 +465,22 @@ const AvailabilityOverrideComponent = () => {
     const errors = {};
 
     if (!formData.overrideDate) {
-      errors.overrideDate = 'Override date is required';
+      errors.overrideDate = t('admin.sessionConfiguration.availabilityOverrides.overrideDateRequired');
     } else {
       // Check if date is in the past
       const today = dayjs().startOf('day');
       const selectedDate = dayjs(formData.overrideDate).startOf('day');
       if (selectedDate.isBefore(today)) {
-        errors.overrideDate = 'Cannot create overrides for dates in the past';
+        errors.overrideDate = t('admin.sessionConfiguration.availabilityOverrides.cannotCreateForPast');
       }
     }
 
     if (!formData.startTime || formData.startTime.trim() === '') {
-      errors.startTime = 'Start time is required';
+      errors.startTime = t('admin.sessionConfiguration.availabilityOverrides.startTimeRequired');
     }
 
     if (!formData.endTime || formData.endTime.trim() === '') {
-      errors.endTime = 'End time is required';
+      errors.endTime = t('admin.sessionConfiguration.availabilityOverrides.endTimeRequired');
     }
 
     if (formData.startTime && formData.endTime) {
@@ -481,12 +492,12 @@ const AvailabilityOverrideComponent = () => {
         const endMinutes = parseInt(endParts[0], 10) * 60 + parseInt(endParts[1], 10);
 
         if (endMinutes <= startMinutes) {
-          errors.endTime = 'End time must be after start time';
+          errors.endTime = t('admin.sessionConfiguration.availabilityOverrides.endTimeAfterStart');
         } else {
           // Check duration (max 24 hours)
           const durationMinutes = endMinutes - startMinutes;
           if (durationMinutes > 24 * 60) {
-            errors.endTime = 'Duration cannot exceed 24 hours';
+            errors.endTime = t('admin.sessionConfiguration.availabilityOverrides.durationExceeds24Hours');
           }
         }
       }
@@ -529,22 +540,22 @@ const AvailabilityOverrideComponent = () => {
           `/api/v1/admin/booking/availability/override/${editingOverride.id}`,
           payload
         );
-        setSuccessMessage('Availability override updated successfully');
+        setSuccessMessage(t('admin.sessionConfiguration.availabilityOverrides.updatedSuccessfully'));
       } else {
         // Create new override
         response = await apiClient.post('/api/v1/admin/booking/availability/override', payload);
-        setSuccessMessage('Availability override created successfully');
+        setSuccessMessage(t('admin.sessionConfiguration.availabilityOverrides.createdSuccessfully'));
       }
 
       handleCloseDialog();
       fetchOverrides();
     } catch (err) {
       console.error('Error saving availability override:', err);
-      let errorMessage = 'Failed to save availability override.';
+      let errorMessage = t('admin.sessionConfiguration.availabilityOverrides.failedToSave');
       if (err.response?.status === 400) {
-        errorMessage = err.response.data?.message || 'Validation error. Please check your input.';
+        errorMessage = err.response.data?.message || t('admin.sessionConfiguration.availabilityOverrides.validationError');
       } else if (err.response?.status === 401) {
-        errorMessage = 'Unauthorized. Please log in again.';
+        errorMessage = t('admin.sessionConfiguration.availabilityOverrides.unauthorized');
       } else if (err.response?.data?.message) {
         errorMessage = err.response.data.message;
       } else if (err.message) {
@@ -575,14 +586,14 @@ const AvailabilityOverrideComponent = () => {
 
     try {
       await apiClient.delete(`/api/v1/admin/booking/availability/override/${overrideToDelete.id}`);
-      setSuccessMessage('Availability override deleted successfully');
+      setSuccessMessage(t('admin.sessionConfiguration.availabilityOverrides.deletedSuccessfully'));
       handleCloseDeleteDialog();
       fetchOverrides();
     } catch (err) {
       console.error('Error deleting availability override:', err);
-      let errorMessage = 'Failed to delete availability override.';
+      let errorMessage = t('admin.sessionConfiguration.availabilityOverrides.failedToDelete');
       if (err.response?.status === 401) {
-        errorMessage = 'Unauthorized. Please log in again.';
+        errorMessage = t('admin.sessionConfiguration.availabilityOverrides.unauthorized');
       } else if (err.response?.data?.message) {
         errorMessage = err.response.data.message;
       } else if (err.message) {
@@ -597,14 +608,14 @@ const AvailabilityOverrideComponent = () => {
   return (
     <Box>
       <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
-        <Typography variant="h6">Availability Rules Overrides</Typography>
+        <Typography variant="h6">{t('admin.sessionConfiguration.availabilityOverrides.title')}</Typography>
         <Button
           variant="contained"
           startIcon={<AddIcon />}
           onClick={() => handleOpenDialog()}
           sx={{ textTransform: 'none' }}
         >
-          Add Override
+          {t('admin.sessionConfiguration.availabilityOverrides.addOverride')}
         </Button>
       </Box>
 
@@ -623,13 +634,13 @@ const AvailabilityOverrideComponent = () => {
           <Table>
             <TableHead>
               <TableRow>
-                <TableCell>ID</TableCell>
-                <TableCell>Date</TableCell>
-                <TableCell>Time Range</TableCell>
-                <TableCell>Type</TableCell>
-                <TableCell>Status</TableCell>
-                <TableCell>Timezone</TableCell>
-                <TableCell align="right">Actions</TableCell>
+                <TableCell>{t('admin.sessionConfiguration.availabilityOverrides.id')}</TableCell>
+                <TableCell>{t('admin.sessionConfiguration.availabilityOverrides.date')}</TableCell>
+                <TableCell>{t('admin.sessionConfiguration.availabilityOverrides.timeRange')}</TableCell>
+                <TableCell>{t('admin.sessionConfiguration.availabilityOverrides.type')}</TableCell>
+                <TableCell>{t('admin.sessionConfiguration.availabilityOverrides.status')}</TableCell>
+                <TableCell>{t('admin.sessionConfiguration.availabilityOverrides.timezone')}</TableCell>
+                <TableCell align="right">{t('admin.sessionConfiguration.availabilityOverrides.actions')}</TableCell>
               </TableRow>
             </TableHead>
             <TableBody>
@@ -656,7 +667,7 @@ const AvailabilityOverrideComponent = () => {
                   </TableCell>
                   <TableCell>
                     <Chip
-                      label={override.status}
+                      label={getStatusLabel(override.status)}
                       color={getStatusColor(override.status)}
                       size="small"
                     />
@@ -684,13 +695,13 @@ const AvailabilityOverrideComponent = () => {
           </Table>
         </TableContainer>
       ) : (
-        <Alert severity="info">No availability overrides found. Create one to get started.</Alert>
+        <Alert severity="info">{t('admin.sessionConfiguration.availabilityOverrides.noOverridesFound')}</Alert>
       )}
 
       {/* Create/Edit Dialog */}
       <Dialog open={dialogOpen} onClose={handleCloseDialog} maxWidth="sm" fullWidth>
         <DialogTitle>
-          {editingOverride ? 'Edit Availability Override' : 'Create Availability Override'}
+          {editingOverride ? t('admin.sessionConfiguration.availabilityOverrides.editOverride') : t('admin.sessionConfiguration.availabilityOverrides.createOverride')}
         </DialogTitle>
         <DialogContent>
           {error && (
@@ -708,7 +719,7 @@ const AvailabilityOverrideComponent = () => {
                     htmlFor="override-date"
                     sx={{ px: 0.5, fontSize: '0.875rem', mb: 0.5, lineHeight: 1.2 }}
                   >
-                    Override Date *
+                    {t('admin.sessionConfiguration.availabilityOverrides.overrideDate')}
                   </MuiInputLabel>
                   <Box>
                     <Button
@@ -732,7 +743,7 @@ const AvailabilityOverrideComponent = () => {
                     >
                       {formData.overrideDate
                         ? formData.overrideDate.format('MMM D, YYYY')
-                        : 'Pick a date'}
+                        : t('admin.sessionConfiguration.availabilityOverrides.pickADate')}
                     </Button>
                     <Popover
                       open={datePopoverOpen}
@@ -777,7 +788,7 @@ const AvailabilityOverrideComponent = () => {
                   <MuiInputLabel
                     sx={{ px: 0.5, fontSize: '0.875rem', mb: 1, lineHeight: 1.2 }}
                   >
-                    Start Time *
+                    {t('admin.sessionConfiguration.availabilityOverrides.startTime')}
                   </MuiInputLabel>
                   <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 1 }}>
                     {/* Hours */}
@@ -911,7 +922,7 @@ const AvailabilityOverrideComponent = () => {
                   <MuiInputLabel
                     sx={{ px: 0.5, fontSize: '0.875rem', mb: 1, lineHeight: 1.2 }}
                   >
-                    End Time *
+                    {t('admin.sessionConfiguration.availabilityOverrides.endTime')}
                   </MuiInputLabel>
                   <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 1 }}>
                     {/* Hours */}
@@ -1061,8 +1072,8 @@ const AvailabilityOverrideComponent = () => {
                   label={
                     <Typography variant="body2">
                       {formData.isAvailable
-                        ? 'This time range will be added to availability'
-                        : 'This time range will be blocked for booking'}
+                        ? t('admin.sessionConfiguration.availabilityOverrides.willBeAdded')
+                        : t('admin.sessionConfiguration.availabilityOverrides.willBeBlocked')}
                     </Typography>
                   }
                 />
@@ -1072,7 +1083,7 @@ const AvailabilityOverrideComponent = () => {
         </DialogContent>
         <DialogActions>
           <Button onClick={handleCloseDialog} sx={{ textTransform: 'none' }} disabled={submitting}>
-            Cancel
+            {t('admin.sessionConfiguration.availabilityOverrides.cancel')}
           </Button>
           <Button
             onClick={handleSubmit}
@@ -1083,10 +1094,10 @@ const AvailabilityOverrideComponent = () => {
             {submitting ? (
               <>
                 <CircularProgress size={16} sx={{ mr: 1 }} />
-                {editingOverride ? 'Updating...' : 'Creating...'}
+                {editingOverride ? t('admin.sessionConfiguration.availabilityOverrides.updating') : t('admin.sessionConfiguration.availabilityOverrides.creating')}
               </>
             ) : (
-              editingOverride ? 'Update Override' : 'Create Override'
+              editingOverride ? t('admin.sessionConfiguration.availabilityOverrides.updateOverride') : t('admin.sessionConfiguration.availabilityOverrides.createOverride')
             )}
           </Button>
         </DialogActions>
@@ -1094,24 +1105,24 @@ const AvailabilityOverrideComponent = () => {
 
       {/* Delete Confirmation Dialog */}
       <Dialog open={deleteDialogOpen} onClose={handleCloseDeleteDialog}>
-        <DialogTitle>Delete Availability Override</DialogTitle>
+        <DialogTitle>{t('admin.sessionConfiguration.availabilityOverrides.deleteOverride')}</DialogTitle>
         <DialogContent>
-          <Typography>Are you sure you want to delete this availability override?</Typography>
+          <Typography>{t('admin.sessionConfiguration.availabilityOverrides.confirmDelete')}</Typography>
           {overrideToDelete && (
             <Box sx={{ mt: 2, p: 2, bgcolor: 'action.hover', borderRadius: 1 }}>
               <Typography variant="body2">
-                <strong>Date:</strong> {formatDate(overrideToDelete.overrideDate)}
+                <strong>{t('admin.sessionConfiguration.availabilityOverrides.dateLabel')}</strong> {formatDate(overrideToDelete.overrideDate)}
               </Typography>
               <Typography variant="body2">
-                <strong>Time:</strong> {formatTime(overrideToDelete.startTime)} -{' '}
+                <strong>{t('admin.sessionConfiguration.availabilityOverrides.timeLabel')}</strong> {formatTime(overrideToDelete.startTime)} -{' '}
                 {formatTime(overrideToDelete.endTime)}
               </Typography>
               <Typography variant="body2">
-                <strong>Type:</strong> {getTypeLabel(overrideToDelete.isAvailable)}
+                <strong>{t('admin.sessionConfiguration.availabilityOverrides.typeLabel')}</strong> {getTypeLabel(overrideToDelete.isAvailable)}
               </Typography>
               {overrideToDelete.status === 'ACTIVE' && (
                 <Alert severity="warning" sx={{ mt: 1 }}>
-                  This will remove the override for the specified date and time.
+                  {t('admin.sessionConfiguration.availabilityOverrides.willRemoveOverride')}
                 </Alert>
               )}
             </Box>
@@ -1123,7 +1134,7 @@ const AvailabilityOverrideComponent = () => {
             sx={{ textTransform: 'none' }}
             disabled={deleting}
           >
-            Cancel
+            {t('admin.sessionConfiguration.availabilityOverrides.cancel')}
           </Button>
           <Button
             onClick={handleConfirmDelete}
@@ -1135,10 +1146,10 @@ const AvailabilityOverrideComponent = () => {
             {deleting ? (
               <>
                 <CircularProgress size={16} sx={{ mr: 1 }} />
-                Deleting...
+                {t('admin.sessionConfiguration.availabilityOverrides.deleting')}
               </>
             ) : (
-              'Delete'
+              t('admin.sessionConfiguration.availabilityOverrides.delete')
             )}
           </Button>
         </DialogActions>

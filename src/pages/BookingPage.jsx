@@ -1,5 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
+import i18n from '../i18n/i18n';
 import axios from 'axios';
 import dayjs from 'dayjs';
 import utc from 'dayjs/plugin/utc';
@@ -7,6 +9,7 @@ import timezone from 'dayjs/plugin/timezone';
 import updateLocale from 'dayjs/plugin/updateLocale';
 import localeData from 'dayjs/plugin/localeData';
 import 'dayjs/locale/en-gb';
+import 'dayjs/locale/ru';
 import apiClient, { fetchWithAuth, getToken, fetchUserSettings as fetchUserSettingsCached } from '../utils/api';
 import { getCachedSlots, setCachedSlots, invalidateCache, clearAllCache } from '../utils/bookingSlotCache';
 
@@ -50,6 +53,7 @@ import { AdapterDayjs } from '@mui/x-date-pickers/AdapterDayjs';
 import AddIcon from '@mui/icons-material/Add';
 
 const BookingPage = ({ sessionTypeId: propSessionTypeId, hideMyBookings = false }) => {
+  const { t, i18n: i18nInstance } = useTranslation();
   const [selectedDate, setSelectedDate] = useState(dayjs());
   const [availableSlots, setAvailableSlots] = useState([]);
   const [loading, setLoading] = useState(false); // Don't fetch on mount, only when dialog opens
@@ -357,7 +361,7 @@ const BookingPage = ({ sessionTypeId: propSessionTypeId, hideMyBookings = false 
       }
     } catch (err) {
       console.error('Error fetching bookings:', err);
-      let errorMessage = 'Failed to load bookings. Please try again later.';
+      let errorMessage = t('pages.booking.failedToLoadBookings');
       if (err.code === 'ECONNABORTED') {
         errorMessage = 'Request timed out. Please try again.';
       } else if (err.response) {
@@ -401,7 +405,7 @@ const BookingPage = ({ sessionTypeId: propSessionTypeId, hideMyBookings = false 
         return;
       }
       console.error('Error fetching past bookings:', err);
-      let errorMessage = 'Failed to load past bookings. Please try again later.';
+      let errorMessage = t('pages.booking.failedToLoadPastBookings');
       if (err.code === 'ECONNABORTED') {
         errorMessage = 'Request timed out. Please try again.';
       } else if (err.response) {
@@ -649,14 +653,14 @@ const BookingPage = ({ sessionTypeId: propSessionTypeId, hideMyBookings = false 
           // Fetch slots for the matched session type
           fetchUpdateSlots(dayjs(), sessionTypeId);
         } else {
-          setUpdateSlotError(`Session type "${booking.sessionName}" is no longer available for booking.`);
+          setUpdateSlotError(t('pages.booking.sessionTypeNotFound'));
         }
       } else {
-        setUpdateSlotError('Failed to load session types.');
+        setUpdateSlotError(t('pages.booking.failedToLoadSessionTypes'));
       }
     } catch (err) {
       console.error('Error fetching session types for update:', err);
-      setUpdateSlotError('Failed to load session types. Please try again.');
+        setUpdateSlotError(t('pages.booking.failedToLoadSessionTypesRetry'));
     }
   };
 
@@ -770,7 +774,7 @@ const BookingPage = ({ sessionTypeId: propSessionTypeId, hideMyBookings = false 
   // Handle booking update confirmation
   const handleConfirmUpdate = async () => {
     if (!bookingToUpdate || !bookingToUpdate.id || !updateSelectedSlot || !updateSelectedSlot.startTimeInstant) {
-      setUpdateBookingError('Please select a time slot');
+      setUpdateBookingError(t('pages.booking.selectTimeSlot'));
       return;
     }
 
@@ -807,7 +811,7 @@ const BookingPage = ({ sessionTypeId: propSessionTypeId, hideMyBookings = false 
       await fetchAvailableSlots(selectedDate); // Refresh available slots
     } catch (err) {
       console.error('Error updating booking:', err);
-      let errorMessage = 'Failed to update booking. Please try again.';
+      let errorMessage = t('pages.booking.failedToUpdateBooking');
       
       if (err.code === 'ECONNABORTED') {
         errorMessage = 'Request timed out. Please try again.';
@@ -877,7 +881,7 @@ const BookingPage = ({ sessionTypeId: propSessionTypeId, hideMyBookings = false 
       await fetchAvailableSlots(selectedDate); // Refresh available slots
     } catch (err) {
       console.error('Error cancelling booking:', err);
-      let errorMessage = 'Failed to cancel booking. Please try again.';
+      let errorMessage = t('pages.booking.failedToCancelBooking');
       
       if (err.code === 'ECONNABORTED') {
         errorMessage = 'Request timed out. Please try again.';
@@ -898,7 +902,7 @@ const BookingPage = ({ sessionTypeId: propSessionTypeId, hideMyBookings = false 
   // Handle booking confirmation
   const handleConfirmBooking = async () => {
     if (!selectedSlot || !selectedSlot.startTimeInstant) {
-      setBookingError('Invalid slot selected. Please try again.');
+      setBookingError(t('pages.booking.selectTimeSlot'));
       return;
     }
 
@@ -921,7 +925,7 @@ const BookingPage = ({ sessionTypeId: propSessionTypeId, hideMyBookings = false 
     // User is logged in, proceed with booking - verify token exists before API call
     const token = getToken();
     if (!token) {
-      setBookingError('You must be logged in to book a session.');
+      setBookingError(t('landing.booking.mustBeLoggedIn'));
       setLoginRequiredDialogOpen(true);
       return;
     }
@@ -947,7 +951,7 @@ const BookingPage = ({ sessionTypeId: propSessionTypeId, hideMyBookings = false 
       // Success - close dialog and refresh bookings and slots
       handleDialogClose();
       handleNewBookingDialogClose(); // Close new booking dialog (also clears cache)
-      setSuccessMessage('Booking created successfully!');
+      setSuccessMessage(t('pages.booking.bookingSuccess'));
       if (hasToken) {
         await fetchBookings(); // Refresh bookings list when user is logged in
       }
@@ -958,7 +962,7 @@ const BookingPage = ({ sessionTypeId: propSessionTypeId, hideMyBookings = false 
       await fetchAvailableSlots(selectedDate); // Refresh available slots
     } catch (err) {
       console.error('Error creating booking:', err);
-      let errorMessage = 'Failed to create booking. Please try again.';
+      let errorMessage = t('pages.booking.bookingFailed');
       
       if (err.code === 'ECONNABORTED') {
         errorMessage = 'Request timed out. Please try again.';
@@ -1012,7 +1016,7 @@ const BookingPage = ({ sessionTypeId: propSessionTypeId, hideMyBookings = false 
       if (response && response.status < 400) {
         // Success - remove pending booking and refresh
         sessionStorage.removeItem(PENDING_BOOKING_KEY);
-        setSuccessMessage('Booking created successfully!');
+        setSuccessMessage(t('pages.booking.bookingSuccess'));
         if (hasToken) {
           await fetchBookings();
         }
@@ -1073,30 +1077,43 @@ const BookingPage = ({ sessionTypeId: propSessionTypeId, hideMyBookings = false 
 
   // Format date for display
   const formatDateForDisplay = (date) => {
-    return dayjs(date).format('MMMM D, YYYY');
+    const locale = i18nInstance.language === 'ru' ? 'ru' : 'en-gb';
+    return dayjs(date).locale(locale).format('MMMM D, YYYY');
   };
 
   // Format instant for display (24-hour format) using user's timezone
   const formatInstant = (instantString) => {
     if (!instantString) return 'N/A';
     try {
+      const locale = i18nInstance.language === 'ru' ? 'ru' : 'en-gb';
       // Parse UTC time from API
       const utcTime = dayjs.utc(instantString);
       
       // Convert to user's timezone if available, otherwise use selected timezone for anonymous users
       let timezone = userTimezone || selectedTimezone || 'Europe/Moscow';
       
-      // Convert UTC to user's timezone
+      // Convert UTC to user's timezone and format with locale
       const localTime = utcTime.tz(timezone);
-      return localTime.format('MMMM D, YYYY HH:mm');
+      return localTime.locale(locale).format('MMMM D, YYYY, HH:mm');
     } catch {
       // Fallback: try without timezone conversion
       try {
-        return dayjs(instantString).format('MMMM D, YYYY HH:mm');
+        const locale = i18nInstance.language === 'ru' ? 'ru' : 'en-gb';
+        return dayjs(instantString).locale(locale).format('MMMM D, YYYY, HH:mm');
       } catch {
         return instantString;
       }
     }
+  };
+
+  // Get human-readable status label
+  const getStatusLabel = (status) => {
+    if (!status) return t('pages.booking.status.UNKNOWN');
+    const statusKey = status.toUpperCase();
+    const translationKey = `pages.booking.status.${statusKey}`;
+    const translated = t(translationKey);
+    // If translation key doesn't exist, return the status as-is
+    return translated !== translationKey ? translated : status;
   };
 
   // Get status color
@@ -1192,7 +1209,7 @@ const BookingPage = ({ sessionTypeId: propSessionTypeId, hideMyBookings = false 
           <>
             <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
               <Typography variant="h4" component="h1">
-                My Bookings
+                {t('pages.booking.myBookings')}
               </Typography>
               <Button
                 variant="contained"
@@ -1201,15 +1218,15 @@ const BookingPage = ({ sessionTypeId: propSessionTypeId, hideMyBookings = false 
                 sx={{ textTransform: 'none' }}
                 startIcon={<AddIcon />}
               >
-                New Booking
+                {t('pages.booking.newBooking')}
               </Button>
             </Box>
 
             {/* Tabs for Active Sessions and Past Sessions */}
             <Box sx={{ borderBottom: 1, borderColor: 'divider', mt: 2 }}>
               <Tabs value={activeTab} onChange={handleTabChange} aria-label="booking tabs">
-                <Tab label="Active Sessions" />
-                <Tab label="Past Sessions" />
+                <Tab label={t('pages.booking.activeSessions')} />
+                <Tab label={t('pages.booking.pastSessions')} />
               </Tabs>
             </Box>
 
@@ -1251,7 +1268,7 @@ const BookingPage = ({ sessionTypeId: propSessionTypeId, hideMyBookings = false 
                                 <Box>
                                   <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 0.5 }}>
                                     <Typography variant="h6" component="h2">
-                                      {booking.sessionName || 'Session'}
+                                      {booking.sessionName || t('pages.booking.session')}
                                     </Typography>
                                     {getBookingPriceDisplay(booking.sessionPrices) && (
                                       <Chip
@@ -1268,14 +1285,14 @@ const BookingPage = ({ sessionTypeId: propSessionTypeId, hideMyBookings = false 
                                 </Box>
                                 <Box sx={{ display: 'flex', gap: 1, alignItems: 'center' }}>
                                   <Chip
-                                    label={booking.status || 'UNKNOWN'}
+                                    label={getStatusLabel(booking.status)}
                                     color={getStatusColor(booking.status)}
                                     size="small"
                                   />
                                   {isPast && (
-                                    <Tooltip title="Status will be updated soon by administrator">
+                                    <Tooltip title={t('pages.booking.pastTooltip')}>
                                       <Chip
-                                        label="Past"
+                                        label={t('pages.booking.past')}
                                         size="small"
                                         sx={{ cursor: 'help', bgcolor: 'grey.300' }}
                                       />
@@ -1292,11 +1309,11 @@ const BookingPage = ({ sessionTypeId: propSessionTypeId, hideMyBookings = false 
                               </>
                             )}
                             <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 1 }}>
-                              Created: {formatInstant(booking.createdAt)}
+                              {t('pages.booking.created')} {formatInstant(booking.createdAt)}
                             </Typography>
                             <Box sx={{ display: 'flex', justifyContent: 'flex-end', gap: 1, mt: 2 }}>
                               {booking.status?.toUpperCase() === 'CONFIRMED' ? (
-                                <Tooltip title="Please contact me to cancel or change session time">
+                                <Tooltip title={t('pages.booking.cancelTooltip')}>
                                   <span>
                                     <Button
                                       variant="outlined"
@@ -1305,7 +1322,7 @@ const BookingPage = ({ sessionTypeId: propSessionTypeId, hideMyBookings = false 
                                       disabled={true}
                                       sx={{ textTransform: 'none' }}
                                     >
-                                      Cancel Booking
+                                      {t('pages.booking.cancelBooking')}
                                     </Button>
                                   </span>
                                 </Tooltip>
@@ -1320,7 +1337,7 @@ const BookingPage = ({ sessionTypeId: propSessionTypeId, hideMyBookings = false 
                                       disabled={updatingBooking || isPast}
                                       sx={{ textTransform: 'none' }}
                                     >
-                                      Update Session Date/Time
+                                      {t('pages.booking.updateSessionDateTime')}
                                     </Button>
                                   )}
                                   <Button
@@ -1331,7 +1348,7 @@ const BookingPage = ({ sessionTypeId: propSessionTypeId, hideMyBookings = false 
                                     disabled={cancelling || isPast}
                                     sx={{ textTransform: 'none' }}
                                   >
-                                    Cancel Booking
+                                    {t('pages.booking.cancelBooking')}
                                   </Button>
                                 </>
                               )}
@@ -1342,7 +1359,7 @@ const BookingPage = ({ sessionTypeId: propSessionTypeId, hideMyBookings = false 
                       })
                     ) : (
                       <Alert severity="info" sx={{ mt: 2 }}>
-                        No active bookings found.
+                        {t('pages.booking.noActiveBookings')}
                       </Alert>
                     )}
                   </Box>
@@ -1374,7 +1391,7 @@ const BookingPage = ({ sessionTypeId: propSessionTypeId, hideMyBookings = false 
                               <Box>
                                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 0.5 }}>
                                   <Typography variant="h6" component="h2">
-                                    {booking.sessionName || 'Session'}
+                                    {booking.sessionName || t('pages.booking.session')}
                                   </Typography>
                                   {getBookingPriceDisplay(booking.sessionPrices) && (
                                     <Chip
@@ -1390,7 +1407,7 @@ const BookingPage = ({ sessionTypeId: propSessionTypeId, hideMyBookings = false 
                                 </Typography>
                               </Box>
                               <Chip
-                                label={booking.status || 'UNKNOWN'}
+                                label={getStatusLabel(booking.status)}
                                 color={getStatusColor(booking.status)}
                                 size="small"
                               />
@@ -1404,14 +1421,14 @@ const BookingPage = ({ sessionTypeId: propSessionTypeId, hideMyBookings = false 
                               </>
                             )}
                             <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 1 }}>
-                              Created: {formatInstant(booking.createdAt)}
+                              {t('pages.booking.created')} {formatInstant(booking.createdAt)}
                             </Typography>
                           </CardContent>
                         </Card>
                       ))
                     ) : (
                       <Alert severity="info">
-                        No past bookings found.
+                        {t('pages.booking.noPastBookings')}
                       </Alert>
                     )}
                   </Box>
@@ -1453,11 +1470,11 @@ const BookingPage = ({ sessionTypeId: propSessionTypeId, hideMyBookings = false 
                   </Alert>
                 ) : sessionTypes.length > 0 ? (
                   <FormControl sx={{ minWidth: 300, width: '100%' }}>
-                    <InputLabel>Select Session Type</InputLabel>
+                    <InputLabel>{t('pages.booking.selectSessionType')}</InputLabel>
                     <Select
                       value={sessionTypeId || ''}
                       onChange={(e) => setSessionTypeId(e.target.value)}
-                      label="Select Session Type"
+                      label={t('pages.booking.selectSessionType')}
                     >
                       {sessionTypes.map((st) => (
                         <MenuItem key={st.id || st.sessionTypeId} value={st.id || st.sessionTypeId}>
@@ -1468,7 +1485,7 @@ const BookingPage = ({ sessionTypeId: propSessionTypeId, hideMyBookings = false 
                   </FormControl>
                 ) : (
                   <Alert severity="info">
-                    No session types available at this time.
+                    {t('pages.booking.noSessionTypesAvailable')}
                   </Alert>
                 )}
               </Box>
@@ -1501,7 +1518,7 @@ const BookingPage = ({ sessionTypeId: propSessionTypeId, hideMyBookings = false 
               {/* Right Column - Available Slots */}
               <Grid item xs={12} md={6}>
                 <Typography variant="h6" gutterBottom>
-                  Available Times on {formatDateForDisplay(selectedDate)}
+                      {t('pages.booking.availableTimes')} {formatDateForDisplay(selectedDate)}
                 </Typography>
 
                 {/* Timezone selector for anonymous users, info message for logged-in users */}
@@ -1582,9 +1599,9 @@ const BookingPage = ({ sessionTypeId: propSessionTypeId, hideMyBookings = false 
                       );
                     })}
                   </List>
-                ) : (
+                  ) : (
                   <Alert severity="info">
-                    No available sessions on this day. Please select another day.
+                    {t('pages.booking.noAvailableSessions')}
                   </Alert>
                 )}
               </Grid>
@@ -1598,7 +1615,7 @@ const BookingPage = ({ sessionTypeId: propSessionTypeId, hideMyBookings = false 
             maxWidth="md" 
             fullWidth
           >
-            <DialogTitle>Book a Session</DialogTitle>
+            <DialogTitle>{t('landing.booking.title')}</DialogTitle>
             <DialogContent>
               {/* Session Type Selection - only show if not provided as prop */}
               {!propSessionTypeId && (
@@ -1613,11 +1630,11 @@ const BookingPage = ({ sessionTypeId: propSessionTypeId, hideMyBookings = false 
                     </Alert>
                   ) : sessionTypes.length > 0 ? (
                     <FormControl sx={{ minWidth: 300, width: '100%' }}>
-                      <InputLabel>Select Session Type</InputLabel>
+                      <InputLabel>{t('pages.booking.selectSessionType')}</InputLabel>
                       <Select
                         value={sessionTypeId || ''}
                         onChange={(e) => setSessionTypeId(e.target.value)}
-                        label="Select Session Type"
+                        label={t('pages.booking.selectSessionType')}
                       >
                         {sessionTypes.map((st) => (
                           <MenuItem key={st.id || st.sessionTypeId} value={st.id || st.sessionTypeId}>
@@ -1628,7 +1645,7 @@ const BookingPage = ({ sessionTypeId: propSessionTypeId, hideMyBookings = false 
                     </FormControl>
                   ) : (
                     <Alert severity="info">
-                      No session types available at this time.
+                      {t('pages.booking.noSessionTypesAvailable')}
                     </Alert>
                   )}
                 </Box>
@@ -1661,7 +1678,7 @@ const BookingPage = ({ sessionTypeId: propSessionTypeId, hideMyBookings = false 
                 {/* Right Column - Available Slots */}
                 <Grid item xs={12} md={6}>
                   <Typography variant="h6" gutterBottom>
-                    Available Times on {formatDateForDisplay(selectedDate)}
+                      {t('pages.booking.availableTimes')} {formatDateForDisplay(selectedDate)}
                   </Typography>
 
                   {/* Timezone selector for anonymous users, info message for logged-in users */}
@@ -1744,7 +1761,7 @@ const BookingPage = ({ sessionTypeId: propSessionTypeId, hideMyBookings = false 
                     </List>
                   ) : (
                     <Alert severity="info">
-                      No available sessions on this day. Please select another day.
+                      {t('pages.booking.noAvailableSessions')}
                     </Alert>
                   )}
                 </Grid>
@@ -1764,12 +1781,12 @@ const BookingPage = ({ sessionTypeId: propSessionTypeId, hideMyBookings = false 
 
         {/* Booking Confirmation Dialog */}
         <Dialog open={openDialog} onClose={handleDialogClose} maxWidth="sm" fullWidth>
-          <DialogTitle>Confirm Booking</DialogTitle>
+          <DialogTitle>{t('pages.booking.confirmBookingTitle')}</DialogTitle>
           <DialogContent>
             <DialogContentText sx={{ mb: 2 }}>
               {dialogSlot && (
                 <>
-                  Confirm your booking for{' '}
+                  {t('pages.booking.confirmBookingMessage')}{' '}
                   <strong>
                     {dialogSlot.startTime 
                       ? formatTime(dialogSlot.startTime) 
@@ -1795,8 +1812,8 @@ const BookingPage = ({ sessionTypeId: propSessionTypeId, hideMyBookings = false 
               fullWidth
               multiline
               rows={4}
-              label="Message (Optional)"
-              placeholder="Add any additional notes or questions..."
+              label={t('pages.booking.messageOptional')}
+              placeholder={t('pages.booking.messagePlaceholder')}
               value={clientMessage}
               onChange={(e) => {
                 const value = e.target.value;
@@ -1808,8 +1825,8 @@ const BookingPage = ({ sessionTypeId: propSessionTypeId, hideMyBookings = false 
               error={clientMessage.length > 2000}
               helperText={
                 clientMessage.length > 2000
-                  ? 'Message must be 2000 characters or less'
-                  : `${clientMessage.length}/2000 characters`
+                  ? t('pages.booking.messageMaxLength')
+                  : `${clientMessage.length}/2000 ${t('common.characters')}`
               }
               sx={{ mt: 1 }}
             />
@@ -1820,7 +1837,7 @@ const BookingPage = ({ sessionTypeId: propSessionTypeId, hideMyBookings = false 
               color="inherit"
               disabled={submittingBooking}
             >
-              Cancel
+              {t('common.cancel')}
             </Button>
             <Button 
               onClick={handleConfirmBooking} 
@@ -1831,12 +1848,12 @@ const BookingPage = ({ sessionTypeId: propSessionTypeId, hideMyBookings = false 
               {submittingBooking ? (
                 <>
                   <CircularProgress size={16} sx={{ mr: 1 }} />
-                  Booking...
+                  {t('pages.booking.booking')}...
                 </>
               ) : hasToken ? (
-                'Confirm Booking'
+                t('pages.booking.confirmBooking')
               ) : (
-                'Log in and confirm'
+                t('pages.booking.logInAndConfirm')
               )}
             </Button>
           </DialogActions>
@@ -1844,15 +1861,15 @@ const BookingPage = ({ sessionTypeId: propSessionTypeId, hideMyBookings = false 
 
         {/* Login Required Dialog */}
         <Dialog open={loginRequiredDialogOpen} onClose={() => setLoginRequiredDialogOpen(false)}>
-          <DialogTitle>Login Required</DialogTitle>
+          <DialogTitle>{t('auth.loginRequired')}</DialogTitle>
           <DialogContent>
             <DialogContentText>
-              You need to be logged in to book a session. Please log in or sign up to continue.
+              {t('landing.booking.loginToBook')}
             </DialogContentText>
             {dialogSlot && (
               <Box sx={{ mt: 2, p: 2, bgcolor: 'action.hover', borderRadius: 1 }}>
                 <Typography variant="body2" color="text.secondary">
-                  Selected slot:
+                  {t('pages.booking.selectedSlot')}:
                 </Typography>
                 <Typography variant="body1" sx={{ mt: 0.5 }}>
                   {dialogSlot.startTime 
@@ -1862,7 +1879,7 @@ const BookingPage = ({ sessionTypeId: propSessionTypeId, hideMyBookings = false 
                   {' '}on {formatDateForDisplay(selectedDate)}
                 </Typography>
                 <Typography variant="caption" color="text.secondary" sx={{ mt: 1, display: 'block' }}>
-                  Your selection will be saved and the booking will be completed after you log in.
+                  {t('pages.booking.selectionSaved')}
                 </Typography>
               </Box>
             )}
@@ -1873,7 +1890,7 @@ const BookingPage = ({ sessionTypeId: propSessionTypeId, hideMyBookings = false 
               color="inherit"
               sx={{ textTransform: 'none' }}
             >
-              Cancel
+              {t('common.cancel')}
             </Button>
             <Button
               onClick={() => {
@@ -1900,16 +1917,16 @@ const BookingPage = ({ sessionTypeId: propSessionTypeId, hideMyBookings = false 
 
         {/* Cancel Booking Confirmation Dialog */}
         <Dialog open={cancelDialogOpen} onClose={handleCancelDialogClose}>
-          <DialogTitle>Cancel Booking</DialogTitle>
+          <DialogTitle>{t('pages.booking.cancelBookingTitle')}</DialogTitle>
           <DialogContent>
             <DialogContentText>
-              Are you sure you want to cancel this booking? This action cannot be undone.
+              {t('pages.booking.cancelBookingMessage')}
               {bookingToCancel && (
                 <>
                   <br />
                   <br />
                   <strong>
-                    {bookingToCancel.sessionName || 'Session'} on{' '}
+                    {bookingToCancel.sessionName || t('pages.booking.session')} {t('pages.booking.on')}{' '}
                     {formatInstant(bookingToCancel.startTimeInstant)}
                   </strong>
                 </>
@@ -1923,7 +1940,7 @@ const BookingPage = ({ sessionTypeId: propSessionTypeId, hideMyBookings = false 
               disabled={cancelling}
               sx={{ textTransform: 'none' }}
             >
-              Keep Booking
+              {t('pages.booking.keepBooking')}
             </Button>
             <Button
               onClick={handleConfirmCancel}
@@ -1935,10 +1952,10 @@ const BookingPage = ({ sessionTypeId: propSessionTypeId, hideMyBookings = false 
               {cancelling ? (
                 <>
                   <CircularProgress size={16} sx={{ mr: 1 }} />
-                  Cancelling...
+                  {t('pages.booking.cancelling')}
                 </>
               ) : (
-                'Cancel Booking'
+                t('pages.booking.cancelBooking')
               )}
             </Button>
           </DialogActions>
@@ -1946,12 +1963,12 @@ const BookingPage = ({ sessionTypeId: propSessionTypeId, hideMyBookings = false 
 
         {/* Update Booking Dialog */}
         <Dialog open={updateDialogOpen} onClose={handleUpdateDialogClose} maxWidth="md" fullWidth>
-          <DialogTitle>Update Session Date/Time</DialogTitle>
+          <DialogTitle>{t('pages.booking.updateSessionDateTimeTitle')}</DialogTitle>
           <DialogContent>
             {bookingToUpdate && (
               <>
                 <DialogContentText sx={{ mb: 2 }}>
-                  Select a new date and time for your <strong>{bookingToUpdate.sessionName || 'Session'}</strong> booking.
+                  {t('pages.booking.selectNewDateTime')} <strong>{bookingToUpdate.sessionName || t('pages.booking.session')}</strong> {t('pages.booking.booking')}.
                 </DialogContentText>
 
                 {updateBookingError && (
@@ -2043,7 +2060,7 @@ const BookingPage = ({ sessionTypeId: propSessionTypeId, hideMyBookings = false 
                       </List>
                     ) : (
                       <Alert severity="info">
-                        No available sessions on this day. Please select another day.
+                        {t('pages.booking.noAvailableSessions')}
                       </Alert>
                     )}
                   </Grid>
@@ -2066,8 +2083,8 @@ const BookingPage = ({ sessionTypeId: propSessionTypeId, hideMyBookings = false 
                   error={updateClientMessage.length > 2000}
                   helperText={
                     updateClientMessage.length > 2000
-                      ? 'Message must be 2000 characters or less'
-                      : `${updateClientMessage.length}/2000 characters`
+                      ? t('pages.booking.messageMaxLength')
+                      : `${updateClientMessage.length}/2000 ${t('common.characters')}`
                   }
                   sx={{ mt: 3 }}
                 />
@@ -2081,7 +2098,7 @@ const BookingPage = ({ sessionTypeId: propSessionTypeId, hideMyBookings = false 
               disabled={updatingBooking}
               sx={{ textTransform: 'none' }}
             >
-              Cancel
+              {t('common.cancel')}
             </Button>
             <Button 
               onClick={handleConfirmUpdate} 

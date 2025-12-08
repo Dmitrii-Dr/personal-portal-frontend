@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useParams } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import apiClient, { getToken } from '../utils/api';
 import ArticleContent from '../components/ArticleContent';
 import {
@@ -16,6 +17,7 @@ import IconButton from '@mui/material/IconButton';
 import { useNavigate } from 'react-router-dom';
 
 const ArticlePage = () => {
+  const { t } = useTranslation();
   const { articleId } = useParams();
   const navigate = useNavigate();
   const [article, setArticle] = useState(null);
@@ -181,7 +183,7 @@ const ArticlePage = () => {
           <IconButton onClick={() => navigate('/blog')} sx={{ mr: 1 }}>
             <ArrowBackIcon />
           </IconButton>
-          <Typography variant="h5">Back to Blog</Typography>
+          <Typography variant="h5">{t('pages.article.backToBlog')}</Typography>
         </Box>
         <Alert severity="error" sx={{ mt: 2 }}>
           {error}
@@ -197,7 +199,7 @@ const ArticlePage = () => {
           <IconButton onClick={() => navigate('/blog')} sx={{ mr: 1 }}>
             <ArrowBackIcon />
           </IconButton>
-          <Typography variant="h5">Back to Blog</Typography>
+          <Typography variant="h5">{t('pages.article.backToBlog')}</Typography>
         </Box>
         <Alert severity="info" sx={{ mt: 2 }}>
           Article not found.
@@ -213,13 +215,13 @@ const ArticlePage = () => {
           <ArrowBackIcon />
         </IconButton>
         <Typography variant="h6" color="text.secondary">
-          Back to Blog
+          {t('pages.article.backToBlog')}
         </Typography>
       </Box>
 
       <Box sx={{ maxWidth: 800, mx: 'auto' }}>
         <Typography variant="h3" component="h1" gutterBottom sx={{ fontWeight: 600, mb: 2 }}>
-          {article.title || 'Untitled'}
+          {article.title || t('pages.blog.untitled')}
         </Typography>
 
         {(article.publishedAt || (article.tags && article.tags.length > 0)) && (

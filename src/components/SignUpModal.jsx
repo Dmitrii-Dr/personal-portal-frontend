@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { setToken } from '../utils/api';
 import {
   Dialog,
@@ -15,6 +16,7 @@ import {
 } from '@mui/material';
 
 const SignUpModal = ({ open, onClose, onSwitchToLogin }) => {
+  const { t } = useTranslation();
   const navigate = useNavigate();
   const [formData, setFormData] = useState({
     email: '',
@@ -66,36 +68,36 @@ const SignUpModal = ({ open, onClose, onSwitchToLogin }) => {
     let isValid = true;
 
     if (!formData.email.trim()) {
-      newErrors.email = 'Email is required';
+      newErrors.email = t('auth.emailRequired');
       isValid = false;
     } else if (!validateEmail(formData.email)) {
-      newErrors.email = 'Email must be valid';
+      newErrors.email = t('auth.emailInvalid');
       isValid = false;
     }
 
     if (!formData.password.trim()) {
-      newErrors.password = 'Password is required';
+      newErrors.password = t('auth.passwordRequired');
       isValid = false;
     } else if (formData.password.length < 6) {
-      newErrors.password = 'Password must be at least 6 characters';
+      newErrors.password = t('auth.passwordMinLength');
       isValid = false;
     }
 
     if (!formData.confirmPassword.trim()) {
-      newErrors.confirmPassword = 'Please confirm your password';
+      newErrors.confirmPassword = t('auth.confirmPasswordRequired');
       isValid = false;
     } else if (formData.password !== formData.confirmPassword) {
-      newErrors.confirmPassword = 'Passwords do not match';
+      newErrors.confirmPassword = t('auth.passwordsDoNotMatch');
       isValid = false;
     }
 
     if (formData.firstName && formData.firstName.length > 100) {
-      newErrors.firstName = 'First name must be at most 100 characters';
+      newErrors.firstName = t('auth.firstNameMaxLength');
       isValid = false;
     }
 
     if (formData.lastName && formData.lastName.length > 100) {
-      newErrors.lastName = 'Last name must be at most 100 characters';
+      newErrors.lastName = t('auth.lastNameMaxLength');
       isValid = false;
     }
 
@@ -195,7 +197,7 @@ const SignUpModal = ({ open, onClose, onSwitchToLogin }) => {
       }, 2000);
     } catch (error) {
       console.error('Error signing up:', error);
-      setSubmitError(error.message || 'Failed to create account. Please try again.');
+      setSubmitError(error.message || t('auth.signUpFailed'));
     } finally {
       setLoading(false);
     }
@@ -225,15 +227,15 @@ const SignUpModal = ({ open, onClose, onSwitchToLogin }) => {
 
   return (
     <Dialog open={open} onClose={handleClose} maxWidth="sm" fullWidth>
-      <DialogTitle>Sign Up</DialogTitle>
+      <DialogTitle>{t('auth.signUpTitle')}</DialogTitle>
       <DialogContent>
         <DialogContentText sx={{ mb: 2 }}>
-          Create a new account to get started
+          {t('auth.signUpDescription')}
         </DialogContentText>
 
         {success && (
           <Alert severity="success" sx={{ mb: 2 }}>
-            Account created successfully!
+            {t('auth.accountCreatedSuccess')}
           </Alert>
         )}
 
@@ -248,7 +250,7 @@ const SignUpModal = ({ open, onClose, onSwitchToLogin }) => {
             fullWidth
             id="email"
             name="email"
-            label="Email"
+            label={t('auth.email')}
             type="email"
             value={formData.email}
             onChange={handleChange}
@@ -264,7 +266,7 @@ const SignUpModal = ({ open, onClose, onSwitchToLogin }) => {
             fullWidth
             id="password"
             name="password"
-            label="Password"
+            label={t('auth.password')}
             type="password"
             value={formData.password}
             onChange={handleChange}
@@ -280,7 +282,7 @@ const SignUpModal = ({ open, onClose, onSwitchToLogin }) => {
             fullWidth
             id="confirmPassword"
             name="confirmPassword"
-            label="Confirm Password"
+            label={t('auth.confirmPassword')}
             type="password"
             value={formData.confirmPassword}
             onChange={handleChange}
@@ -296,12 +298,12 @@ const SignUpModal = ({ open, onClose, onSwitchToLogin }) => {
             fullWidth
             id="firstName"
             name="firstName"
-            label="First Name"
+            label={t('auth.firstName')}
             type="text"
             value={formData.firstName}
             onChange={handleChange}
             error={!!errors.firstName}
-            helperText={errors.firstName || 'Optional'}
+            helperText={errors.firstName || t('common.optional')}
             margin="normal"
             autoComplete="given-name"
             disabled={loading || success}
@@ -312,12 +314,12 @@ const SignUpModal = ({ open, onClose, onSwitchToLogin }) => {
             fullWidth
             id="lastName"
             name="lastName"
-            label="Last Name"
+            label={t('auth.lastName')}
             type="text"
             value={formData.lastName}
             onChange={handleChange}
             error={!!errors.lastName}
-            helperText={errors.lastName || 'Optional'}
+            helperText={errors.lastName || t('common.optional')}
             margin="normal"
             autoComplete="family-name"
             disabled={loading || success}
@@ -335,16 +337,16 @@ const SignUpModal = ({ open, onClose, onSwitchToLogin }) => {
             {loading ? (
               <>
                 <CircularProgress size={20} sx={{ mr: 1 }} />
-                Creating Account...
+                {t('auth.creatingAccount')}
               </>
             ) : (
-              'Sign Up'
+              t('auth.signUp')
             )}
           </Button>
 
           <Box sx={{ textAlign: 'center' }}>
             <DialogContentText variant="body2">
-              Already have an account?{' '}
+              {t('auth.alreadyHaveAccount')}{' '}
               <MuiLink
                 component="button"
                 type="button"
@@ -356,7 +358,7 @@ const SignUpModal = ({ open, onClose, onSwitchToLogin }) => {
                 }}
                 sx={{ textDecoration: 'none', cursor: 'pointer' }}
               >
-                Sign in
+                {t('auth.signIn')}
               </MuiLink>
             </DialogContentText>
           </Box>

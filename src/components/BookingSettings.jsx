@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { useTranslation } from 'react-i18next';
 import { fetchWithAuth } from '../utils/api';
 import {
   Box,
@@ -80,6 +81,7 @@ const getUniqueTimezoneOffsets = () => {
 };
 
 const BookingSettings = () => {
+  const { t } = useTranslation();
   const [settings, setSettings] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -107,7 +109,7 @@ const BookingSettings = () => {
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({}));
         throw new Error(
-          errorData.message || `Failed to load booking settings: ${response.status} ${response.statusText}`
+          errorData.message || t('admin.sessionConfiguration.bookingSettings.failedToLoad')
         );
       }
 
@@ -122,7 +124,7 @@ const BookingSettings = () => {
       });
     } catch (err) {
       console.error('Error fetching booking settings:', err);
-      setError(err.message || 'Failed to load booking settings. Please try again.');
+      setError(err.message || t('admin.sessionConfiguration.bookingSettings.failedToLoad'));
     } finally {
       setLoading(false);
     }
@@ -139,15 +141,20 @@ const BookingSettings = () => {
 
   // Format minutes to readable format (hours and minutes)
   const formatMinutes = (minutes) => {
-    if (minutes === 0) return '0 minutes';
-    if (minutes < 60) return `${minutes} minute${minutes !== 1 ? 's' : ''}`;
+    if (minutes === 0) return `0 ${t('admin.sessionConfiguration.bookingSettings.minutes')}`;
+    if (minutes < 60) {
+      const minuteKey = minutes === 1 ? 'minute' : 'minutes';
+      return `${minutes} ${t(`admin.sessionConfiguration.bookingSettings.${minuteKey}`)}`;
+    }
     
     const hours = Math.floor(minutes / 60);
     const remainingMinutes = minutes % 60;
     
-    let result = `${hours} hour${hours !== 1 ? 's' : ''}`;
+    const hourKey = hours === 1 ? 'hour' : 'hours';
+    let result = `${hours} ${t(`admin.sessionConfiguration.bookingSettings.${hourKey}`)}`;
     if (remainingMinutes > 0) {
-      result += ` ${remainingMinutes} minute${remainingMinutes !== 1 ? 's' : ''}`;
+      const minuteKey = remainingMinutes === 1 ? 'minute' : 'minutes';
+      result += ` ${remainingMinutes} ${t(`admin.sessionConfiguration.bookingSettings.${minuteKey}`)}`;
     }
     return result;
   };
@@ -181,23 +188,23 @@ const BookingSettings = () => {
     const errors = {};
 
     if (formData.bookingSlotsInterval < 0) {
-      errors.bookingSlotsInterval = 'Must be greater than or equal to 0';
+      errors.bookingSlotsInterval = t('admin.sessionConfiguration.bookingSettings.mustBeGreaterThanOrEqual');
     }
 
     if (formData.bookingFirstSlotInterval < 10) {
-      errors.bookingFirstSlotInterval = 'Must be greater than or equal to 10 minutes';
+      errors.bookingFirstSlotInterval = t('admin.sessionConfiguration.bookingSettings.mustBeGreaterThanOrEqual10');
     }
 
     if (formData.bookingCancelationInterval < 0) {
-      errors.bookingCancelationInterval = 'Must be greater than or equal to 0';
+      errors.bookingCancelationInterval = t('admin.sessionConfiguration.bookingSettings.mustBeGreaterThanOrEqual');
     }
 
     if (formData.bookingUpdatingInterval < 0) {
-      errors.bookingUpdatingInterval = 'Must be greater than or equal to 0';
+      errors.bookingUpdatingInterval = t('admin.sessionConfiguration.bookingSettings.mustBeGreaterThanOrEqual');
     }
 
     if (!formData.defaultTimezone || formData.defaultTimezone.trim() === '') {
-      errors.defaultTimezone = 'Timezone is required';
+      errors.defaultTimezone = t('admin.sessionConfiguration.bookingSettings.timezoneRequired');
     }
 
     setFormErrors(errors);
@@ -231,18 +238,18 @@ const BookingSettings = () => {
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({}));
         throw new Error(
-          errorData.message || `Failed to update booking settings: ${response.status} ${response.statusText}`
+          errorData.message || t('admin.sessionConfiguration.bookingSettings.failedToUpdate')
         );
       }
 
       const updatedData = await response.json();
       setSettings(updatedData);
       setIsEditing(false);
-      setSuccessMessage('Booking settings updated successfully');
+      setSuccessMessage(t('admin.sessionConfiguration.bookingSettings.updatedSuccessfully'));
       fetchSettings(); // Refresh to get latest data
     } catch (err) {
       console.error('Error updating booking settings:', err);
-      setSaveError(err.message || 'Failed to update booking settings. Please try again.');
+      setSaveError(err.message || t('admin.sessionConfiguration.bookingSettings.failedToUpdate'));
     } finally {
       setSaving(false);
     }
@@ -282,7 +289,7 @@ const BookingSettings = () => {
   return (
     <Box>
       <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
-        <Typography variant="h6">Booking Settings</Typography>
+        <Typography variant="h6">{t('admin.sessionConfiguration.bookingSettings.title')}</Typography>
         {!isEditing && (
           <Button
             variant="outlined"
@@ -290,7 +297,7 @@ const BookingSettings = () => {
             onClick={handleEdit}
             sx={{ textTransform: 'none' }}
           >
-            Edit
+            {t('admin.sessionConfiguration.bookingSettings.edit')}
           </Button>
         )}
       </Box>
@@ -308,8 +315,8 @@ const BookingSettings = () => {
       )}
 
       {timezoneChanged && isEditing && (
-        <Alert severity="warning" sx={{ mb: 2 }}>
-          Changing timezone requires all active availability rules to be archived first.
+          <Alert severity="warning" sx={{ mb: 2 }}>
+          {t('admin.sessionConfiguration.bookingSettings.timezoneChangedWarning')}
         </Alert>
       )}
 
@@ -318,7 +325,7 @@ const BookingSettings = () => {
         <Grid container spacing={2}>
           <Grid item xs={12} md={6}>
             <Typography variant="body2" color="text.secondary">
-              Booking Slots Interval
+              {t('admin.sessionConfiguration.bookingSettings.bookingSlotsInterval')}
             </Typography>
             <Typography variant="body1" gutterBottom>
               {settings ? formatMinutes(settings.bookingSlotsInterval) : 'N/A'}
@@ -326,7 +333,7 @@ const BookingSettings = () => {
           </Grid>
           <Grid item xs={12} md={6}>
             <Typography variant="body2" color="text.secondary">
-              Booking First Slot Interval
+              {t('admin.sessionConfiguration.bookingSettings.bookingFirstSlotInterval')}
             </Typography>
             <Typography variant="body1" gutterBottom>
               {settings ? formatMinutes(settings.bookingFirstSlotInterval) : 'N/A'}
@@ -334,7 +341,7 @@ const BookingSettings = () => {
           </Grid>
           <Grid item xs={12} md={6}>
             <Typography variant="body2" color="text.secondary">
-              Booking Cancellation Interval
+              {t('admin.sessionConfiguration.bookingSettings.bookingCancellationInterval')}
             </Typography>
             <Typography variant="body1" gutterBottom>
               {settings ? formatMinutes(settings.bookingCancelationInterval) : 'N/A'}
@@ -342,7 +349,7 @@ const BookingSettings = () => {
           </Grid>
           <Grid item xs={12} md={6}>
             <Typography variant="body2" color="text.secondary">
-              Booking Updating Interval
+              {t('admin.sessionConfiguration.bookingSettings.bookingUpdatingInterval')}
             </Typography>
             <Typography variant="body1" gutterBottom>
               {settings ? formatMinutes(settings.bookingUpdatingInterval) : 'N/A'}
@@ -350,7 +357,7 @@ const BookingSettings = () => {
           </Grid>
           <Grid item xs={12} md={6}>
             <Typography variant="body2" color="text.secondary">
-              Default Timezone
+              {t('admin.sessionConfiguration.bookingSettings.defaultTimezone')}
             </Typography>
             <Typography variant="body1" gutterBottom>
               {settings?.defaultTimezone && settings?.defaultUtcOffset
@@ -365,14 +372,14 @@ const BookingSettings = () => {
           <Grid item xs={12} md={6}>
             <TextField
               fullWidth
-              label="Booking Slots Interval (minutes)"
+              label={t('admin.sessionConfiguration.bookingSettings.bookingSlotsIntervalLabel')}
               type="number"
               value={formData.bookingSlotsInterval}
               onChange={handleChange('bookingSlotsInterval')}
               error={!!formErrors.bookingSlotsInterval}
               helperText={
                 formErrors.bookingSlotsInterval ||
-                'Interval between available booking slots (e.g., 30 = slots every 30 minutes)'
+                t('admin.sessionConfiguration.bookingSettings.bookingSlotsIntervalHelper')
               }
               inputProps={{ min: 0 }}
               required
@@ -381,14 +388,14 @@ const BookingSettings = () => {
           <Grid item xs={12} md={6}>
             <TextField
               fullWidth
-              label="Booking First Slot Interval (minutes)"
+              label={t('admin.sessionConfiguration.bookingSettings.bookingFirstSlotIntervalLabel')}
               type="number"
               value={formData.bookingFirstSlotInterval}
               onChange={handleChange('bookingFirstSlotInterval')}
               error={!!formErrors.bookingFirstSlotInterval}
               helperText={
                 formErrors.bookingFirstSlotInterval ||
-                'Minimum time from now until the first bookable slot (minimum: 10 minutes)'
+                t('admin.sessionConfiguration.bookingSettings.bookingFirstSlotIntervalHelper')
               }
               inputProps={{ min: 10 }}
               required
@@ -397,14 +404,14 @@ const BookingSettings = () => {
           <Grid item xs={12} md={6}>
             <TextField
               fullWidth
-              label="Booking Cancellation Interval (minutes)"
+              label={t('admin.sessionConfiguration.bookingSettings.bookingCancellationIntervalLabel')}
               type="number"
               value={formData.bookingCancelationInterval}
               onChange={handleChange('bookingCancelationInterval')}
               error={!!formErrors.bookingCancelationInterval}
               helperText={
                 formErrors.bookingCancelationInterval ||
-                'Minimum time before booking start time when cancellation is allowed'
+                t('admin.sessionConfiguration.bookingSettings.bookingCancellationIntervalHelper')
               }
               inputProps={{ min: 0 }}
               required
@@ -413,14 +420,14 @@ const BookingSettings = () => {
           <Grid item xs={12} md={6}>
             <TextField
               fullWidth
-              label="Booking Updating Interval (minutes)"
+              label={t('admin.sessionConfiguration.bookingSettings.bookingUpdatingIntervalLabel')}
               type="number"
               value={formData.bookingUpdatingInterval}
               onChange={handleChange('bookingUpdatingInterval')}
               error={!!formErrors.bookingUpdatingInterval}
               helperText={
                 formErrors.bookingUpdatingInterval ||
-                'Minimum time before booking start time when updates are allowed'
+                t('admin.sessionConfiguration.bookingSettings.bookingUpdatingIntervalHelper')
               }
               inputProps={{ min: 0 }}
               required
@@ -428,11 +435,11 @@ const BookingSettings = () => {
           </Grid>
           <Grid item xs={12} md={6}>
             <FormControl fullWidth required error={!!formErrors.defaultTimezone}>
-              <InputLabel>Default Timezone</InputLabel>
+              <InputLabel>{t('admin.sessionConfiguration.bookingSettings.defaultTimezone')}</InputLabel>
               <Select
                 value={formData.defaultTimezone}
                 onChange={handleChange('defaultTimezone')}
-                label="Default Timezone"
+                label={t('admin.sessionConfiguration.bookingSettings.defaultTimezone')}
               >
                 {getUniqueTimezoneOffsets().map((tz) => (
                   <MenuItem key={tz.value} value={tz.value}>
@@ -446,7 +453,7 @@ const BookingSettings = () => {
                 </Typography>
               )}
               <Typography variant="caption" color="text.secondary" sx={{ mt: 0.5, display: 'block' }}>
-                Default timezone for availability rules (IANA timezone identifier). UTC offset is calculated automatically.
+                {t('admin.sessionConfiguration.bookingSettings.defaultTimezoneHelper')}
               </Typography>
             </FormControl>
           </Grid>
@@ -459,7 +466,7 @@ const BookingSettings = () => {
                 disabled={saving}
                 sx={{ textTransform: 'none' }}
               >
-                Cancel
+                {t('admin.sessionConfiguration.bookingSettings.cancel')}
               </Button>
               <Button
                 variant="contained"
@@ -468,7 +475,7 @@ const BookingSettings = () => {
                 disabled={saving}
                 sx={{ textTransform: 'none' }}
               >
-                {saving ? 'Saving...' : 'Save'}
+                {saving ? t('admin.sessionConfiguration.bookingSettings.saving') : t('admin.sessionConfiguration.bookingSettings.save')}
               </Button>
             </Box>
           </Grid>

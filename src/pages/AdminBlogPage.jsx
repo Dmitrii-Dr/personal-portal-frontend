@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import apiClient, { fetchWithAuth } from '../utils/api';
 import CreateTagForm from '../components/CreateTagForm';
 import ArticleContent from '../components/ArticleContent';
@@ -53,6 +54,20 @@ import PhotoLibraryIcon from '@mui/icons-material/PhotoLibrary';
 import { loadThumbnailWithCache } from '../utils/imageCache';
 
 const AdminBlogPage = () => {
+  const { t } = useTranslation();
+  
+  // Helper function to translate article status
+  const getStatusLabel = (status) => {
+    if (!status) return t('admin.blog.statusDraft');
+    const statusMap = {
+      'DRAFT': t('admin.blog.statusDraft'),
+      'PUBLISHED': t('admin.blog.statusPublished'),
+      'PRIVATE': t('admin.blog.statusPrivate'),
+      'ARCHIVED': t('admin.blog.statusArchived'),
+    };
+    return statusMap[status] || status;
+  };
+  
   const [articles, setArticles] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -153,16 +168,16 @@ const AdminBlogPage = () => {
         
         console.error('Error fetching articles:', err);
         if (isMounted) {
-          let errorMessage = 'Failed to load articles. Please try again later.';
+          let errorMessage = t('admin.blog.failedToLoadArticles');
           
           if (err.code === 'ECONNABORTED') {
-            errorMessage = 'Request timed out. Please try again.';
+            errorMessage = t('admin.blog.requestTimeout');
           } else if (err.response) {
             // Server responded with error status
             errorMessage = err.response.data?.message || `Server error: ${err.response.status}`;
           } else if (err.request) {
             // Request was made but no response received (likely 404 or network error)
-            errorMessage = 'Unable to reach the server. The API endpoint may not be available.';
+            errorMessage = t('admin.blog.unableToReachServer');
           } else {
             // Something else happened
             errorMessage = err.message || errorMessage;
@@ -534,19 +549,19 @@ const AdminBlogPage = () => {
 
   const validateCreateForm = () => {
     if (!createArticleData.title.trim()) {
-      setCreateError('Title is required');
+      setCreateError(t('admin.blog.titleRequired'));
       return false;
     }
     if (!createArticleData.slug.trim()) {
-      setCreateError('Slug is required');
+      setCreateError(t('admin.blog.slugRequired'));
       return false;
     }
     if (!createArticleData.content.trim()) {
-      setCreateError('Content is required');
+      setCreateError(t('admin.blog.contentRequired'));
       return false;
     }
     if (!createArticleData.status) {
-      setCreateError('Status is required');
+      setCreateError(t('admin.blog.statusRequired'));
       return false;
     }
     return true;
@@ -730,7 +745,7 @@ const AdminBlogPage = () => {
     // Validate file type
     const validImageTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/webp'];
     if (!validImageTypes.includes(file.type)) {
-      setCreateError('Please select a valid image file (JPEG, PNG, GIF, or WebP)');
+      setCreateError(t('admin.blog.failedToUploadImage'));
       return;
     }
 
@@ -988,14 +1003,14 @@ const AdminBlogPage = () => {
       setLoading(false);
     } catch (err) {
       console.error('Error fetching articles:', err);
-      let errorMessage = 'Failed to load articles. Please try again later.';
+      let errorMessage = t('admin.blog.failedToLoadArticles');
       
       if (err.code === 'ECONNABORTED') {
-        errorMessage = 'Request timed out. Please try again.';
+        errorMessage = t('admin.blog.requestTimeout');
       } else if (err.response) {
         errorMessage = err.response.data?.message || `Server error: ${err.response.status}`;
       } else if (err.request) {
-        errorMessage = 'Unable to reach the server. The API endpoint may not be available.';
+        errorMessage = t('admin.blog.unableToReachServer');
       } else {
         errorMessage = err.message || errorMessage;
       }
@@ -1034,7 +1049,7 @@ const AdminBlogPage = () => {
     <Box>
       <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <Typography variant="h4" component="h1" gutterBottom>
-          Admin Blog
+          {t('admin.blog.adminBlog')}
         </Typography>
         <Box sx={{ display: 'flex', gap: 2, mb: 2 }}>
           <Button
@@ -1043,7 +1058,7 @@ const AdminBlogPage = () => {
             onClick={handleAddPostOpen}
             sx={{ textTransform: 'none' }}
           >
-            Add Post
+            {t('admin.blog.addPost')}
           </Button>
         </Box>
       </Box>
@@ -1085,7 +1100,7 @@ const AdminBlogPage = () => {
                 }}
               >
                 <Typography variant="h6" component="h2" sx={{ flexGrow: 1 }}>
-                  {article.title || 'Untitled'}
+                  {article.title || t('pages.article.untitled')}
                 </Typography>
                 {/* Status with colored dot */}
                 <Box sx={{ display: 'flex', alignItems: 'center', mr: 1 }}>
@@ -1103,7 +1118,7 @@ const AdminBlogPage = () => {
                     }}
                   />
                   <Typography variant="caption" color="text.secondary">
-                    {article.status || 'DRAFT'}
+                    {getStatusLabel(article.status)}
                   </Typography>
                 </Box>
                 <IconButton
@@ -1111,6 +1126,7 @@ const AdminBlogPage = () => {
                   onClick={(e) => handleEditClick(e, article)}
                   sx={{ mr: 1 }}
                   color="primary"
+                  title={t('common.edit')}
                 >
                   <EditIcon fontSize="small" />
                 </IconButton>
@@ -1128,7 +1144,7 @@ const AdminBlogPage = () => {
                     color="text.secondary"
                     sx={{ ml: 2, mr: 1 }}
                   >
-                    {formatDate(article.publishedAt)}
+                    {t('admin.blog.dateOfPublication')}: {formatDate(article.publishedAt)}
                   </Typography>
                 )}
               </AccordionSummary>
@@ -1149,7 +1165,7 @@ const AdminBlogPage = () => {
                   )}
                   {!article.content && (
                     <Typography variant="body2" color="text.secondary">
-                      No content available.
+                      {t('admin.blog.noContentAvailable')}
                     </Typography>
                   )}
                 </Box>
@@ -1159,13 +1175,13 @@ const AdminBlogPage = () => {
         </Box>
       ) : (
         <Alert severity="info" sx={{ mt: 2 }}>
-          No articles available at the moment.
+          {t('admin.blog.noArticlesAvailable')}
         </Alert>
       )}
 
       {/* Edit Article Dialog */}
       <Dialog open={editDialogOpen} onClose={handleEditClose} maxWidth="md" fullWidth>
-        <DialogTitle>Edit Article</DialogTitle>
+        <DialogTitle>{t('admin.blog.editArticle')}</DialogTitle>
         <DialogContent>
           {submitError && (
             <Alert severity="error" sx={{ mb: 2 }}>
@@ -1177,7 +1193,7 @@ const AdminBlogPage = () => {
               <TextField
                 autoFocus
                 fullWidth
-                label="Title *"
+                label={t('admin.blog.titleLabel')}
                 variant="outlined"
                 value={articleData.title}
                 onChange={handleFieldChange('title')}
@@ -1188,13 +1204,13 @@ const AdminBlogPage = () => {
             <Grid item xs={12}>
               <TextField
                 fullWidth
-                label="Slug *"
+                label={t('admin.blog.slugLabel')}
                 variant="outlined"
                 value={articleData.slug}
                 onChange={handleFieldChange('slug')}
                 required
                 disabled={submitting}
-                helperText="URL-friendly identifier (e.g., my-article-title)"
+                helperText={t('admin.blog.slugHelper')}
               />
             </Grid>
             <Grid item xs={12}>
@@ -1210,7 +1226,7 @@ const AdminBlogPage = () => {
                 imageUrls={imageUrls}
                 loadImageUrls={handleEditImageUrlsUpdate}
                 disabled={submitting}
-                placeholder="Enter content... You can use HTML tags. Images will appear in preview."
+                placeholder={t('admin.blog.contentPlaceholder')}
               />
             </Grid>
             <Grid item xs={12}>
@@ -1231,7 +1247,7 @@ const AdminBlogPage = () => {
                     disabled={submitting || uploadingImage}
                     sx={{ textTransform: 'none' }}
                   >
-                    {uploadingImage ? 'Uploading...' : 'Upload Image'}
+                    {uploadingImage ? t('admin.blog.uploadingImage') : t('admin.blog.uploadImage')}
                   </Button>
                 </label>
                 <Button
@@ -1241,7 +1257,7 @@ const AdminBlogPage = () => {
                   disabled={submitting || uploadingImage}
                   sx={{ textTransform: 'none' }}
                 >
-                  Select from Gallery
+                  {t('admin.blog.selectFromGallery')}
                 </Button>
                 {uploadingImage && (
                   <CircularProgress size={20} />
@@ -1255,7 +1271,7 @@ const AdminBlogPage = () => {
                 return (
                   <Box sx={{ mt: 2 }}>
                     <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
-                      Uploaded Images:
+                      {t('admin.blog.uploadedImages')}
                     </Typography>
                     <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 2 }}>
                       {mediaIdsInContent.map((mediaId) => {
@@ -1323,7 +1339,7 @@ const AdminBlogPage = () => {
                               },
                               transition: 'opacity 0.2s',
                             }}
-                            aria-label="Delete image"
+                            aria-label={t('admin.blog.deleteImage')}
                           >
                             <CloseIcon fontSize="small" />
                           </IconButton>
@@ -1345,7 +1361,7 @@ const AdminBlogPage = () => {
                               },
                               transition: 'opacity 0.2s',
                             }}
-                            aria-label="Adjust image size"
+                            aria-label={t('admin.blog.adjustImageSize')}
                           >
                             <SettingsIcon fontSize="small" />
                           </IconButton>
@@ -1360,47 +1376,47 @@ const AdminBlogPage = () => {
             <Grid item xs={12}>
               <TextField
                 fullWidth
-                label="Excerpt"
+                label={t('admin.blog.excerpt')}
                 variant="outlined"
                 multiline
                 rows={3}
                 value={articleData.excerpt}
                 onChange={handleFieldChange('excerpt')}
                 disabled={submitting}
-                helperText="Optional short summary. Leave empty to remove."
+                helperText={t('admin.blog.excerptHelper')}
               />
             </Grid>
             <Grid item xs={12}>
               <FormControl fullWidth required>
-                <InputLabel>Status *</InputLabel>
+                <InputLabel>{t('admin.blog.statusLabel')}</InputLabel>
                 <Select
                   value={articleData.status}
                   onChange={handleFieldChange('status')}
-                  label="Status *"
+                  label={t('admin.blog.statusLabel')}
                   disabled={submitting}
                 >
-                  <MenuItem value="DRAFT">Draft</MenuItem>
-                  <MenuItem value="PUBLISHED">Published</MenuItem>
-                  <MenuItem value="PRIVATE">Private</MenuItem>
-                  <MenuItem value="ARCHIVED">Archived</MenuItem>
+                  <MenuItem value="DRAFT">{t('admin.blog.statusDraft')}</MenuItem>
+                  <MenuItem value="PUBLISHED">{t('admin.blog.statusPublished')}</MenuItem>
+                  <MenuItem value="PRIVATE">{t('admin.blog.statusPrivate')}</MenuItem>
+                  <MenuItem value="ARCHIVED">{t('admin.blog.statusArchived')}</MenuItem>
                 </Select>
               </FormControl>
             </Grid>
             {articleData.status === 'PUBLISHED' && selectedUserIds.length > 0 && (
               <Grid item xs={12}>
                 <Alert severity="warning">
-                  Selected users will be erased when submitting a published article.
+                  {t('admin.blog.usersWarning')}
                 </Alert>
               </Grid>
             )}
             <Grid item xs={12}>
               <FormControl fullWidth>
-                <InputLabel>Users (visible to)</InputLabel>
+                <InputLabel>{t('admin.blog.usersLabel')}</InputLabel>
                 <Select
                   multiple
                   value={selectedUserIds}
                   onChange={handleUsersChange}
-                  label="Users (visible to)"
+                  label={t('admin.blog.usersLabel')}
                   disabled={submitting || articleData.status === 'PUBLISHED' || loadingUsers}
                   renderValue={(selected) => {
                     if (!selected || selected.length === 0) return '';
@@ -1415,7 +1431,7 @@ const AdminBlogPage = () => {
                 >
                   {loadingUsers && (
                     <MenuItem disabled>
-                      <CircularProgress size={16} sx={{ mr: 1 }} /> Loading users...
+                      <CircularProgress size={16} sx={{ mr: 1 }} /> {t('admin.blog.loadingUsers')}
                     </MenuItem>
                   )}
                   {!loadingUsers &&
@@ -1434,7 +1450,7 @@ const AdminBlogPage = () => {
             </Grid>
             <Grid item xs={12}>
               <FormControl fullWidth>
-                <InputLabel>Tags</InputLabel>
+                <InputLabel>{t('admin.blog.tagsLabel')}</InputLabel>
                 <Select
                   multiple
                   value={selectedTagIds}
@@ -1442,7 +1458,7 @@ const AdminBlogPage = () => {
                     const value = e.target.value || [];
                     setSelectedTagIds(typeof value === 'string' ? value.split(',') : value);
                   }}
-                  label="Tags"
+                  label={t('admin.blog.tagsLabel')}
                   disabled={submitting || loadingTags}
                   renderValue={(selected) => {
                     if (!selected || selected.length === 0) return '';
@@ -1456,7 +1472,7 @@ const AdminBlogPage = () => {
                 >
                   {loadingTags && (
                     <MenuItem disabled>
-                      <CircularProgress size={16} sx={{ mr: 1 }} /> Loading tags...
+                      <CircularProgress size={16} sx={{ mr: 1 }} /> {t('admin.blog.loadingTags')}
                     </MenuItem>
                   )}
                   {!loadingTags &&
@@ -1513,7 +1529,7 @@ const AdminBlogPage = () => {
             sx={{ textTransform: 'none' }}
             disabled={submitting}
           >
-            Cancel
+            {t('admin.blog.cancel')}
           </Button>
           <Button
             onClick={handleSubmitEdit}
@@ -1529,10 +1545,10 @@ const AdminBlogPage = () => {
             {submitting ? (
               <>
                 <CircularProgress size={16} sx={{ mr: 1 }} />
-                Updating...
+                {t('admin.blog.updating')}
               </>
             ) : (
-              'Update Article'
+              t('admin.blog.updateArticle')
             )}
           </Button>
         </DialogActions>
@@ -1540,10 +1556,10 @@ const AdminBlogPage = () => {
 
       {/* Confirmation Dialog */}
       <Dialog open={confirmDialogOpen} onClose={() => setConfirmDialogOpen(false)}>
-        <DialogTitle>Confirm Changes</DialogTitle>
+        <DialogTitle>{t('admin.blog.confirmChanges')}</DialogTitle>
         <DialogContent>
           <Typography>
-            You have made changes to this article. Are you sure you want to save these changes?
+            {t('admin.blog.confirmChangesMessage')}
           </Typography>
         </DialogContent>
         <DialogActions>
@@ -1551,24 +1567,26 @@ const AdminBlogPage = () => {
             onClick={() => setConfirmDialogOpen(false)}
             sx={{ textTransform: 'none' }}
           >
-            Cancel
+            {t('admin.blog.cancel')}
           </Button>
           <Button
             onClick={handleConfirmSubmit}
             variant="contained"
             sx={{ textTransform: 'none' }}
           >
-            Confirm
+            {t('admin.blog.confirm')}
           </Button>
         </DialogActions>
       </Dialog>
 
       {/* Delete Confirmation Dialog */}
       <Dialog open={deleteDialogOpen} onClose={() => !deleting && setDeleteDialogOpen(false)}>
-        <DialogTitle>Delete Article</DialogTitle>
+        <DialogTitle>{t('admin.blog.deleteArticle')}</DialogTitle>
         <DialogContent>
           <Typography>
-            Are you sure you want to delete "{articleToDelete?.title || 'this article'}"? This action cannot be undone.
+            {articleToDelete?.title 
+              ? t('admin.blog.deleteArticleMessage', { title: articleToDelete.title })
+              : t('admin.blog.deleteArticleMessageFallback')}
           </Typography>
         </DialogContent>
         <DialogActions>
@@ -1577,7 +1595,7 @@ const AdminBlogPage = () => {
             sx={{ textTransform: 'none' }}
             disabled={deleting}
           >
-            Cancel
+            {t('admin.blog.cancel')}
           </Button>
           <Button
             onClick={handleConfirmDelete}
@@ -1589,10 +1607,10 @@ const AdminBlogPage = () => {
             {deleting ? (
               <>
                 <CircularProgress size={16} sx={{ mr: 1 }} />
-                Deleting...
+                {t('admin.blog.deleting')}
               </>
             ) : (
-              'Delete'
+              t('admin.blog.delete')
             )}
           </Button>
         </DialogActions>
@@ -1600,7 +1618,7 @@ const AdminBlogPage = () => {
 
       {/* Add Post Dialog */}
       <Dialog open={addPostOpen} onClose={handleAddPostClose} maxWidth="md" fullWidth>
-        <DialogTitle>Add New Article</DialogTitle>
+        <DialogTitle>{t('admin.blog.addNewArticle')}</DialogTitle>
         <DialogContent>
           {createError && (
             <Alert severity="error" sx={{ mb: 2 }}>
@@ -1608,8 +1626,8 @@ const AdminBlogPage = () => {
             </Alert>
           )}
           {createArticleData.status === 'PUBLISHED' && selectedUserIds.length > 0 && (
-            <Alert severity="warning" sx={{ mb: 2 }}>
-              Selected users will be erased when submitting a published article.
+              <Alert severity="warning" sx={{ mb: 2 }}>
+              {t('admin.blog.usersWarning')}
             </Alert>
           )}
           <Grid container spacing={2} sx={{ mt: 1 }}>
@@ -1617,7 +1635,7 @@ const AdminBlogPage = () => {
               <TextField
                 autoFocus
                 fullWidth
-                label="Title *"
+                label={t('admin.blog.titleLabel')}
                 variant="outlined"
                 value={createArticleData.title}
                 onChange={handleCreateFieldChange('title')}
@@ -1628,13 +1646,13 @@ const AdminBlogPage = () => {
             <Grid item xs={12}>
               <TextField
                 fullWidth
-                label="Slug *"
+                label={t('admin.blog.slugLabel')}
                 variant="outlined"
                 value={createArticleData.slug}
                 onChange={handleCreateFieldChange('slug')}
                 required
                 disabled={creating}
-                helperText="URL-friendly identifier (e.g., my-article-title)"
+                helperText={t('admin.blog.slugHelper')}
               />
             </Grid>
             <Grid item xs={12}>
@@ -1650,7 +1668,7 @@ const AdminBlogPage = () => {
                 imageUrls={createImageUrls}
                 loadImageUrls={handleCreateImageUrlsUpdate}
                 disabled={creating}
-                placeholder="Enter content... You can use HTML tags. Images will appear in preview."
+                placeholder={t('admin.blog.contentPlaceholder')}
               />
             </Grid>
             <Grid item xs={12}>
@@ -1671,7 +1689,7 @@ const AdminBlogPage = () => {
                     disabled={creating || uploadingImage}
                     sx={{ textTransform: 'none' }}
                   >
-                    {uploadingImage ? 'Uploading...' : 'Upload Image'}
+                    {uploadingImage ? t('admin.blog.uploadingImage') : t('admin.blog.uploadImage')}
                   </Button>
                 </label>
                 <Button
@@ -1681,7 +1699,7 @@ const AdminBlogPage = () => {
                   disabled={creating || uploadingImage}
                   sx={{ textTransform: 'none' }}
                 >
-                  Select from Gallery
+                  {t('admin.blog.selectFromGallery')}
                 </Button>
                 {uploadingImage && (
                   <CircularProgress size={20} />
@@ -1691,40 +1709,40 @@ const AdminBlogPage = () => {
             <Grid item xs={12}>
               <TextField
                 fullWidth
-                label="Excerpt"
+                label={t('admin.blog.excerpt')}
                 variant="outlined"
                 multiline
                 rows={3}
                 value={createArticleData.excerpt}
                 onChange={handleCreateFieldChange('excerpt')}
                 disabled={creating}
-                helperText="Optional short summary"
+                helperText={t('admin.blog.excerptHelperCreate')}
               />
             </Grid>
             <Grid item xs={12}>
               <FormControl fullWidth required>
-                <InputLabel>Status *</InputLabel>
+                <InputLabel>{t('admin.blog.statusLabel')}</InputLabel>
                 <Select
                   value={createArticleData.status}
                   onChange={handleCreateFieldChange('status')}
-                  label="Status *"
+                  label={t('admin.blog.statusLabel')}
                   disabled={creating}
                 >
-                  <MenuItem value="DRAFT">Draft</MenuItem>
-                  <MenuItem value="PUBLISHED">Published</MenuItem>
-                  <MenuItem value="PRIVATE">Private</MenuItem>
-                  <MenuItem value="ARCHIVED">Archived</MenuItem>
+                  <MenuItem value="DRAFT">{t('admin.blog.statusDraft')}</MenuItem>
+                  <MenuItem value="PUBLISHED">{t('admin.blog.statusPublished')}</MenuItem>
+                  <MenuItem value="PRIVATE">{t('admin.blog.statusPrivate')}</MenuItem>
+                  <MenuItem value="ARCHIVED">{t('admin.blog.statusArchived')}</MenuItem>
                 </Select>
               </FormControl>
             </Grid>
             <Grid item xs={12}>
               <FormControl fullWidth>
-                <InputLabel>Users (visible to)</InputLabel>
+                <InputLabel>{t('admin.blog.usersLabel')}</InputLabel>
                 <Select
                   multiple
                   value={selectedUserIds}
                   onChange={handleUsersChange}
-                  label="Users (visible to)"
+                  label={t('admin.blog.usersLabel')}
                   disabled={creating || createArticleData.status === 'PUBLISHED' || loadingUsers}
                   renderValue={(selected) => {
                     if (!selected || selected.length === 0) return '';
@@ -1739,7 +1757,7 @@ const AdminBlogPage = () => {
                 >
                   {loadingUsers && (
                     <MenuItem disabled>
-                      <CircularProgress size={16} sx={{ mr: 1 }} /> Loading users...
+                      <CircularProgress size={16} sx={{ mr: 1 }} /> {t('admin.blog.loadingUsers')}
                     </MenuItem>
                   )}
                   {!loadingUsers &&
@@ -1758,7 +1776,7 @@ const AdminBlogPage = () => {
             </Grid>
             <Grid item xs={12}>
               <FormControl fullWidth>
-                <InputLabel>Tags</InputLabel>
+                <InputLabel>{t('admin.blog.tagsLabel')}</InputLabel>
                 <Select
                   multiple
                   value={createTagIds}
@@ -1766,7 +1784,7 @@ const AdminBlogPage = () => {
                     const value = e.target.value || [];
                     setCreateTagIds(typeof value === 'string' ? value.split(',') : value);
                   }}
-                  label="Tags"
+                  label={t('admin.blog.tagsLabel')}
                   disabled={creating || loadingTags}
                   renderValue={(selected) => {
                     if (!selected || selected.length === 0) return '';
@@ -1780,7 +1798,7 @@ const AdminBlogPage = () => {
                 >
                   {loadingTags && (
                     <MenuItem disabled>
-                      <CircularProgress size={16} sx={{ mr: 1 }} /> Loading tags...
+                      <CircularProgress size={16} sx={{ mr: 1 }} /> {t('admin.blog.loadingTags')}
                     </MenuItem>
                   )}
                   {!loadingTags &&
@@ -1796,7 +1814,7 @@ const AdminBlogPage = () => {
                     }}
                     sx={{ fontStyle: 'italic', color: 'primary.main' }}
                   >
-                    + Create new tag
+                    {t('admin.blog.createNewTag')}
                   </MenuItem>
                 </Select>
               </FormControl>
@@ -1837,7 +1855,7 @@ const AdminBlogPage = () => {
             sx={{ textTransform: 'none' }}
             disabled={creating}
           >
-            Cancel
+            {t('admin.blog.cancel')}
           </Button>
           <Button
             onClick={handleSubmitCreate}
@@ -1853,10 +1871,10 @@ const AdminBlogPage = () => {
             {creating ? (
               <>
                 <CircularProgress size={16} sx={{ mr: 1 }} />
-                Creating...
+                {t('admin.blog.creating')}
               </>
             ) : (
-              'Create Article'
+              t('admin.blog.createArticle')
             )}
           </Button>
         </DialogActions>
@@ -1866,7 +1884,7 @@ const AdminBlogPage = () => {
       <Dialog open={galleryDialogOpen} onClose={handleCloseGallery} maxWidth="md" fullWidth>
         <DialogTitle>
           <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <Typography variant="h6">Select Image from Gallery</Typography>
+            <Typography variant="h6">{t('admin.blog.selectImageFromGallery')}</Typography>
             <IconButton onClick={handleCloseGallery} size="small">
               <CloseIcon />
             </IconButton>
@@ -1884,7 +1902,7 @@ const AdminBlogPage = () => {
             </Box>
           ) : galleryImages.length === 0 ? (
             <Alert severity="info">
-              No images found in the gallery. Upload images to see them here.
+              {t('admin.blog.noImagesFound')}
             </Alert>
           ) : (
             <>
@@ -1936,7 +1954,7 @@ const AdminBlogPage = () => {
                           noWrap
                           sx={{ fontSize: '0.7rem' }}
                         >
-                          {item.fileUrl || 'Untitled'}
+                          {item.fileUrl || t('pages.article.untitled')}
                         </Typography>
                       </CardContent>
                     </Card>
@@ -1958,19 +1976,19 @@ const AdminBlogPage = () => {
         </DialogContent>
         <DialogActions>
           <Button onClick={handleCloseGallery} sx={{ textTransform: 'none' }}>
-            Close
+            {t('admin.blog.close')}
           </Button>
         </DialogActions>
       </Dialog>
 
       {/* Image Size Adjustment Dialog */}
       <Dialog open={imageSizeDialogOpen} onClose={handleImageSizeCancel} maxWidth="sm" fullWidth>
-        <DialogTitle>Adjust Image Size</DialogTitle>
+        <DialogTitle>{t('admin.blog.adjustImageSize')}</DialogTitle>
         <DialogContent>
           <Box sx={{ mt: 2 }}>
             <Grid container spacing={3}>
               <Grid item xs={12}>
-                <Typography gutterBottom>Width (pixels)</Typography>
+                <Typography gutterBottom>{t('admin.blog.widthPixels')}</Typography>
                 <Slider
                   value={imageWidth}
                   onChange={(e, newValue) => {
@@ -2004,7 +2022,7 @@ const AdminBlogPage = () => {
                 />
               </Grid>
               <Grid item xs={12}>
-                <Typography gutterBottom>Height (pixels)</Typography>
+                <Typography gutterBottom>{t('admin.blog.heightPixels')}</Typography>
                 <Slider
                   value={imageHeight}
                   onChange={(e, newValue) => {
@@ -2046,11 +2064,11 @@ const AdminBlogPage = () => {
                       disabled={submitting}
                     />
                   }
-                  label="Maintain aspect ratio"
+                  label={t('admin.blog.maintainAspectRatio')}
                 />
               </Grid>
               <Grid item xs={12}>
-                <Typography gutterBottom>Alignment</Typography>
+                <Typography gutterBottom>{t('admin.blog.alignment')}</Typography>
                 <ToggleButtonGroup
                   value={imageAlignment}
                   exclusive
@@ -2062,13 +2080,13 @@ const AdminBlogPage = () => {
                   aria-label="image alignment"
                   disabled={submitting}
                 >
-                  <ToggleButton value="left" aria-label="left aligned">
+                  <ToggleButton value="left" aria-label={t('admin.blog.leftAligned')}>
                     <FormatAlignLeftIcon />
                   </ToggleButton>
-                  <ToggleButton value="center" aria-label="center aligned">
+                  <ToggleButton value="center" aria-label={t('admin.blog.centerAligned')}>
                     <FormatAlignCenterIcon />
                   </ToggleButton>
-                  <ToggleButton value="right" aria-label="right aligned">
+                  <ToggleButton value="right" aria-label={t('admin.blog.rightAligned')}>
                     <FormatAlignRightIcon />
                   </ToggleButton>
                 </ToggleButtonGroup>
@@ -2099,7 +2117,7 @@ const AdminBlogPage = () => {
                         src={isEditingCreateImage 
                           ? createImageUrls[editingCreateImageMediaId]
                           : imageUrls[editingImageMediaId]}
-                        alt="Preview"
+                        alt={t('admin.blog.preview')}
                         sx={{
                           display: 'block',
                           width: `${Math.min(imageWidth, 400)}px`,
@@ -2143,7 +2161,7 @@ const AdminBlogPage = () => {
                     </Box>
                   </Box>
                   <Typography variant="caption" color="text.secondary" sx={{ mt: 1, display: 'block', textAlign: 'center' }}>
-                    Preview: {imageWidth} × {imageHeight}px • Drag corner to resize
+                    {t('admin.blog.previewSize', { width: imageWidth, height: imageHeight })}
                   </Typography>
                 </Grid>
               )}
@@ -2156,7 +2174,7 @@ const AdminBlogPage = () => {
             sx={{ textTransform: 'none' }}
             disabled={submitting}
           >
-            Cancel
+            {t('admin.blog.cancel')}
           </Button>
           <Button
             onClick={handleImageSizeSave}
@@ -2164,7 +2182,7 @@ const AdminBlogPage = () => {
             sx={{ textTransform: 'none' }}
             disabled={submitting}
           >
-            Save
+            {t('admin.blog.save')}
           </Button>
         </DialogActions>
       </Dialog>

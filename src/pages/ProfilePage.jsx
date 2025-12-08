@@ -1,4 +1,5 @@
 import React, { useEffect, useState, useMemo } from 'react';
+import { useTranslation } from 'react-i18next';
 import { fetchWithAuth, fetchUserProfile, clearUserProfileCache, fetchUserSettings, clearUserSettingsCache, getToken } from '../utils/api';
 import {
   Box,
@@ -82,6 +83,7 @@ const getUniqueTimezoneOffsets = () => {
 };
 
 const ProfilePage = () => {
+  const { t } = useTranslation();
   const [profile, setProfile] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -207,12 +209,12 @@ const ProfilePage = () => {
           setFirstName(data?.firstName || '');
           setLastName(data?.lastName || '');
         } else {
-          setError('No profile data available');
+          setError(t('pages.profile.noProfileData'));
         }
       } catch (e) {
         if (!isMounted) return;
         
-        setError(e.message || 'Failed to load profile');
+        setError(e.message || t('pages.profile.failedToLoadProfile'));
       } finally {
         if (isMounted) {
           setLoading(false);
@@ -263,7 +265,7 @@ const ProfilePage = () => {
         if (!isMounted) return;
         
         console.error('Error fetching settings:', err);
-        setSettingsError(err.message || 'Failed to load settings. Please try again.');
+        setSettingsError(err.message || t('pages.profile.failedToLoadSettings'));
       } finally {
         if (isMounted) {
           setSettingsLoading(false);
@@ -382,7 +384,7 @@ const ProfilePage = () => {
         // Notify app to refresh displayed user name if needed
         window.dispatchEvent(new Event('auth-changed'));
       } catch (e) {
-        errors.push(e.message || 'Failed to update profile');
+        errors.push(e.message || t('pages.profile.failedToUpdateProfile'));
       }
     }
     
@@ -414,7 +416,7 @@ const ProfilePage = () => {
         // Clear cache so next fetch gets fresh data
         clearUserSettingsCache();
       } catch (err) {
-        errors.push(err.message || 'Failed to update settings');
+        errors.push(err.message || t('pages.profile.failedToUpdateSettings'));
       }
     }
     
@@ -423,11 +425,11 @@ const ProfilePage = () => {
       setSaveError(errors.join('; '));
     } else {
       if (profileChanged && settingsChanged) {
-        setSaveSuccess('Profile and settings updated successfully!');
+        setSaveSuccess(t('pages.profile.profileAndSettingsUpdated'));
       } else if (profileChanged) {
-        setSaveSuccess('Profile updated successfully!');
+        setSaveSuccess(t('pages.profile.profileUpdated'));
       } else if (settingsChanged) {
-        setSaveSuccess('Settings updated successfully!');
+        setSaveSuccess(t('pages.profile.settingsUpdated'));
       }
       
       // Clear success message after 3 seconds
@@ -449,28 +451,28 @@ const ProfilePage = () => {
     let isValid = true;
 
     if (!settingsFormData.timezone.trim()) {
-      newErrors.timezone = 'Timezone is required';
+      newErrors.timezone = t('pages.profile.timezoneRequired');
       isValid = false;
     } else if (settingsFormData.timezone.length > 50) {
-      newErrors.timezone = 'Timezone must be at most 50 characters';
+      newErrors.timezone = t('pages.profile.timezoneMaxLength');
       isValid = false;
     }
 
     if (!settingsFormData.language.trim()) {
-      newErrors.language = 'Language is required';
+      newErrors.language = t('pages.profile.languageRequired');
       isValid = false;
     } else if (settingsFormData.language.length > 10) {
-      newErrors.language = 'Language must be at most 10 characters';
+      newErrors.language = t('pages.profile.languageMaxLength');
       isValid = false;
     }
 
     if (!settingsFormData.currency.trim()) {
-      newErrors.currency = 'Currency is required';
+      newErrors.currency = t('pages.profile.currencyRequired');
       isValid = false;
     } else {
       const validCurrencyCodes = currencies.map(c => c.code);
       if (!validCurrencyCodes.includes(settingsFormData.currency)) {
-        newErrors.currency = 'Currency must be one of: RUB, TENGE, USD';
+        newErrors.currency = t('pages.profile.currencyInvalid');
         isValid = false;
       }
     }
@@ -499,7 +501,7 @@ const ProfilePage = () => {
   return (
     <Box>
       <Typography variant="h4" component="h1" gutterBottom>
-        My Profile
+        {t('pages.profile.title')}
       </Typography>
 
       {loading ? (
@@ -538,7 +540,7 @@ const ProfilePage = () => {
                   {editingFirstName ? (
                     <TextField
                       fullWidth
-                      label="First name"
+                      label={t('pages.profile.firstName')}
                       value={firstName}
                       onChange={(e) => {
                         setFirstName(e.target.value);
@@ -553,7 +555,7 @@ const ProfilePage = () => {
                   ) : (
                     <Box sx={{ flexGrow: 1 }}>
                       <Typography variant="subtitle2" color="text.secondary">
-                        First name
+                        {t('pages.profile.firstName')}
                       </Typography>
                       <Typography variant="body1">{firstName || '-'}</Typography>
                     </Box>
@@ -575,7 +577,7 @@ const ProfilePage = () => {
                   {editingLastName ? (
                     <TextField
                       fullWidth
-                      label="Last name"
+                      label={t('pages.profile.lastName')}
                       value={lastName}
                       onChange={(e) => {
                         setLastName(e.target.value);
@@ -590,7 +592,7 @@ const ProfilePage = () => {
                   ) : (
                     <Box sx={{ flexGrow: 1 }}>
                       <Typography variant="subtitle2" color="text.secondary">
-                        Last name
+                        {t('pages.profile.lastName')}
                       </Typography>
                       <Typography variant="body1">{lastName || '-'}</Typography>
                     </Box>
@@ -600,7 +602,7 @@ const ProfilePage = () => {
               {/* Second row: Email */}
               <Grid item xs={12}>
                 <Typography variant="subtitle2" color="text.secondary">
-                  Email
+                  {t('pages.profile.email')}
                 </Typography>
                 <Typography variant="body1">{profile?.email || '-'}</Typography>
               </Grid>
@@ -612,7 +614,7 @@ const ProfilePage = () => {
             {/* User Settings Section */}
             <Divider sx={{ mt: 3, mb: 3 }} />
             <Typography variant="h6" gutterBottom>
-              User Settings
+              {t('pages.profile.userSettings')}
             </Typography>
 
             {settingsLoading ? (
@@ -627,12 +629,12 @@ const ProfilePage = () => {
               <Grid container spacing={2}>
                 <Grid item xs={12} md={6}>
                   <FormControl fullWidth>
-                    <InputLabel id="timezone-label">Timezone</InputLabel>
+                    <InputLabel id="timezone-label">{t('pages.profile.timezone')}</InputLabel>
                     <Select
                       labelId="timezone-label"
                       id="timezone"
                       value={settingsFormData.timezone}
-                      label="Timezone"
+                      label={t('pages.profile.timezone')}
                       onChange={(e) => handleSettingsFieldChange('timezone', e.target.value)}
                       error={!!settingsErrors.timezone}
                       disabled={saving || savingSettings}
@@ -649,19 +651,19 @@ const ProfilePage = () => {
                       </Typography>
                     )}
                     <Typography variant="caption" color="text.secondary" sx={{ mt: 0.5, display: 'block' }}>
-                      Your timezone preference for viewing and booking sessions.
+                      {t('pages.profile.timezoneDescription')}
                     </Typography>
                   </FormControl>
                 </Grid>
 
                 <Grid item xs={12} md={6}>
                   <FormControl fullWidth>
-                    <InputLabel id="language-label">Language</InputLabel>
+                    <InputLabel id="language-label">{t('pages.profile.language')}</InputLabel>
                     <Select
                       labelId="language-label"
                       id="language"
                       value={settingsFormData.language}
-                      label="Language"
+                      label={t('pages.profile.language')}
                       onChange={(e) => handleSettingsFieldChange('language', e.target.value)}
                       error={!!settingsErrors.language}
                       disabled={saving || savingSettings}
@@ -682,12 +684,12 @@ const ProfilePage = () => {
 
                 <Grid item xs={12} md={6}>
                   <FormControl fullWidth>
-                    <InputLabel id="currency-label">Currency</InputLabel>
+                    <InputLabel id="currency-label">{t('pages.profile.currency')}</InputLabel>
                     <Select
                       labelId="currency-label"
                       id="currency"
                       value={settingsFormData.currency}
-                      label="Currency"
+                      label={t('pages.profile.currency')}
                       onChange={(e) => handleSettingsFieldChange('currency', e.target.value)}
                       error={!!settingsErrors.currency}
                       disabled={saving || savingSettings}
@@ -735,10 +737,10 @@ const ProfilePage = () => {
                         disabled={saving || savingSettings}
                       />
                     }
-                    label="Email Notification"
+                    label={t('pages.profile.emailNotifications')}
                   />
                   <Typography variant="caption" color="text.secondary" sx={{ mt: 0.5, display: 'block' }}>
-                    Receive email notifications about your bookings and account updates.
+                    {t('pages.profile.emailNotificationDescription')}
                   </Typography>
                 </Grid>
               </Grid>
@@ -756,10 +758,10 @@ const ProfilePage = () => {
                 {(saving || savingSettings) ? (
                   <>
                     <CircularProgress size={16} sx={{ mr: 1 }} />
-                    Saving...
+                    {t('pages.profile.saving')}
                   </>
                 ) : (
-                  'Save Changes'
+                  t('pages.profile.saveChanges')
                 )}
               </Button>
             </Box>

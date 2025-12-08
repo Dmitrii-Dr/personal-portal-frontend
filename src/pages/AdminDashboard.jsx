@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import {
   Box,
   Typography,
@@ -57,6 +58,15 @@ import CreateTagForm from '../components/CreateTagForm';
 import BookingsManagement from '../components/BookingsManagement';
 
 const PastSessions = () => {
+  const { t } = useTranslation();
+  
+  // Helper function to get translated status label
+  const getStatusLabel = (status) => {
+    if (!status) return t('pages.booking.status.UNKNOWN');
+    const statusKey = `pages.booking.status.${status}`;
+    return t(statusKey, { defaultValue: status.replace(/_/g, ' ') });
+  };
+  
   const [status, setStatus] = useState('COMPLETED');
   const [bookings, setBookings] = useState([]);
   const [allBookings, setAllBookings] = useState([]);
@@ -353,7 +363,7 @@ const PastSessions = () => {
           return;
         }
         console.error('Error fetching past sessions:', err);
-        setError(err.message || 'Failed to load past sessions. Please try again.');
+        setError(err.message || t('admin.dashboard.failedToLoadSessions'));
         setBookings([]);
         setTotalPages(0);
         setTotalElements(0);
@@ -420,20 +430,22 @@ const PastSessions = () => {
       <Box>
         <Box sx={{ mb: 3, display: 'flex', alignItems: 'center', gap: 2 }}>
           <FormControl sx={{ minWidth: 200 }}>
-            <InputLabel>Status</InputLabel>
+            <InputLabel>{t('admin.dashboard.statusFilter')}</InputLabel>
             <Select
               value={status}
               onChange={handleStatusChange}
-              label="Status"
+              label={t('admin.dashboard.statusFilter')}
             >
-              <MenuItem value="COMPLETED">Completed</MenuItem>
-              <MenuItem value="DECLINED">Declined</MenuItem>
-              <MenuItem value="CANCELLED">Cancelled</MenuItem>
+              <MenuItem value="COMPLETED">{t('admin.dashboard.statusCompleted')}</MenuItem>
+              <MenuItem value="DECLINED">{t('admin.dashboard.statusDeclined')}</MenuItem>
+              <MenuItem value="CANCELLED">{t('admin.dashboard.statusCancelled')}</MenuItem>
             </Select>
           </FormControl>
           {!loading && (
             <Typography variant="body2" color="text.secondary">
-              Total: {totalElements} session{totalElements !== 1 ? 's' : ''}
+              {totalElements === 1 
+                ? t('admin.dashboard.totalSessions', { count: totalElements })
+                : t('admin.dashboard.totalSessionsPlural', { count: totalElements })}
             </Typography>
           )}
         </Box>
@@ -449,7 +461,7 @@ const PastSessions = () => {
               onClick={(e) => setCalendarAnchorEl(e.currentTarget)}
               sx={{ textTransform: 'none' }}
             >
-              Date Range
+              {t('admin.dashboard.dateRange')}
             </Button>
             <Button
               variant={getActiveFilter() === 'today' ? 'contained' : 'outlined'}
@@ -457,7 +469,7 @@ const PastSessions = () => {
               onClick={handleTodayFilter}
               sx={{ textTransform: 'none' }}
             >
-              Today
+              {t('admin.dashboard.today')}
             </Button>
             <Button
               variant={getActiveFilter() === 'thisWeek' ? 'contained' : 'outlined'}
@@ -465,7 +477,7 @@ const PastSessions = () => {
               onClick={handleThisWeekFilter}
               sx={{ textTransform: 'none' }}
             >
-              This Week
+              {t('admin.dashboard.thisWeek')}
             </Button>
             <Button
               variant={getActiveFilter() === 'thisMonth' ? 'contained' : 'outlined'}
@@ -473,16 +485,19 @@ const PastSessions = () => {
               onClick={handleThisMonthFilter}
               sx={{ textTransform: 'none' }}
             >
-              This Month
+              {t('admin.dashboard.thisMonth')}
             </Button>
             {startDate && (
               <Typography variant="body2" color="text.secondary">
                 {endDate && dayjs(startDate).format('YYYY-MM-DD') !== dayjs(endDate).format('YYYY-MM-DD') ? (
                   <>
-                    From: {dayjs(startDate).format('MMM DD, YYYY')} To: {dayjs(endDate).format('MMM DD, YYYY')}
+                    {t('admin.dashboard.fromTo', { 
+                      start: dayjs(startDate).format('MMM DD, YYYY'), 
+                      end: dayjs(endDate).format('MMM DD, YYYY') 
+                    })}
                   </>
                 ) : (
-                  <>Date: {dayjs(startDate).format('MMM DD, YYYY')}</>
+                  <>{t('admin.dashboard.date', { date: dayjs(startDate).format('MMM DD, YYYY') })}</>
                 )}
               </Typography>
             )}
@@ -494,7 +509,7 @@ const PastSessions = () => {
                 onClick={handleClearFilter}
                 sx={{ textTransform: 'none', ml: 'auto' }}
               >
-                Clear Filter
+                {t('admin.dashboard.clear')} Filter
               </Button>
             )}
           </Box>
@@ -648,7 +663,7 @@ const PastSessions = () => {
           <CircularProgress />
         </Box>
       ) : bookings.length === 0 ? (
-        <Alert severity="info">No {status.toLowerCase()} sessions found.</Alert>
+        <Alert severity="info">{t('admin.dashboard.noSessionsFound', { status: status.toLowerCase() })}</Alert>
       ) : (
         <>
           <Grid container spacing={2}>
@@ -658,7 +673,7 @@ const PastSessions = () => {
                   <CardContent>
                     <Box sx={{ display: 'flex', gap: 1, alignItems: 'center', mb: 2 }}>
                       <Chip
-                        label={booking.status.replace(/_/g, ' ')}
+                        label={getStatusLabel(booking.status)}
                         color={STATUS_COLORS[booking.status] || 'default'}
                         size="small"
                       />
@@ -681,7 +696,7 @@ const PastSessions = () => {
                     <Grid container spacing={2}>
                       <Grid item xs={12} sm={6}>
                         <Typography variant="body2" color="text.secondary">
-                          Session Type
+                          {t('admin.dashboard.sessionTypeLabel').replace(' *', '')}
                         </Typography>
                         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
                           {booking.sessionDurationMinutes && (
@@ -764,6 +779,7 @@ const PastSessions = () => {
 };
 
 const AdminDashboard = () => {
+  const { t } = useTranslation();
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState(0);
   const [addPostOpen, setAddPostOpen] = useState(false);
@@ -916,19 +932,19 @@ const AdminDashboard = () => {
 
   const validateForm = () => {
     if (!articleData.title.trim()) {
-      setSubmitError('Title is required');
+      setSubmitError(t('admin.dashboard.titleRequired'));
       return false;
     }
     if (!articleData.slug.trim()) {
-      setSubmitError('Slug is required');
+      setSubmitError(t('admin.dashboard.slugRequired'));
       return false;
     }
     if (!articleData.content.trim()) {
-      setSubmitError('Content is required');
+      setSubmitError(t('admin.dashboard.contentRequired'));
       return false;
     }
     if (!articleData.status) {
-      setSubmitError('Status is required');
+      setSubmitError(t('admin.dashboard.statusRequired'));
       return false;
     }
     return true;
@@ -972,7 +988,7 @@ const AdminDashboard = () => {
       handleAddPostClose();
     } catch (err) {
       console.error('Error creating article:', err);
-      setSubmitError(err.message || 'Failed to create article. Please try again.');
+      setSubmitError(err.message || t('admin.dashboard.failedToCreateArticle'));
     } finally {
       setSubmitting(false);
     }
@@ -1054,7 +1070,7 @@ const AdminDashboard = () => {
       }
     } catch (err) {
       console.error('Error fetching session types:', err);
-      setSessionTypesError(err.message || 'Failed to load session types');
+      setSessionTypesError(err.message || t('admin.dashboard.failedToLoadSessionTypes'));
       setBookingSessionTypes([]);
     } finally {
       setLoadingSessionTypes(false);
@@ -1196,7 +1212,7 @@ const AdminDashboard = () => {
     if (isToday && slot.startTimeInstant) {
       const slotTime = dayjs(slot.startTimeInstant);
       if (slotTime.isBefore(dayjs())) {
-        setBookingError('Cannot select a time slot in the past for today');
+        setBookingError(t('admin.dashboard.cannotSelectPastSlot'));
         return;
       }
     }
@@ -1235,7 +1251,7 @@ const AdminDashboard = () => {
       const isPastTime = isToday && combinedDateTime.isBefore(dayjs());
       
       if (isPastTime) {
-        setBookingError('Cannot select a time in the past for today');
+        setBookingError(t('admin.dashboard.cannotSelectPastTime'));
         // Still create the slot object but mark it as invalid
         const customSlot = {
           startTimeInstant: combinedDateTime.toISOString(),
@@ -1484,33 +1500,33 @@ const AdminDashboard = () => {
   const handleCreateClientSubmit = async () => {
     // Validate form
     if (!newClientData.email.trim()) {
-      setCreateClientError('Email is required');
+      setCreateClientError(t('admin.dashboard.emailRequired'));
       return;
     }
     
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!emailRegex.test(newClientData.email.trim())) {
-      setCreateClientError('Please enter a valid email address');
+      setCreateClientError(t('admin.dashboard.emailInvalid'));
       return;
     }
 
     if (!newClientData.timezone || !newClientData.timezone.trim()) {
-      setCreateClientError('Timezone is required');
+      setCreateClientError(t('admin.dashboard.timezoneRequired'));
       return;
     }
 
     if (newClientData.timezone.length > 50) {
-      setCreateClientError('Timezone must be at most 50 characters');
+      setCreateClientError(t('admin.dashboard.timezoneMaxLength'));
       return;
     }
 
     if (newClientData.firstName && newClientData.firstName.length > 100) {
-      setCreateClientError('First name must be at most 100 characters');
+      setCreateClientError(t('admin.dashboard.firstNameMaxLength'));
       return;
     }
 
     if (newClientData.lastName && newClientData.lastName.length > 100) {
-      setCreateClientError('Last name must be at most 100 characters');
+      setCreateClientError(t('admin.dashboard.lastNameMaxLength'));
       return;
     }
 
@@ -1557,7 +1573,7 @@ const AdminDashboard = () => {
       handleCreateClientClose();
     } catch (err) {
       console.error('Error creating client:', err);
-      setCreateClientError(err.message || 'Failed to create client. Please try again.');
+      setCreateClientError(err.message || t('admin.dashboard.failedToCreateClient'));
     } finally {
       setCreatingClient(false);
     }
@@ -1618,18 +1634,18 @@ const AdminDashboard = () => {
       bookingsRefreshKeyRef.current += 1;
 
       // Success - close dialog and show notification
-      setSuccessMessage('Booking created successfully!');
+      setSuccessMessage(t('admin.dashboard.bookingCreatedSuccess'));
       handleNewBookingClose();
     } catch (err) {
       console.error('Error creating booking:', err);
-      let errorMessage = 'Failed to create booking. Please try again.';
+      let errorMessage = t('admin.dashboard.failedToCreateBooking');
       
       if (err.code === 'ECONNABORTED') {
-        errorMessage = 'Request timed out. Please try again.';
+        errorMessage = t('admin.dashboard.requestTimeout');
       } else if (err.response) {
         errorMessage = err.response.data?.message || `Server error: ${err.response.status}`;
       } else if (err.request) {
-        errorMessage = 'Unable to reach the server. Please check your connection.';
+        errorMessage = t('admin.dashboard.unableToReachServer');
       } else {
         errorMessage = err.message || errorMessage;
       }
@@ -1645,7 +1661,7 @@ const AdminDashboard = () => {
       <Box>
         <Box sx={{ mb: 3 }}>
           <Typography variant="h4" component="h1">
-            Admin Dashboard
+            {t('admin.dashboard.title')}
           </Typography>
         </Box>
 
@@ -1655,8 +1671,8 @@ const AdminDashboard = () => {
         <Box sx={{ mb: 4 }}>
           <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
             <Tabs value={activeTab} onChange={handleTabChange}>
-              <Tab label="Active Sessions" />
-              <Tab label="Past Sessions" />
+              <Tab label={t('admin.dashboard.activeSessions')} />
+              <Tab label={t('admin.dashboard.pastSessions')} />
             </Tabs>
             {activeTab === 0 && (
               <Button
@@ -1665,7 +1681,7 @@ const AdminDashboard = () => {
                 onClick={handleNewBookingOpen}
                 sx={{ textTransform: 'none' }}
               >
-                New Booking
+                {t('admin.dashboard.newBooking')}
               </Button>
             )}
           </Box>
@@ -1687,7 +1703,7 @@ const AdminDashboard = () => {
 
       {/* Add Post Dialog */}
       <Dialog open={addPostOpen} onClose={handleAddPostClose} maxWidth="md" fullWidth>
-        <DialogTitle>Add New Article</DialogTitle>
+        <DialogTitle>{t('admin.dashboard.addNewArticle')}</DialogTitle>
         <DialogContent>
           {submitError && (
             <Alert severity="error" sx={{ mb: 2 }}>
@@ -1696,7 +1712,7 @@ const AdminDashboard = () => {
           )}
           {articleData.status === 'PUBLISHED' && selectedUserIds.length > 0 && (
             <Alert severity="warning" sx={{ mb: 2 }}>
-              Selected users will be erased when submitting a published article.
+              {t('admin.dashboard.usersWarning')}
             </Alert>
           )}
           <Grid container spacing={2} sx={{ mt: 1 }}>
@@ -1704,7 +1720,7 @@ const AdminDashboard = () => {
               <TextField
                 autoFocus
                 fullWidth
-                label="Title *"
+                label={t('admin.dashboard.titleLabel')}
                 variant="outlined"
                 value={articleData.title}
                 onChange={handleFieldChange('title')}
@@ -1715,19 +1731,19 @@ const AdminDashboard = () => {
             <Grid item xs={12}>
               <TextField
                 fullWidth
-                label="Slug *"
+                label={t('admin.dashboard.slugLabel')}
                 variant="outlined"
                 value={articleData.slug}
                 onChange={handleFieldChange('slug')}
                 required
                 disabled={submitting}
-                helperText="URL-friendly identifier (e.g., my-article-title)"
+                helperText={t('admin.dashboard.slugHelper')}
               />
             </Grid>
             <Grid item xs={12}>
               <TextField
                 fullWidth
-                label="Content *"
+                label={t('admin.dashboard.contentLabel')}
                 variant="outlined"
                 multiline
                 rows={8}
@@ -1740,40 +1756,40 @@ const AdminDashboard = () => {
             <Grid item xs={12}>
               <TextField
                 fullWidth
-                label="Excerpt"
+                label={t('admin.dashboard.excerptLabel')}
                 variant="outlined"
                 multiline
                 rows={3}
                 value={articleData.excerpt}
                 onChange={handleFieldChange('excerpt')}
                 disabled={submitting}
-                helperText="Optional short summary"
+                helperText={t('admin.dashboard.excerptHelper')}
               />
             </Grid>
             <Grid item xs={12}>
               <FormControl fullWidth required>
-                <InputLabel>Status *</InputLabel>
+                <InputLabel>{t('admin.dashboard.statusLabel')}</InputLabel>
                 <Select
                   value={articleData.status}
                   onChange={handleFieldChange('status')}
-                  label="Status *"
+                  label={t('admin.dashboard.statusLabel')}
                   disabled={submitting}
                 >
-                  <MenuItem value="DRAFT">Draft</MenuItem>
-                  <MenuItem value="PUBLISHED">Published</MenuItem>
-                  <MenuItem value="PRIVATE">Private</MenuItem>
-                  <MenuItem value="ARCHIVED">Archived</MenuItem>
+                  <MenuItem value="DRAFT">{t('admin.dashboard.statusDraft')}</MenuItem>
+                  <MenuItem value="PUBLISHED">{t('admin.dashboard.statusPublished')}</MenuItem>
+                  <MenuItem value="PRIVATE">{t('admin.dashboard.statusPrivate')}</MenuItem>
+                  <MenuItem value="ARCHIVED">{t('admin.dashboard.statusArchived')}</MenuItem>
                 </Select>
               </FormControl>
             </Grid>
             <Grid item xs={12}>
               <FormControl fullWidth>
-                <InputLabel>Users (visible to)</InputLabel>
+                <InputLabel>{t('admin.dashboard.usersLabel')}</InputLabel>
                 <Select
                   multiple
                   value={selectedUserIds}
                   onChange={handleUsersChange}
-                  label="Users (visible to)"
+                  label={t('admin.dashboard.usersLabel')}
                   disabled={submitting || articleData.status === 'PUBLISHED' || loadingUsers}
                   renderValue={(selected) => {
                     if (!selected || selected.length === 0) return '';
@@ -1807,7 +1823,7 @@ const AdminDashboard = () => {
             </Grid>
             <Grid item xs={12}>
               <FormControl fullWidth>
-                <InputLabel>Tags</InputLabel>
+                <InputLabel>{t('admin.dashboard.tagsLabel')}</InputLabel>
                 <Select
                   multiple
                   value={selectedTagIds}
@@ -1815,7 +1831,7 @@ const AdminDashboard = () => {
                     const value = e.target.value || [];
                     setSelectedTagIds(typeof value === 'string' ? value.split(',') : value);
                   }}
-                  label="Tags"
+                  label={t('admin.dashboard.tagsLabel')}
                   disabled={submitting || loadingTags}
                   renderValue={(selected) => {
                     if (!selected || selected.length === 0) return '';
@@ -1829,7 +1845,7 @@ const AdminDashboard = () => {
                 >
                   {loadingTags && (
                     <MenuItem disabled>
-                      <CircularProgress size={16} sx={{ mr: 1 }} /> Loading tags...
+                      <CircularProgress size={16} sx={{ mr: 1 }} /> {t('admin.dashboard.loadingTags')}
                     </MenuItem>
                   )}
                   {!loadingTags &&
@@ -1902,10 +1918,10 @@ const AdminDashboard = () => {
             {submitting ? (
               <>
                 <CircularProgress size={16} sx={{ mr: 1 }} />
-                Creating...
+                {t('admin.dashboard.creatingArticle')}
               </>
             ) : (
-              'Create Article'
+              t('admin.dashboard.createArticle')
             )}
           </Button>
         </DialogActions>
@@ -1913,7 +1929,7 @@ const AdminDashboard = () => {
 
       {/* New Booking Dialog */}
       <Dialog open={newBookingOpen} onClose={handleNewBookingClose} maxWidth="md" fullWidth>
-        <DialogTitle>Book a Session</DialogTitle>
+        <DialogTitle>{t('landing.booking.title')}</DialogTitle>
         <DialogContent>
           {bookingError && (
             <Alert severity="error" sx={{ mb: 2 }} onClose={() => setBookingError(null)}>
@@ -1925,7 +1941,7 @@ const AdminDashboard = () => {
             {/* Session Type Selection */}
             <Grid item xs={12}>
               <FormControl fullWidth required>
-                <InputLabel>Session Type *</InputLabel>
+                <InputLabel>{t('admin.dashboard.sessionTypeLabel')}</InputLabel>
                 <Select
                   value={selectedSessionTypeId || ''}
                   onChange={(e) => {
@@ -1933,7 +1949,7 @@ const AdminDashboard = () => {
                     setSelectedBookingSlot(null);
                     setBookingAvailableSlots([]);
                   }}
-                  label="Session Type *"
+                  label={t('admin.dashboard.sessionTypeLabel')}
                   disabled={submittingBooking || loadingSessionTypes}
                 >
                   {loadingSessionTypes && (
@@ -1959,7 +1975,7 @@ const AdminDashboard = () => {
             {/* Client Selection */}
             <Grid item xs={12}>
               <FormControl fullWidth>
-                <InputLabel>Client</InputLabel>
+                <InputLabel>{t('admin.dashboard.clientLabel')}</InputLabel>
                 <Select
                   value={selectedClientId}
                   onChange={(e) => {
@@ -1969,7 +1985,7 @@ const AdminDashboard = () => {
                       setSelectedClientId(value);
                     }
                   }}
-                  label="Client"
+                  label={t('admin.dashboard.clientLabel')}
                   disabled={submittingBooking || loadingBookingUsers}
                   renderValue={(selected) => {
                     if (!selected) return '';
@@ -2033,30 +2049,33 @@ const AdminDashboard = () => {
               </Box>
               {!selectedSessionTypeId && (
                 <Typography variant="body2" color="text.secondary" sx={{ mt: 1, textAlign: 'center' }}>
-                  Please select a session type to enable date selection
+                  {t('admin.dashboard.selectSessionTypeForDate')}
                 </Typography>
               )}
               {selectedSessionTypeId && !selectedClientId && (
                 <Typography variant="body2" color="text.secondary" sx={{ mt: 1, textAlign: 'center' }}>
-                  Please select a client to enable date selection
+                  {t('admin.dashboard.selectClientForDate')}
                 </Typography>
               )}
             </Grid>
 
             <Grid item xs={12} md={6}>
               <Typography variant="h6" gutterBottom>
-                Available Times on {formatDateForDisplay(bookingSelectedDate)}
+                {t('admin.dashboard.availableTimes')} {formatDateForDisplay(bookingSelectedDate)}
               </Typography>
 
               {userTimezone && (
                 <Alert severity="info" sx={{ mb: 2 }}>
-                  Slots are shown in your timezone: <strong>{userTimezone}</strong> ({getTimezoneOffset(userTimezone)})
+                  {t('admin.dashboard.slotsTimezone', { 
+                    timezone: userTimezone, 
+                    offset: getTimezoneOffset(userTimezone) 
+                  })}
                 </Alert>
               )}
 
               {!selectedSessionTypeId ? (
                 <Alert severity="info">
-                  Please select a session type to view available time slots.
+                  {t('admin.dashboard.selectSessionType')}
                 </Alert>
               ) : (
                 <>
@@ -2116,7 +2135,7 @@ const AdminDashboard = () => {
                           >
                             <Typography variant="body1" color={isDisabled ? 'text.disabled' : 'text.primary'}>
                               {startTime}{endTime !== 'N/A' ? ` - ${endTime}` : ''}
-                              {isDisabled && ' (Past)'}
+                              {isDisabled && ` ${t('admin.dashboard.past')}`}
                             </Typography>
                           </ListItemButton>
                         );
@@ -2138,7 +2157,7 @@ const AdminDashboard = () => {
                         }}
                       >
                         <Typography variant="body1" sx={{ fontStyle: 'italic' }}>
-                          + Create new slot
+                          {t('admin.dashboard.createNewSlot')}
                         </Typography>
                       </ListItemButton>
                       {/* Custom time picker */}
@@ -2155,7 +2174,7 @@ const AdminDashboard = () => {
                           }}
                         >
                           <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-                            Enter time
+                            {t('admin.dashboard.enterTime')}
                           </Typography>
                           <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 1, mb: 2 }}>
                             {/* Hours */}
@@ -2276,14 +2295,14 @@ const AdminDashboard = () => {
                               onClick={handleSetNow}
                               sx={{ color: 'primary.main', textTransform: 'none' }}
                             >
-                              Now
+                              {t('admin.dashboard.now')}
                             </Button>
                             <Button
                               size="small"
                               onClick={handleClearTime}
                               sx={{ color: 'primary.main', textTransform: 'none' }}
                             >
-                              Clear
+                              {t('admin.dashboard.clear')}
                             </Button>
                           </Box>
                         </Box>
@@ -2310,7 +2329,7 @@ const AdminDashboard = () => {
                         }}
                       >
                         <Typography variant="body1" sx={{ fontStyle: 'italic' }}>
-                          + Create new slot
+                          {t('admin.dashboard.createNewSlot')}
                         </Typography>
                       </ListItemButton>
                       {/* Custom time picker */}
@@ -2327,7 +2346,7 @@ const AdminDashboard = () => {
                           }}
                         >
                           <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-                            Enter time
+                            {t('admin.dashboard.enterTime')}
                           </Typography>
                           <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 1, mb: 2 }}>
                             {/* Hours */}
@@ -2448,14 +2467,14 @@ const AdminDashboard = () => {
                               onClick={handleSetNow}
                               sx={{ color: 'primary.main', textTransform: 'none' }}
                             >
-                              Now
+                              {t('admin.dashboard.now')}
                             </Button>
                             <Button
                               size="small"
                               onClick={handleClearTime}
                               sx={{ color: 'primary.main', textTransform: 'none' }}
                             >
-                              Clear
+                              {t('admin.dashboard.clear')}
                             </Button>
                           </Box>
                         </Box>
@@ -2472,8 +2491,8 @@ const AdminDashboard = () => {
                 fullWidth
                 multiline
                 rows={4}
-                label="Message (Optional)"
-                placeholder="Add any additional notes or questions..."
+                label={t('admin.dashboard.messageOptional')}
+                placeholder={t('admin.dashboard.messagePlaceholder')}
                 value={bookingClientMessage}
                 onChange={(e) => {
                   const value = e.target.value;
@@ -2485,8 +2504,8 @@ const AdminDashboard = () => {
                 error={bookingClientMessage.length > 2000}
                 helperText={
                   bookingClientMessage.length > 2000
-                    ? 'Message must be 2000 characters or less'
-                    : `${bookingClientMessage.length}/2000 characters`
+                    ? t('admin.dashboard.messageMaxLength')
+                    : `${bookingClientMessage.length}/2000 ${t('common.characters')}`
                 }
               />
             </Grid>
@@ -2498,7 +2517,7 @@ const AdminDashboard = () => {
             sx={{ textTransform: 'none' }}
             disabled={submittingBooking}
           >
-            Cancel
+            {t('admin.dashboard.cancel')}
           </Button>
           <Button
             onClick={handleSubmitBooking}
@@ -2515,10 +2534,10 @@ const AdminDashboard = () => {
             {submittingBooking ? (
               <>
                 <CircularProgress size={16} sx={{ mr: 1 }} />
-                Creating...
+                {t('admin.dashboard.creating')}
               </>
             ) : (
-              'Create Booking'
+              t('admin.dashboard.createBooking')
             )}
           </Button>
         </DialogActions>
@@ -2526,7 +2545,7 @@ const AdminDashboard = () => {
 
       {/* Create New Client Dialog */}
       <Dialog open={createClientOpen} onClose={handleCreateClientClose} maxWidth="sm" fullWidth>
-        <DialogTitle>Create New Client</DialogTitle>
+        <DialogTitle>{t('admin.dashboard.createNewClient')}</DialogTitle>
         <DialogContent>
           {createClientError && (
             <Alert severity="error" sx={{ mb: 2 }} onClose={() => setCreateClientError(null)}>
@@ -2539,7 +2558,7 @@ const AdminDashboard = () => {
               <TextField
                 autoFocus
                 fullWidth
-                label="Email *"
+                label={t('admin.dashboard.emailLabel')}
                 type="email"
                 value={newClientData.email}
                 onChange={(e) => {
@@ -2555,7 +2574,7 @@ const AdminDashboard = () => {
             <Grid item xs={12}>
               <TextField
                 fullWidth
-                label="First Name"
+                label={t('admin.dashboard.firstNameLabel')}
                 value={newClientData.firstName}
                 onChange={(e) => {
                   setNewClientData((prev) => ({ ...prev, firstName: e.target.value }));
@@ -2568,7 +2587,7 @@ const AdminDashboard = () => {
             <Grid item xs={12}>
               <TextField
                 fullWidth
-                label="Last Name"
+                label={t('admin.dashboard.lastNameLabel')}
                 value={newClientData.lastName}
                 onChange={(e) => {
                   setNewClientData((prev) => ({ ...prev, lastName: e.target.value }));
@@ -2580,13 +2599,13 @@ const AdminDashboard = () => {
 
             <Grid item xs={12}>
               <FormControl fullWidth>
-                <InputLabel>Timezone</InputLabel>
+                <InputLabel>{t('admin.dashboard.timezoneLabel')}</InputLabel>
                 <Select
                   value={newClientData.timezone}
                   onChange={(e) => {
                     setNewClientData((prev) => ({ ...prev, timezone: e.target.value }));
                   }}
-                  label="Timezone"
+                  label={t('admin.dashboard.timezoneLabel')}
                   disabled={creatingClient}
                 >
                   {getUniqueTimezoneOffsets().map((tz) => (
@@ -2609,7 +2628,7 @@ const AdminDashboard = () => {
                     disabled={creatingClient}
                   />
                 }
-                label="Send Notification"
+                label={t('pages.profile.emailNotifications')}
               />
             </Grid>
           </Grid>
@@ -2631,10 +2650,10 @@ const AdminDashboard = () => {
             {creatingClient ? (
               <>
                 <CircularProgress size={16} sx={{ mr: 1 }} />
-                Creating...
+                {t('admin.dashboard.creatingClient')}
               </>
             ) : (
-              'Create Client'
+              t('admin.dashboard.createClient')
             )}
           </Button>
         </DialogActions>

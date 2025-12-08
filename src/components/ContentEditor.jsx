@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { useTranslation } from 'react-i18next';
 import {
   Box,
   TextField,
@@ -17,6 +18,7 @@ import { loadImageWithCache } from '../utils/imageCache';
 const EditableImage = ({ mediaId, width, height, alignment, onEdit, imageUrls, loadImageUrls }) => {
   const [imageUrl, setImageUrl] = useState(imageUrls[mediaId] || null);
   const [loading, setLoading] = useState(!imageUrl);
+  const [hasError, setHasError] = useState(false);
 
   useEffect(() => {
     if (imageUrl || imageUrls[mediaId]) {
@@ -198,6 +200,7 @@ const EditableImage = ({ mediaId, width, height, alignment, onEdit, imageUrls, l
 
 // Content Editor with Preview
 const ContentEditor = ({ value, onChange, onImageEdit, imageUrls, loadImageUrls, disabled, placeholder }) => {
+  const { t } = useTranslation();
   const [activeTab, setActiveTab] = useState(0);
   const [previewParts, setPreviewParts] = useState([]);
 
@@ -294,8 +297,8 @@ const ContentEditor = ({ value, onChange, onImageEdit, imageUrls, loadImageUrls,
   return (
     <Box>
       <Tabs value={activeTab} onChange={handleTabChange} sx={{ mb: 2 }}>
-        <Tab label="Edit" />
-        <Tab label="Preview" />
+        <Tab label={t('common.edit')} />
+        <Tab label={t('admin.blog.preview')} />
       </Tabs>
       <Divider />
       {activeTab === 0 ? (

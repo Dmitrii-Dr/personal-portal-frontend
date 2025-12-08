@@ -138,11 +138,7 @@ const theme = createTheme({
         disableRipple: true,
       },
     },
-    MuiChip: {
-      defaultProps: {
-        disableRipple: true,
-      },
-    },
+    // MuiChip doesn't support disableRipple prop
     MuiFab: {
       defaultProps: {
         disableRipple: true,
@@ -163,6 +159,7 @@ const theme = createTheme({
 
 // Placeholder components for routes
 const HomePage = () => {
+  const { t } = useTranslation();
   const [healthStatus, setHealthStatus] = useState('');
   const [healthError, setHealthError] = useState('');
   const [checking, setChecking] = useState(false);
@@ -282,7 +279,7 @@ const HomePage = () => {
               Loading...
             </>
           ) : (
-            'Book a Session'
+            {/* Translation handled in component */}
           )}
         </Button>
       </Box>
@@ -336,10 +333,10 @@ const HomePage = () => {
       {/* Prices and Services Section */}
       <Box sx={{ mt: 6 }}>
         <Typography variant="h4" component="h2" gutterBottom>
-          Services & Pricing
+          {t('landing.services.title')}
         </Typography>
         <Typography variant="body1" color="text.secondary" paragraph>
-          Choose the service package that best fits your needs
+          {t('landing.services.description')}
         </Typography>
 
         <Grid container spacing={3} sx={{ mt: 2 }}>

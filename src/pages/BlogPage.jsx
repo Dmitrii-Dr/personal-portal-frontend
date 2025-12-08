@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import apiClient, { getToken } from '../utils/api';
 import {
   Card,
@@ -17,6 +18,7 @@ import {
 } from '@mui/material';
 
 const BlogPage = () => {
+  const { t } = useTranslation();
   const navigate = useNavigate();
   const [articles, setArticles] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -84,16 +86,16 @@ const BlogPage = () => {
         
         console.error('Error fetching articles:', err);
         if (isMounted) {
-          let errorMessage = 'Failed to load articles. Please try again later.';
+          let errorMessage = t('pages.blog.errorLoadFailed');
           
           if (err.code === 'ECONNABORTED') {
-            errorMessage = 'Request timed out. Please try again.';
+            errorMessage = t('pages.blog.errorTimeout');
           } else if (err.response) {
             // Server responded with error status
             errorMessage = err.response.data?.message || `Server error: ${err.response.status}`;
           } else if (err.request) {
             // Request was made but no response received (likely 404 or network error)
-            errorMessage = 'Unable to reach the server. The API endpoint may not be available.';
+            errorMessage = t('pages.blog.errorServer');
           } else {
             // Something else happened
             errorMessage = err.message || errorMessage;
@@ -161,13 +163,13 @@ const BlogPage = () => {
     <Box>
       <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
         <Typography variant="h4" component="h1">
-          Blog
+          {t('pages.blog.title')}
         </Typography>
       </Box>
       
       <Tabs value={activeTab} onChange={handleTabChange} sx={{ mb: 3 }}>
-        <Tab label="Public Articles" />
-        {hasToken && <Tab label="Private Articles" />}
+        <Tab label={t('pages.blog.publicArticles')} />
+        {hasToken && <Tab label={t('pages.blog.privateArticles')} />}
       </Tabs>
 
       {loading ? (
@@ -218,7 +220,7 @@ const BlogPage = () => {
                           lineHeight: 1.3,
                         }}
                       >
-                        {article.title || 'Untitled'}
+                        {article.title || t('pages.blog.untitled')}
                       </Typography>
 
                       {article.publishedAt && (
@@ -287,7 +289,7 @@ const BlogPage = () => {
         </Grid>
       ) : (
         <Alert severity="info" sx={{ mt: 2 }}>
-          No articles available at the moment.
+          {t('pages.blog.noArticlesAvailable')}
         </Alert>
       )}
     </Box>

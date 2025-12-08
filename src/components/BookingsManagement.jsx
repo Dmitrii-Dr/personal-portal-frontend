@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { useTranslation } from 'react-i18next';
 import dayjs from 'dayjs';
 import utc from 'dayjs/plugin/utc';
 import timezone from 'dayjs/plugin/timezone';
@@ -68,6 +69,7 @@ const STATUS_TRANSITIONS = {
 };
 
 const BookingsManagement = () => {
+  const { t } = useTranslation();
   const [bookings, setBookings] = useState({
     PENDING_APPROVAL: [],
     CONFIRMED: [],
@@ -509,14 +511,14 @@ const BookingsManagement = () => {
         console.error('Error fetching available slots for reschedule:', err);
         if (!isMounted) return;
         
-        let errorMessage = 'Failed to load available slots. Please try again later.';
+        let errorMessage = t('admin.bookingsManagement.failedToLoadSlots');
         
         if (err.code === 'ECONNABORTED') {
-          errorMessage = 'Request timed out. Please try again.';
+          errorMessage = t('admin.bookingsManagement.requestTimeout');
         } else if (err.response) {
           errorMessage = err.response.data?.message || `Server error: ${err.response.status}`;
         } else if (err.request) {
-          errorMessage = 'Unable to reach the server. Please check your connection.';
+          errorMessage = t('admin.bookingsManagement.unableToReachServer');
         } else {
           errorMessage = err.message || errorMessage;
         }
@@ -560,6 +562,13 @@ const BookingsManagement = () => {
     const lastName = booking.clientLastName || '';
     const name = `${firstName} ${lastName}`.trim();
     return name || booking.clientEmail || 'Unknown';
+  };
+
+  // Get human-readable status label
+  const getStatusLabel = (status) => {
+    if (!status) return '';
+    // Use the status translation from pages.booking.status
+    return t(`pages.booking.status.${status}`, { defaultValue: status.replace(/_/g, ' ') });
   };
 
   // Handle update dialog open
@@ -655,14 +664,14 @@ const BookingsManagement = () => {
           // Fetch slots for the matched session type
           fetchRescheduleSlots(dayjs(), sessionTypeId);
         } else {
-          setRescheduleSlotError(`Session type "${booking.sessionName}" is no longer available for booking.`);
+          setRescheduleSlotError(t('admin.bookingsManagement.sessionTypeNotAvailable', { sessionName: booking.sessionName }));
         }
       } else {
-        setRescheduleSlotError('Failed to load session types.');
+        setRescheduleSlotError(t('admin.bookingsManagement.failedToLoadSessionTypes'));
       }
     } catch (err) {
       console.error('Error fetching session types for reschedule:', err);
-      setRescheduleSlotError('Failed to load session types. Please try again.');
+      setRescheduleSlotError(t('admin.bookingsManagement.failedToLoadSessionTypesRetry'));
     }
   };
 
@@ -671,7 +680,7 @@ const BookingsManagement = () => {
     if (!sessionTypeId) {
       setRescheduleLoadingSlots(false);
       setRescheduleAvailableSlots([]);
-      setRescheduleSlotError('Session type not found');
+      setRescheduleSlotError(t('admin.bookingsManagement.sessionTypeNotFound'));
       return;
     }
 
@@ -714,14 +723,14 @@ const BookingsManagement = () => {
       }
     } catch (err) {
       console.error('Error fetching available slots for reschedule:', err);
-      let errorMessage = 'Failed to load available slots. Please try again later.';
+      let errorMessage = t('admin.bookingsManagement.failedToLoadSlots');
       
       if (err.code === 'ECONNABORTED') {
-        errorMessage = 'Request timed out. Please try again.';
+        errorMessage = t('admin.bookingsManagement.requestTimeout');
       } else if (err.response) {
         errorMessage = err.response.data?.message || `Server error: ${err.response.status}`;
       } else if (err.request) {
-        errorMessage = 'Unable to reach the server. Please check your connection.';
+        errorMessage = t('admin.bookingsManagement.unableToReachServer');
       } else {
         errorMessage = err.message || errorMessage;
       }
@@ -899,7 +908,7 @@ const BookingsManagement = () => {
   // Handle booking reschedule confirmation
   const handleConfirmReschedule = async () => {
     if (!bookingToReschedule || !bookingToReschedule.id) {
-      setRescheduleBookingError('Booking information is missing');
+      setRescheduleBookingError(t('admin.bookingsManagement.bookingInfoMissing'));
       return;
     }
 
@@ -916,14 +925,14 @@ const BookingsManagement = () => {
         .millisecond(0);
       startTimeInstant = combinedDateTime.toISOString();
     } else {
-      setRescheduleBookingError('Please select a time slot or create a custom time');
+      setRescheduleBookingError(t('admin.bookingsManagement.noSlotSelected'));
       return;
     }
 
     // Get userId from booking - try different possible field names
     const userId = bookingToReschedule.userId || bookingToReschedule.clientId || bookingToReschedule.user?.id;
     if (!userId) {
-      setRescheduleBookingError('User ID not found in booking data');
+      setRescheduleBookingError(t('admin.bookingsManagement.userIDNotFound'));
       return;
     }
 
@@ -948,7 +957,7 @@ const BookingsManagement = () => {
 
       // Success - close dialog and refresh bookings
       handleRescheduleDialogClose();
-      setSuccessMessage('Booking updated successfully');
+      setSuccessMessage(t('admin.bookingsManagement.rescheduleSuccess'));
       // Invalidate cache for the date that was rescheduled to refresh slots
       const dateString = formatDateForAPI(rescheduleSelectedDate);
       const timezone = userTimezone || Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC';
@@ -958,10 +967,10 @@ const BookingsManagement = () => {
       fetchBookings();
     } catch (err) {
       console.error('Error rescheduling booking:', err);
-      let errorMessage = 'Failed to update booking. Please try again.';
+      let errorMessage = t('admin.bookingsManagement.failedToUpdateBooking');
       
       if (err.code === 'ECONNABORTED') {
-        errorMessage = 'Request timed out. Please try again.';
+        errorMessage = t('admin.bookingsManagement.requestTimeout');
       } else if (err.response) {
         errorMessage = err.response.data?.message || `Server error: ${err.response.status}`;
         // If reschedule failed (e.g., slot was already booked), invalidate cache to refresh
@@ -971,7 +980,7 @@ const BookingsManagement = () => {
           invalidateCache(rescheduleSessionTypeId, dateString, timezone);
         }
       } else if (err.request) {
-        errorMessage = 'Unable to reach the server. Please check your connection.';
+        errorMessage = t('admin.bookingsManagement.unableToReachServer');
       } else {
         errorMessage = err.message || errorMessage;
       }
@@ -985,7 +994,7 @@ const BookingsManagement = () => {
   // Handle status update
   const handleStatusUpdate = async () => {
     if (!selectedBooking || !newStatus) {
-      setUpdateError('Please select a new status');
+      setUpdateError(t('admin.dashboard.statusRequired'));
       return;
     }
 
@@ -1013,7 +1022,7 @@ const BookingsManagement = () => {
 
       // Success - close dialog and refresh bookings
       handleUpdateClose();
-      setSuccessMessage(`Booking status updated to ${newStatus}`);
+      setSuccessMessage(t('admin.bookingsManagement.statusUpdatedTo', { status: getStatusLabel(newStatus) }));
       fetchBookings();
     } catch (err) {
       console.error('Error updating booking status:', err);
@@ -1096,13 +1105,13 @@ const BookingsManagement = () => {
           <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2, flexWrap: 'wrap', gap: 1 }}>
             <Box sx={{ display: 'flex', gap: 1, alignItems: 'center', flexWrap: 'wrap' }}>
             <Chip
-              label={booking.status.replace(/_/g, ' ')}
+              label={getStatusLabel(booking.status)}
               color={STATUS_COLORS[booking.status] || 'default'}
               size="small"
             />
             {overdue && (
               <Chip
-                label="Overdue"
+                label={t('pages.booking.overdue')}
                 color="default"
                 size="small"
                 sx={{ bgcolor: 'grey.500', color: 'white' }}
@@ -1110,14 +1119,14 @@ const BookingsManagement = () => {
             )}
             {past && (
               <Chip
-                label="Overdue"
+                label={t('pages.booking.overdue')}
                 color="default"
                 size="small"
                 sx={{ bgcolor: 'grey.500', color: 'white' }}
               />
             )}
             {urgent && (
-              <Tooltip title="A decision must be taken ASAP">
+              <Tooltip title={t('pages.booking.urgentTooltip')}>
                 <WarningIcon sx={{ color: 'error.main', fontSize: '1.5rem' }} />
               </Tooltip>
             )}
@@ -1128,7 +1137,7 @@ const BookingsManagement = () => {
                 onClick={() => handleInfoClick(booking)}
               sx={{ textTransform: 'none' }}
             >
-                Info
+                {t('common.info')}
             </Button>
             </Box>
             {canUpdate && (
@@ -1139,7 +1148,7 @@ const BookingsManagement = () => {
                 onClick={() => handleUpdateClick(booking)}
                 sx={{ textTransform: 'none' }}
               >
-                Update
+                {t('admin.bookingsManagement.update')}
               </Button>
             )}
           </Box>
@@ -1156,7 +1165,7 @@ const BookingsManagement = () => {
           <Grid container spacing={2}>
             <Grid item xs={12} sm={6}>
               <Typography variant="body2" color="text.secondary">
-                Session Type
+                {t('admin.bookingsManagement.sessionType')}
               </Typography>
               <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
                 {booking.sessionDurationMinutes && (
@@ -1192,7 +1201,7 @@ const BookingsManagement = () => {
               <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 1 }}>
                 <Box sx={{ flex: 1 }}>
               <Typography variant="body2" color="text.secondary">
-                Start Time
+                {t('admin.bookingsManagement.startTime')}
               </Typography>
                   <Typography variant="body1">
                 {formatDateTime(booking.startTimeInstant)}
@@ -1205,7 +1214,7 @@ const BookingsManagement = () => {
                   onClick={() => handleRescheduleClick(booking)}
                   sx={{ textTransform: 'none', alignSelf: 'flex-end' }}
                 >
-                  Update
+                  {t('admin.bookingsManagement.update')}
                 </Button>
               </Box>
             </Grid>
@@ -1220,7 +1229,7 @@ const BookingsManagement = () => {
       <Box>
         <Box sx={{ mb: 3 }}>
           <Typography variant="h5" component="h2">
-            Bookings Management
+            {t('admin.bookingsManagement.title')}
           </Typography>
         </Box>
 
@@ -1235,7 +1244,7 @@ const BookingsManagement = () => {
               onClick={(e) => setCalendarAnchorEl(e.currentTarget)}
               sx={{ textTransform: 'none' }}
             >
-              Date Range
+              {t('admin.bookingsManagement.dateRange')}
             </Button>
             <Button
               variant={getActiveFilter() === 'today' ? 'contained' : 'outlined'}
@@ -1243,7 +1252,7 @@ const BookingsManagement = () => {
               onClick={handleTodayFilter}
               sx={{ textTransform: 'none' }}
             >
-              Today
+              {t('admin.bookingsManagement.today')}
             </Button>
             <Button
               variant={getActiveFilter() === 'thisWeek' ? 'contained' : 'outlined'}
@@ -1251,7 +1260,7 @@ const BookingsManagement = () => {
               onClick={handleThisWeekFilter}
               sx={{ textTransform: 'none' }}
             >
-              This Week
+              {t('admin.bookingsManagement.thisWeek')}
             </Button>
             <Button
               variant={getActiveFilter() === 'thisMonth' ? 'contained' : 'outlined'}
@@ -1259,16 +1268,19 @@ const BookingsManagement = () => {
               onClick={handleThisMonthFilter}
               sx={{ textTransform: 'none' }}
             >
-              This Month
+              {t('admin.bookingsManagement.thisMonth')}
             </Button>
             {startDate && (
               <Typography variant="body2" color="text.secondary">
                 {endDate && dayjs(startDate).format('YYYY-MM-DD') !== dayjs(endDate).format('YYYY-MM-DD') ? (
                   <>
-                    From: {dayjs(startDate).format('MMM DD, YYYY')} To: {dayjs(endDate).format('MMM DD, YYYY')}
+                    {t('admin.bookingsManagement.fromTo', { 
+                      start: dayjs(startDate).format('MMM DD, YYYY'), 
+                      end: dayjs(endDate).format('MMM DD, YYYY') 
+                    })}
                   </>
                 ) : (
-                  <>Date: {dayjs(startDate).format('MMM DD, YYYY')}</>
+                  <>{t('admin.bookingsManagement.date', { date: dayjs(startDate).format('MMM DD, YYYY') })}</>
                 )}
               </Typography>
             )}
@@ -1280,7 +1292,7 @@ const BookingsManagement = () => {
                 onClick={handleClearFilter}
                 sx={{ textTransform: 'none', ml: 'auto' }}
               >
-                Clear Filter
+                {t('admin.bookingsManagement.clearFilter')}
               </Button>
             )}
           </Box>
@@ -1446,7 +1458,9 @@ const BookingsManagement = () => {
             <Box>
               <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
                 <Typography variant="body2" color="text.secondary">
-                  {bookings.PENDING_APPROVAL.length} booking{bookings.PENDING_APPROVAL.length !== 1 ? 's' : ''} wait for approval
+                  {bookings.PENDING_APPROVAL.length === 1 
+                    ? t('admin.bookingsManagement.pendingApprovalCount', { count: bookings.PENDING_APPROVAL.length })
+                    : t('admin.bookingsManagement.pendingApprovalCountPlural', { count: bookings.PENDING_APPROVAL.length })}
                 </Typography>
               </Box>
               {bookings.PENDING_APPROVAL.length > 0 ? (
@@ -1454,7 +1468,7 @@ const BookingsManagement = () => {
                   {bookings.PENDING_APPROVAL.map((booking) => renderBookingCard(booking))}
                 </Box>
               ) : (
-                <Alert severity="info">No bookings pending approval.</Alert>
+                <Alert severity="info">{t('admin.bookingsManagement.noPendingApproval')}</Alert>
               )}
             </Box>
           </Grid>
@@ -1464,7 +1478,9 @@ const BookingsManagement = () => {
             <Box>
               <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
                 <Typography variant="body2" color="text.secondary">
-                  {bookings.CONFIRMED.length} booking{bookings.CONFIRMED.length !== 1 ? 's' : ''} were confirmed
+                  {bookings.CONFIRMED.length === 1 
+                    ? t('admin.bookingsManagement.confirmedCount', { count: bookings.CONFIRMED.length })
+                    : t('admin.bookingsManagement.confirmedCountPlural', { count: bookings.CONFIRMED.length })}
                 </Typography>
               </Box>
               {bookings.CONFIRMED.length > 0 ? (
@@ -1472,7 +1488,7 @@ const BookingsManagement = () => {
                   {bookings.CONFIRMED.map((booking) => renderBookingCard(booking))}
                 </Box>
               ) : (
-                <Alert severity="info">No confirmed bookings.</Alert>
+                <Alert severity="info">{t('admin.bookingsManagement.noConfirmed')}</Alert>
               )}
             </Box>
           </Grid>
@@ -1481,7 +1497,7 @@ const BookingsManagement = () => {
 
       {/* Update Status Dialog */}
       <Dialog open={updateDialogOpen} onClose={handleUpdateClose} maxWidth="sm" fullWidth>
-        <DialogTitle>Update Booking Status</DialogTitle>
+        <DialogTitle>{t('admin.bookingsManagement.updateBookingStatus')}</DialogTitle>
         <DialogContent>
           {updateError && (
             <Alert severity="error" sx={{ mb: 2 }} onClose={() => setUpdateError(null)}>
@@ -1492,31 +1508,31 @@ const BookingsManagement = () => {
           {selectedBooking && (
             <Box>
               <Typography variant="body2" color="text.secondary" gutterBottom>
-                Client: {getClientName(selectedBooking)}
+                {t('admin.bookingsManagement.client')} {getClientName(selectedBooking)}
               </Typography>
               <Typography variant="body2" color="text.secondary" gutterBottom>
-                Session: {selectedBooking.sessionName}
+                {t('admin.bookingsManagement.session')} {selectedBooking.sessionName}
               </Typography>
               <Typography variant="body2" color="text.secondary" gutterBottom sx={{ mb: 3 }}>
-                Current Status:{' '}
+                {t('admin.bookingsManagement.currentStatus')}{' '}
                 <Chip
-                  label={selectedBooking.status.replace(/_/g, ' ')}
+                  label={getStatusLabel(selectedBooking.status)}
                   color={STATUS_COLORS[selectedBooking.status] || 'default'}
                   size="small"
                 />
               </Typography>
 
               <FormControl fullWidth required>
-                <InputLabel>New Status</InputLabel>
+                <InputLabel>{t('admin.bookingsManagement.newStatus')}</InputLabel>
                 <Select
                   value={newStatus}
                   onChange={(e) => setNewStatus(e.target.value)}
-                  label="New Status"
+                  label={t('admin.bookingsManagement.newStatus')}
                   disabled={updating}
                 >
                   {getValidTransitions(selectedBooking.status).map((status) => (
                     <MenuItem key={status} value={status}>
-                      {status.replace(/_/g, ' ')}
+                      {getStatusLabel(status)}
                     </MenuItem>
                   ))}
                 </Select>
@@ -1530,7 +1546,7 @@ const BookingsManagement = () => {
             sx={{ textTransform: 'none' }}
             disabled={updating}
           >
-            Cancel
+            {t('admin.bookingsManagement.cancel')}
           </Button>
           <Button
             onClick={handleStatusUpdate}
@@ -1541,10 +1557,10 @@ const BookingsManagement = () => {
             {updating ? (
               <>
                 <CircularProgress size={16} sx={{ mr: 1 }} />
-                Updating...
+                {t('admin.bookingsManagement.updating')}
               </>
             ) : (
-              'Update Status'
+              t('admin.bookingsManagement.updateStatus')
             )}
           </Button>
         </DialogActions>
@@ -1552,30 +1568,30 @@ const BookingsManagement = () => {
 
       {/* Info Dialog */}
       <Dialog open={infoDialogOpen} onClose={handleInfoClose} maxWidth="md" fullWidth>
-        <DialogTitle>Booking Details</DialogTitle>
+        <DialogTitle>{t('admin.bookingsManagement.bookingDetails')}</DialogTitle>
         <DialogContent>
           {selectedBookingInfo && (
             <Box>
               {/* Main Data - Duplicated */}
               <Box sx={{ mb: 3 }}>
                 <Typography variant="h6" gutterBottom>
-                  Main Information
+                  {t('admin.bookingsManagement.mainInformation')}
               </Typography>
                 <Divider sx={{ mb: 2 }} />
                 <Grid container spacing={2}>
                   <Grid item xs={12} sm={6}>
                     <Typography variant="body2" color="text.secondary">
-                      Status
+                      {t('admin.bookingsManagement.status')}
                     </Typography>
                     <Box sx={{ mt: 0.5, mb: 1 }}>
                       <Chip
-                        label={selectedBookingInfo.status.replace(/_/g, ' ')}
+                        label={getStatusLabel(selectedBookingInfo.status)}
                         color={STATUS_COLORS[selectedBookingInfo.status] || 'default'}
                         size="small"
                       />
                       {isOverdue(selectedBookingInfo) && (
                         <Chip
-                          label="Overdue"
+                          label={t('pages.booking.overdue')}
                           color="default"
                           size="small"
                           sx={{ bgcolor: 'grey.500', color: 'white', ml: 1 }}
@@ -1585,7 +1601,7 @@ const BookingsManagement = () => {
                   </Grid>
                   <Grid item xs={12} sm={6}>
                     <Typography variant="body2" color="text.secondary">
-                      Client Name
+                      {t('admin.bookingsManagement.clientName')}
                     </Typography>
                     <Typography variant="body1" gutterBottom>
                       {getClientName(selectedBookingInfo)}
@@ -1593,7 +1609,7 @@ const BookingsManagement = () => {
                   </Grid>
                   <Grid item xs={12} sm={6}>
                     <Typography variant="body2" color="text.secondary">
-                      Start Time
+                      {t('admin.bookingsManagement.startTime')}
                     </Typography>
                     <Typography variant="body1" gutterBottom>
                       {formatDateTime(selectedBookingInfo.startTimeInstant)}
@@ -1601,7 +1617,7 @@ const BookingsManagement = () => {
                   </Grid>
                   <Grid item xs={12} sm={6}>
                     <Typography variant="body2" color="text.secondary">
-                      Session Type
+                      {t('admin.bookingsManagement.sessionType')}
                     </Typography>
                     <Typography variant="body1" gutterBottom>
                       {selectedBookingInfo.sessionName || 'N/A'}
@@ -1615,13 +1631,13 @@ const BookingsManagement = () => {
               {/* Additional Information */}
               <Box>
                 <Typography variant="h6" gutterBottom>
-                  Additional Information
+                  {t('admin.bookingsManagement.additionalInformation')}
               </Typography>
               <Divider sx={{ mb: 2 }} />
                 <Grid container spacing={2}>
                   <Grid item xs={12} sm={6}>
                     <Typography variant="body2" color="text.secondary">
-                      Email
+                      {t('admin.bookingsManagement.email')}
                     </Typography>
                     <Typography variant="body1" gutterBottom>
                       {selectedBookingInfo.clientEmail || 'N/A'}
@@ -1629,7 +1645,7 @@ const BookingsManagement = () => {
                   </Grid>
                   <Grid item xs={12} sm={6}>
                     <Typography variant="body2" color="text.secondary">
-                      End Time
+                      {t('admin.bookingsManagement.endTime')}
                     </Typography>
                     <Typography variant="body1" gutterBottom>
                       {formatDateTime(selectedBookingInfo.endTimeInstant)}
@@ -1637,7 +1653,7 @@ const BookingsManagement = () => {
                   </Grid>
                   <Grid item xs={12} sm={6}>
                     <Typography variant="body2" color="text.secondary">
-                      Created At
+                      {t('admin.bookingsManagement.createdAt')}
                     </Typography>
                     <Typography variant="body1" gutterBottom>
                       {formatDateTime(selectedBookingInfo.createdAt)}
@@ -1646,17 +1662,17 @@ const BookingsManagement = () => {
                   {selectedBookingInfo.sessionDurationMinutes && (
                     <Grid item xs={12} sm={6}>
                       <Typography variant="body2" color="text.secondary">
-                        Duration
+                        {t('admin.bookingsManagement.duration')}
                       </Typography>
                       <Typography variant="body1" gutterBottom>
-                        {selectedBookingInfo.sessionDurationMinutes} minutes
+                        {selectedBookingInfo.sessionDurationMinutes} {t('admin.bookingsManagement.minutes')}
                       </Typography>
                     </Grid>
                   )}
                   {selectedBookingInfo.sessionPrices && Object.keys(selectedBookingInfo.sessionPrices).length > 0 && (
                     <Grid item xs={12}>
                       <Typography variant="body2" color="text.secondary" gutterBottom>
-                        Prices
+                        {t('admin.bookingsManagement.prices')}
                       </Typography>
                       <Stack direction="row" spacing={1} sx={{ flexWrap: 'wrap', gap: 1 }}>
                         {Object.entries(selectedBookingInfo.sessionPrices).map(([currency, price]) => {
@@ -1674,7 +1690,7 @@ const BookingsManagement = () => {
                   )}
                   <Grid item xs={12}>
                     <Typography variant="body2" color="text.secondary" gutterBottom>
-                      Client Message
+                      {t('admin.bookingsManagement.clientMessage')}
                     </Typography>
                     {selectedBookingInfo.clientMessage ? (
                       <Typography variant="body1" sx={{ whiteSpace: 'pre-wrap', bgcolor: 'grey.50', p: 2, borderRadius: 1 }}>
@@ -1682,7 +1698,7 @@ const BookingsManagement = () => {
                 </Typography>
               ) : (
                       <Typography variant="body2" color="text.secondary" fontStyle="italic" sx={{ bgcolor: 'grey.50', p: 2, borderRadius: 1 }}>
-                  No message provided
+                  {t('admin.bookingsManagement.noMessageProvided')}
                 </Typography>
               )}
                   </Grid>
@@ -1693,19 +1709,21 @@ const BookingsManagement = () => {
         </DialogContent>
         <DialogActions>
           <Button onClick={handleInfoClose} sx={{ textTransform: 'none' }}>
-            Close
+            {t('common.close')}
           </Button>
         </DialogActions>
       </Dialog>
 
       {/* Reschedule/Update Booking Dialog */}
       <Dialog open={rescheduleDialogOpen} onClose={handleRescheduleDialogClose} maxWidth="md" fullWidth>
-        <DialogTitle>Update Session Date/Time</DialogTitle>
+        <DialogTitle>{t('admin.bookingsManagement.updateSessionDateTime')}</DialogTitle>
         <DialogContent>
           {bookingToReschedule && (
             <>
               <DialogContentText sx={{ mb: 2 }}>
-                Select a new date and time for the <strong>{bookingToReschedule.sessionName || 'Session'}</strong> booking.
+                {bookingToReschedule.sessionName 
+                  ? t('admin.bookingsManagement.selectNewDateTime', { sessionName: bookingToReschedule.sessionName })
+                  : t('admin.bookingsManagement.selectNewDateTimeFallback')}
               </DialogContentText>
 
               {/* Current and New Time Display */}
@@ -1713,7 +1731,7 @@ const BookingsManagement = () => {
                 <Grid container spacing={2}>
                   <Grid item xs={12} sm={6}>
                     <Typography variant="body2" color="text.secondary" gutterBottom>
-                      Current Date/Time
+                      {t('admin.bookingsManagement.currentDateTime')}
                     </Typography>
                     <Typography variant="body1" fontWeight="medium">
                       {formatDateTime(bookingToReschedule.startTimeInstant)}
@@ -1722,7 +1740,7 @@ const BookingsManagement = () => {
                   {rescheduleSelectedSlot && (
                     <Grid item xs={12} sm={6}>
                       <Typography variant="body2" color="text.secondary" gutterBottom>
-                        New Date/Time
+                        {t('admin.bookingsManagement.newDateTime')}
                       </Typography>
                       <Typography variant="body1" fontWeight="medium" color="primary.main">
                         {formatDateTime(rescheduleSelectedSlot.startTimeInstant)}
@@ -1753,7 +1771,7 @@ const BookingsManagement = () => {
               {/* Warning for past date selection */}
               {rescheduleSelectedDate && rescheduleSelectedDate.isBefore(dayjs(), 'day') && (
                 <Alert severity="warning" sx={{ mb: 2 }}>
-                  You are selecting a past date. Please ensure this is intentional.
+                  {t('admin.bookingsManagement.pastDateWarning')}
                 </Alert>
               )}
 
@@ -1783,7 +1801,7 @@ const BookingsManagement = () => {
                 {/* Right Column - Available Slots */}
                 <Grid item xs={12} md={6}>
                   <Typography variant="h6" gutterBottom>
-                    Available Times on {formatDateForDisplay(rescheduleSelectedDate)}
+                    {t('admin.bookingsManagement.availableTimes')} {formatDateForDisplay(rescheduleSelectedDate)}
                   </Typography>
 
                   {rescheduleSlotError && (
@@ -1853,7 +1871,7 @@ const BookingsManagement = () => {
                         }}
                       >
                         <Typography variant="body1" sx={{ fontStyle: 'italic' }}>
-                          + Create new slot
+                          {t('admin.bookingsManagement.createNewSlot')}
                         </Typography>
                       </ListItemButton>
                       {/* Custom time picker */}
@@ -1870,7 +1888,7 @@ const BookingsManagement = () => {
                           }}
                         >
                           <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-                            Enter time
+                            {t('admin.bookingsManagement.enterTime')}
                           </Typography>
                           <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 1, mb: 2 }}>
                             {/* Hours */}
@@ -1990,14 +2008,14 @@ const BookingsManagement = () => {
                               onClick={handleSetNow}
                               sx={{ color: 'primary.main', textTransform: 'none' }}
                             >
-                              Now
+                              {t('admin.bookingsManagement.now')}
                             </Button>
                             <Button
                               size="small"
                               onClick={handleClearTime}
                               sx={{ color: 'primary.main', textTransform: 'none' }}
                             >
-                              Clear
+                              {t('admin.bookingsManagement.clear')}
                             </Button>
                           </Box>
                         </Box>
@@ -2006,7 +2024,7 @@ const BookingsManagement = () => {
                   ) : (
                     <>
                       <Alert severity="info" sx={{ mb: 2 }}>
-                        No available sessions on this day. Please select another day.
+                        {t('admin.bookingsManagement.noAvailableSessions')}
                       </Alert>
                       {/* Create new slot option even when no slots available */}
                       <ListItemButton
@@ -2024,7 +2042,7 @@ const BookingsManagement = () => {
                         }}
                       >
                         <Typography variant="body1" sx={{ fontStyle: 'italic' }}>
-                          + Create new slot
+                          {t('admin.bookingsManagement.createNewSlot')}
                         </Typography>
                       </ListItemButton>
                       {/* Custom time picker */}
@@ -2041,7 +2059,7 @@ const BookingsManagement = () => {
                           }}
                         >
                           <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-                            Enter time
+                            {t('admin.bookingsManagement.enterTime')}
                           </Typography>
                           <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 1, mb: 2 }}>
                             {/* Hours */}
@@ -2161,14 +2179,14 @@ const BookingsManagement = () => {
                               onClick={handleSetNow}
                               sx={{ color: 'primary.main', textTransform: 'none' }}
                             >
-                              Now
+                              {t('admin.bookingsManagement.now')}
                             </Button>
                             <Button
                               size="small"
                               onClick={handleClearTime}
                               sx={{ color: 'primary.main', textTransform: 'none' }}
                             >
-                              Clear
+                              {t('admin.bookingsManagement.clear')}
                             </Button>
                           </Box>
                         </Box>
@@ -2182,7 +2200,7 @@ const BookingsManagement = () => {
                 fullWidth
                 multiline
                 rows={4}
-                label="Message (Optional)"
+                label={t('admin.bookingsManagement.messageOptional')}
                 placeholder="Add any additional notes or questions..."
                 value={rescheduleClientMessage}
                 onChange={(e) => {
@@ -2195,8 +2213,8 @@ const BookingsManagement = () => {
                 error={rescheduleClientMessage.length > 2000}
                 helperText={
                   rescheduleClientMessage.length > 2000
-                    ? 'Message must be 2000 characters or less'
-                    : `${rescheduleClientMessage.length}/2000 characters`
+                    ? t('admin.dashboard.messageMaxLength')
+                    : `${rescheduleClientMessage.length}/2000 ${t('common.characters')}`
                 }
                 sx={{ mt: 3 }}
               />
@@ -2210,7 +2228,7 @@ const BookingsManagement = () => {
             disabled={reschedulingBooking}
             sx={{ textTransform: 'none' }}
           >
-            Cancel
+            {t('admin.bookingsManagement.cancel')}
           </Button>
           <Button 
             onClick={handleConfirmReschedule} 
@@ -2222,10 +2240,10 @@ const BookingsManagement = () => {
             {reschedulingBooking ? (
               <>
                 <CircularProgress size={16} sx={{ mr: 1 }} />
-                Updating...
+                {t('admin.bookingsManagement.rescheduling')}
               </>
             ) : (
-              'Update Booking'
+              t('admin.bookingsManagement.confirmReschedule')
             )}
           </Button>
         </DialogActions>
