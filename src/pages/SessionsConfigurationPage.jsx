@@ -1,7 +1,9 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { fetchWithAuth } from '../utils/api';
 import apiClient from '../utils/api';
+import { getCachedSlots, setCachedSlots } from '../utils/bookingSlotCache';
 import AvailabilityRuleComponent from '../components/AvailabilityRuleComponent';
+import AvailabilityOverrideComponent from '../components/AvailabilityOverrideComponent';
 import BookingSettings from '../components/BookingSettings';
 import {
   Box,
@@ -47,6 +49,71 @@ dayjs.extend(updateLocale);
 dayjs.extend(localeData);
 dayjs.locale('en-gb'); // Use en-gb locale which starts week on Monday
 
+// Common timezones with UTC offsets
+// Format: { value: timezone, offset: UTC offset, label: display name }
+const COMMON_TIMEZONES = [
+  { value: 'UTC', offset: '+00:00', label: 'UTC' },
+  { value: 'Europe/London', offset: '+00:00', label: 'Europe/London' },
+  { value: 'Europe/Paris', offset: '+01:00', label: 'Europe/Paris' },
+  { value: 'Europe/Berlin', offset: '+01:00', label: 'Europe/Berlin' },
+  { value: 'Europe/Athens', offset: '+02:00', label: 'Europe/Athens' },
+  { value: 'Europe/Moscow', offset: '+03:00', label: 'Europe/Moscow' },
+  { value: 'Asia/Dubai', offset: '+04:00', label: 'Asia/Dubai' },
+  { value: 'Asia/Tashkent', offset: '+05:00', label: 'Asia/Tashkent' },
+  { value: 'Asia/Kolkata', offset: '+05:30', label: 'Asia/Kolkata' },
+  { value: 'Asia/Dhaka', offset: '+06:00', label: 'Asia/Dhaka' },
+  { value: 'Asia/Bangkok', offset: '+07:00', label: 'Asia/Bangkok' },
+  { value: 'Asia/Singapore', offset: '+08:00', label: 'Asia/Singapore' },
+  { value: 'Asia/Shanghai', offset: '+08:00', label: 'Asia/Shanghai' },
+  { value: 'Asia/Almaty', offset: '+06:00', label: 'Asia/Almaty' },
+  { value: 'Asia/Tokyo', offset: '+09:00', label: 'Asia/Tokyo' },
+  { value: 'Asia/Seoul', offset: '+09:00', label: 'Asia/Seoul' },
+  { value: 'Australia/Sydney', offset: '+10:00', label: 'Australia/Sydney' },
+  { value: 'Australia/Melbourne', offset: '+10:00', label: 'Australia/Melbourne' },
+  { value: 'Pacific/Auckland', offset: '+12:00', label: 'Pacific/Auckland' },
+  { value: 'America/Honolulu', offset: '-10:00', label: 'America/Honolulu' },
+  { value: 'America/Anchorage', offset: '-09:00', label: 'America/Anchorage' },
+  { value: 'America/Los_Angeles', offset: '-08:00', label: 'America/Los_Angeles' },
+  { value: 'America/Phoenix', offset: '-07:00', label: 'America/Phoenix' },
+  { value: 'America/Denver', offset: '-07:00', label: 'America/Denver' },
+  { value: 'America/Chicago', offset: '-06:00', label: 'America/Chicago' },
+  { value: 'America/New_York', offset: '-05:00', label: 'America/New_York' },
+  { value: 'America/Caracas', offset: '-04:00', label: 'America/Caracas' },
+  { value: 'America/Sao_Paulo', offset: '-03:00', label: 'America/Sao_Paulo' },
+];
+
+// Helper function to get UTC offset for a timezone
+const getTimezoneOffset = (timezone) => {
+  try {
+    const now = new Date();
+    const utcDate = new Date(now.toLocaleString('en-US', { timeZone: 'UTC' }));
+    const tzDate = new Date(now.toLocaleString('en-US', { timeZone: timezone }));
+    const offsetMs = tzDate - utcDate;
+    const offsetHours = Math.floor(offsetMs / (1000 * 60 * 60));
+    const offsetMinutes = Math.floor((offsetMs % (1000 * 60 * 60)) / (1000 * 60));
+    const sign = offsetHours >= 0 ? '+' : '-';
+    const absHours = Math.abs(offsetHours);
+    const absMinutes = Math.abs(offsetMinutes);
+    return `${sign}${absHours.toString().padStart(2, '0')}:${absMinutes.toString().padStart(2, '0')}`;
+  } catch {
+    return '+00:00';
+  }
+};
+
+// Get timezone with offset for display
+const getTimezoneWithOffset = (timezone) => {
+  const found = COMMON_TIMEZONES.find(tz => tz.value === timezone);
+  if (found) {
+    return found;
+  }
+  // If not in common list, calculate offset dynamically
+  return {
+    value: timezone,
+    offset: getTimezoneOffset(timezone),
+    label: timezone,
+  };
+};
+
 const SessionsConfigurationPage = () => {
   // Session types state
   const [sessionTypes, setSessionTypes] = useState([]);
@@ -73,6 +140,8 @@ const SessionsConfigurationPage = () => {
   const [loadingSlots, setLoadingSlots] = useState(false);
   const [slotsError, setSlotsError] = useState(null);
   const [selectedSessionTypeId, setSelectedSessionTypeId] = useState(null);
+  const [selectedTimezone, setSelectedTimezone] = useState(null);
+  const [userTimezone, setUserTimezone] = useState(null);
   const hasFetchedSessionTypesRef = useRef(false);
 
   // Fetch session types (admin endpoint returns all session types, active and inactive)
@@ -111,35 +180,97 @@ const SessionsConfigurationPage = () => {
     fetchSessionTypes();
   }, []);
 
-  // Fetch available slots when date or session type changes
+  // Fetch user settings to get default timezone
   useEffect(() => {
-    if (selectedSessionTypeId) {
+    let isMounted = true;
+    const controller = new AbortController();
+
+    const fetchUserSettings = async () => {
+      try {
+        const response = await fetchWithAuth('/api/v1/user/setting');
+        if (!isMounted) return;
+        if (response.ok) {
+          const data = await response.json();
+          if (data.timezone) {
+            setUserTimezone(data.timezone);
+            setSelectedTimezone(data.timezone);
+          } else {
+            // Fallback to browser timezone if no timezone in settings
+            const browserTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC';
+            setSelectedTimezone(browserTimezone);
+          }
+        } else {
+          // Fallback to browser timezone if request fails
+          const browserTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC';
+          setSelectedTimezone(browserTimezone);
+        }
+      } catch (err) {
+        if (err.name === 'AbortError' || err.name === 'CanceledError' || err.code === 'ERR_CANCELED') {
+          return;
+        }
+        if (!isMounted) return;
+        console.warn('Error fetching user settings:', err);
+        // Fallback to browser timezone
+        const browserTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC';
+        setSelectedTimezone(browserTimezone);
+      }
+    };
+
+    fetchUserSettings();
+
+    return () => {
+      isMounted = false;
+      controller.abort();
+    };
+  }, []);
+
+  // Fetch available slots when date, session type, or timezone changes
+  useEffect(() => {
+    if (selectedSessionTypeId && selectedTimezone) {
       fetchAvailableSlots(selectedDate);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedDate, selectedSessionTypeId]);
+  }, [selectedDate, selectedSessionTypeId, selectedTimezone]);
 
   // Fetch available slots
   const fetchAvailableSlots = async (date) => {
+    if (!selectedTimezone) {
+      return;
+    }
     try {
       setLoadingSlots(true);
       setSlotsError(null);
       const dateString = dayjs(date).format('YYYY-MM-DD');
-      const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC';
+
+      // Check cache first
+      const cachedData = getCachedSlots(selectedSessionTypeId, dateString, selectedTimezone);
+      if (cachedData) {
+        if (cachedData.slots && Array.isArray(cachedData.slots)) {
+          setAvailableSlots(cachedData.slots);
+        } else {
+          setAvailableSlots([]);
+        }
+        setLoadingSlots(false);
+        return;
+      }
 
       const response = await apiClient.get('/api/v1/public/booking/available/slot', {
         params: {
           sessionTypeId: selectedSessionTypeId,
           suggestedDate: dateString,
-          timezone,
+          timezone: selectedTimezone,
         },
         timeout: 10000,
       });
 
       if (response.data && response.data.slots && Array.isArray(response.data.slots)) {
         setAvailableSlots(response.data.slots);
+        // Cache the response data
+        setCachedSlots(selectedSessionTypeId, dateString, selectedTimezone, response.data);
       } else {
         setAvailableSlots([]);
+        // Cache empty result too
+        setCachedSlots(selectedSessionTypeId, dateString, selectedTimezone, { slots: [] });
       }
     } catch (err) {
       console.error('Error fetching available slots:', err);
@@ -446,6 +577,15 @@ const SessionsConfigurationPage = () => {
               </Card>
             </Grid>
 
+            {/* Availability Rules Overrides Section */}
+            <Grid item xs={12}>
+              <Card>
+                <CardContent>
+                  <AvailabilityOverrideComponent />
+                </CardContent>
+              </Card>
+            </Grid>
+
             {/* Available Slots Section */}
             <Grid item xs={12}>
               <Card>
@@ -455,9 +595,10 @@ const SessionsConfigurationPage = () => {
                   </Typography>
                   <Box sx={{ display: 'flex', gap: 2, mb: 2 }}>
                     <FormControl sx={{ minWidth: 200 }}>
-                      <InputLabel>Session Type</InputLabel>
+                      <InputLabel id="session-type-select-label">Session Type</InputLabel>
                       <Select
-                        value={selectedSessionTypeId}
+                        labelId="session-type-select-label"
+                        value={selectedSessionTypeId || ''}
                         onChange={(e) => setSelectedSessionTypeId(e.target.value)}
                         label="Session Type"
                       >
@@ -466,6 +607,28 @@ const SessionsConfigurationPage = () => {
                             {st.name}
                           </MenuItem>
                         ))}
+                      </Select>
+                    </FormControl>
+                    <FormControl sx={{ minWidth: 300 }}>
+                      <InputLabel>Timezone</InputLabel>
+                      <Select
+                        value={selectedTimezone || ''}
+                        onChange={(e) => setSelectedTimezone(e.target.value)}
+                        label="Timezone"
+                      >
+                        {(() => {
+                          // Get all timezones, including user's timezone if not in the list
+                          const allTimezones = [...COMMON_TIMEZONES];
+                          if (selectedTimezone && !COMMON_TIMEZONES.find(tz => tz.value === selectedTimezone)) {
+                            const tzWithOffset = getTimezoneWithOffset(selectedTimezone);
+                            allTimezones.unshift(tzWithOffset);
+                          }
+                          return allTimezones.map((tz) => (
+                            <MenuItem key={tz.value} value={tz.value}>
+                              {tz.label} ({tz.offset})
+                            </MenuItem>
+                          ));
+                        })()}
                       </Select>
                     </FormControl>
                   </Box>

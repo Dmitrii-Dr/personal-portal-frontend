@@ -50,11 +50,20 @@ import { loadImageWithCache } from '../utils/imageCache';
 // Currency symbol mapping
 const getCurrencySymbol = (currency) => {
   const currencyMap = {
-    'Rub': '₽',
+    'Rubles': '₽',
     'Tenge': '₸',
     'USD': '$',
   };
   return currencyMap[currency] || currency;
+};
+
+// Check if all prices are 0 (free)
+const areAllPricesZero = (prices) => {
+  if (!prices || typeof prices !== 'object') {
+    return false;
+  }
+  const priceValues = Object.values(prices);
+  return priceValues.length > 0 && priceValues.every(price => price === 0 || price === null || price === undefined);
 };
 
 const LandingPage = () => {
@@ -88,7 +97,7 @@ const LandingPage = () => {
   const [selectedSessionTypeId, setSelectedSessionTypeId] = useState(null);
   const [selectedSessionType, setSelectedSessionType] = useState(null);
   const [bookingDialogOpen, setBookingDialogOpen] = useState(false);
-  const [selectedCurrency, setSelectedCurrency] = useState('Rub');
+  const [selectedCurrency, setSelectedCurrency] = useState('Rubles');
   const [currencyMenuAnchor, setCurrencyMenuAnchor] = useState(null);
 
   // Blog articles state
@@ -136,15 +145,23 @@ const LandingPage = () => {
 
   // Fetch welcome data
   useEffect(() => {
+    let isMounted = true;
+    const controller = new AbortController();
+
     const fetchWelcomeData = async () => {
-      setWelcomeLoading(true);
-      setWelcomeError(null);
       try {
-        const response = await fetch('/api/v1/public/welcome');
-        if (!response.ok) {
-          throw new Error(`Failed to load: ${response.status}`);
-        }
-        const data = await response.json();
+        setWelcomeLoading(true);
+        setWelcomeError(null);
+        
+        const response = await apiClient.get('/api/v1/public/welcome', {
+          signal: controller.signal,
+          timeout: 10000,
+        });
+        
+        if (!isMounted) return;
+        
+        const data = response.data;
+        
         setWelcomeData(data);
         // Set about-me data from welcome response for backward compatibility
         if (data.aboutMessage) {
@@ -178,7 +195,9 @@ const LandingPage = () => {
               })
             );
             const urls = await Promise.all(imagePromises);
-            setReviewImageUrls(urls.filter(url => url !== null));
+            if (isMounted) {
+              setReviewImageUrls(urls.filter(url => url !== null));
+            }
           };
           loadReviewImages();
         }
@@ -212,24 +231,58 @@ const LandingPage = () => {
           ]);
         }
       } catch (error) {
+        // Don't set error if request was aborted
+        if (
+          error.name === 'AbortError' || 
+          error.name === 'CanceledError' || 
+          error.code === 'ERR_CANCELED' ||
+          (error.message && error.message.includes('canceled'))
+        ) {
+          return;
+        }
+        
+        if (!isMounted) return;
+        
         console.error('Error fetching welcome data:', error);
-        setWelcomeError(error.message || 'Failed to load welcome information');
+        let errorMessage = 'Failed to load welcome information';
+        if (error.response?.data?.message) {
+          errorMessage = error.response.data.message;
+        } else if (error.message) {
+          errorMessage = error.message;
+        }
+        setWelcomeError(errorMessage);
       } finally {
-        setWelcomeLoading(false);
+        if (isMounted) {
+          setWelcomeLoading(false);
+        }
       }
     };
+    
     fetchWelcomeData();
+
+    return () => {
+      isMounted = false;
+      controller.abort();
+    };
   }, []);
 
   // Fetch session types
   useEffect(() => {
+    let isMounted = true;
+    const controller = new AbortController();
+
     const fetchSessionTypes = async () => {
-      setLoadingSessionTypes(true);
-      setSessionTypesError(null);
       try {
+        setLoadingSessionTypes(true);
+        setSessionTypesError(null);
+        
         const response = await apiClient.get('/api/v1/public/session/type', {
+          signal: controller.signal,
           timeout: 10000,
         });
+        
+        if (!isMounted) return;
+        
         if (response.data && Array.isArray(response.data)) {
           setSessionTypes(response.data);
           // Set first session type as default if available
@@ -240,14 +293,40 @@ const LandingPage = () => {
           setSessionTypes([]);
         }
       } catch (error) {
+        // Don't set error if request was aborted
+        if (
+          error.name === 'AbortError' || 
+          error.name === 'CanceledError' || 
+          error.code === 'ERR_CANCELED' ||
+          (error.message && error.message.includes('canceled'))
+        ) {
+          return;
+        }
+        
+        if (!isMounted) return;
+        
         console.error('Error fetching session types:', error);
-        setSessionTypesError(error.message || 'Failed to load session types');
+        let errorMessage = 'Failed to load session types';
+        if (error.response?.data?.message) {
+          errorMessage = error.response.data.message;
+        } else if (error.message) {
+          errorMessage = error.message;
+        }
+        setSessionTypesError(errorMessage);
         setSessionTypes([]);
       } finally {
-        setLoadingSessionTypes(false);
+        if (isMounted) {
+          setLoadingSessionTypes(false);
+        }
       }
     };
+    
     fetchSessionTypes();
+
+    return () => {
+      isMounted = false;
+      controller.abort();
+    };
   }, []);
 
   // Fetch blog articles
@@ -783,12 +862,12 @@ const LandingPage = () => {
                 >
                   <MenuItem
                     onClick={() => {
-                      setSelectedCurrency('Rub');
+                      setSelectedCurrency('Rubles');
                       setCurrencyMenuAnchor(null);
                     }}
-                    selected={selectedCurrency === 'Rub'}
+                    selected={selectedCurrency === 'Rubles'}
                   >
-                    ₽ Rub
+                    ₽ Rubles
                   </MenuItem>
                   <MenuItem
                     onClick={() => {
@@ -917,7 +996,11 @@ const LandingPage = () => {
                                 </Typography>
                               )}
                               <Box sx={{ mb: 1, mt: 'auto' }}>
-                                {sessionType.prices && sessionType.prices[selectedCurrency] ? (
+                                {sessionType.prices && areAllPricesZero(sessionType.prices) ? (
+                                  <Typography variant="h4" component="span" color="primary" sx={{ fontSize: '1.75rem' }}>
+                                    Free
+                                  </Typography>
+                                ) : sessionType.prices && sessionType.prices[selectedCurrency] ? (
                                   <Typography variant="h4" component="span" color="primary" sx={{ fontSize: '1.75rem' }}>
                                     {sessionType.prices[selectedCurrency]} {getCurrencySymbol(selectedCurrency)}
                                   </Typography>
@@ -1490,7 +1573,19 @@ const LandingPage = () => {
                     height: 28,
                   }}
                 />
-                {selectedSessionType.prices && selectedSessionType.prices[selectedCurrency] ? (
+                {selectedSessionType.prices && areAllPricesZero(selectedSessionType.prices) ? (
+                  <Chip
+                    label="Free"
+                    size="small"
+                    sx={{
+                      bgcolor: 'success.main',
+                      color: 'white',
+                      fontWeight: 600,
+                      height: 28,
+                      fontSize: '0.875rem',
+                    }}
+                  />
+                ) : selectedSessionType.prices && selectedSessionType.prices[selectedCurrency] ? (
                   <Chip
                     label={`${selectedSessionType.prices[selectedCurrency]} ${getCurrencySymbol(selectedCurrency)}`}
                     size="small"

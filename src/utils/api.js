@@ -259,20 +259,32 @@ export const clearUserProfileCache = () => {
 // Cache for user settings to prevent duplicate requests
 let userSettingsCache = null;
 let userSettingsPromise = null;
+let userSettingsToken = null;
 
 // Fetch user settings with caching
 export const fetchUserSettings = async () => {
-  // Return cached data if available
-  if (userSettingsCache !== null) {
+  const token = getToken();
+  
+  // If no token, clear cache and return null
+  if (!token) {
+    userSettingsCache = null;
+    userSettingsToken = null;
+    userSettingsPromise = null;
+    return null;
+  }
+
+  // Return cached data if available and token matches
+  if (userSettingsCache !== null && userSettingsToken === token) {
     return userSettingsCache;
   }
 
-  // Return existing promise if request is in flight
-  if (userSettingsPromise) {
+  // Return existing promise if request is in flight for the same token
+  if (userSettingsPromise && userSettingsToken === token) {
     return userSettingsPromise;
   }
 
   // Create new request
+  userSettingsToken = token;
   userSettingsPromise = (async () => {
     try {
       const response = await fetchWithAuth('/api/v1/user/setting');
@@ -286,6 +298,7 @@ export const fetchUserSettings = async () => {
     } catch (error) {
       // Clear promise on error so it can be retried
       userSettingsPromise = null;
+      userSettingsToken = null;
       throw error;
     } finally {
       // Clear promise after completion (success or error)
@@ -300,6 +313,7 @@ export const fetchUserSettings = async () => {
 export const clearUserSettingsCache = () => {
   userSettingsCache = null;
   userSettingsPromise = null;
+  userSettingsToken = null;
 };
 
 // Export configured axios instance

@@ -2,12 +2,17 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import dayjs from 'dayjs';
+import utc from 'dayjs/plugin/utc';
+import timezone from 'dayjs/plugin/timezone';
 import updateLocale from 'dayjs/plugin/updateLocale';
 import localeData from 'dayjs/plugin/localeData';
 import 'dayjs/locale/en-gb';
-import apiClient, { fetchWithAuth, getToken } from '../utils/api';
+import apiClient, { fetchWithAuth, getToken, fetchUserSettings as fetchUserSettingsCached } from '../utils/api';
+import { getCachedSlots, setCachedSlots, invalidateCache, clearAllCache } from '../utils/bookingSlotCache';
 
 // Configure dayjs to start week on Monday
+dayjs.extend(utc);
+dayjs.extend(timezone);
 dayjs.extend(updateLocale);
 dayjs.extend(localeData);
 dayjs.locale('en-gb'); // Use en-gb locale which starts week on Monday
@@ -47,7 +52,7 @@ import AddIcon from '@mui/icons-material/Add';
 const BookingPage = ({ sessionTypeId: propSessionTypeId, hideMyBookings = false }) => {
   const [selectedDate, setSelectedDate] = useState(dayjs());
   const [availableSlots, setAvailableSlots] = useState([]);
-  const [loading, setLoading] = useState(true); // Start with true since we fetch on mount
+  const [loading, setLoading] = useState(false); // Don't fetch on mount, only when dialog opens
   const [error, setError] = useState(null);
   const [openDialog, setOpenDialog] = useState(false);
   const [selectedSlot, setSelectedSlot] = useState(null);
@@ -61,6 +66,7 @@ const BookingPage = ({ sessionTypeId: propSessionTypeId, hideMyBookings = false 
   const [sessionTypesError, setSessionTypesError] = useState(null);
   const [userTimezone, setUserTimezone] = useState(null); // User timezone from settings
   const [userCurrency, setUserCurrency] = useState(null); // User currency from settings
+  const [selectedTimezone, setSelectedTimezone] = useState(null); // Anonymous user's selected timezone
   const [groupedBookings, setGroupedBookings] = useState({});
   const [pastBookings, setPastBookings] = useState([]);
   const [loadingBookings, setLoadingBookings] = useState(true);
@@ -96,27 +102,32 @@ const BookingPage = ({ sessionTypeId: propSessionTypeId, hideMyBookings = false 
   };
 
   // Fetch user settings to get timezone and currency (only when user is logged in)
+  // Uses cached version from api.js to prevent duplicate calls
   const fetchUserSettings = async () => {
     if (!hasToken) {
       return;
     }
     
     try {
-      const response = await fetchWithAuth('/api/v1/user/setting');
-      if (response.ok) {
-        const data = await response.json();
+      const data = await fetchUserSettingsCached();
+      if (data) {
         if (data.timezone) {
           setUserTimezone(data.timezone);
+        } else {
+          // Clear timezone if not in settings
+          setUserTimezone(null);
         }
         if (data.currency) {
           setUserCurrency(data.currency);
         }
+      } else {
+        // Clear timezone if no data returned
+        setUserTimezone(null);
       }
     } catch (err) {
       console.warn('Error fetching user settings:', err);
-      // Fallback to browser timezone if settings fetch fails
-      const browserTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
-      setUserTimezone(browserTimezone);
+      // Clear timezone on error - don't use cached/browser timezone
+      setUserTimezone(null);
     }
   };
 
@@ -177,6 +188,80 @@ const BookingPage = ({ sessionTypeId: propSessionTypeId, hideMyBookings = false 
     return `${price}${symbol}`;
   };
 
+  // Helper function to get UTC offset for a timezone
+  const getTimezoneOffset = (timezone) => {
+    try {
+      const now = new Date();
+      const utcDate = new Date(now.toLocaleString('en-US', { timeZone: 'UTC' }));
+      const tzDate = new Date(now.toLocaleString('en-US', { timeZone: timezone }));
+      const offsetMs = tzDate - utcDate;
+      const offsetHours = Math.floor(offsetMs / (1000 * 60 * 60));
+      const offsetMinutes = Math.floor((offsetMs % (1000 * 60 * 60)) / (1000 * 60));
+      const sign = offsetHours >= 0 ? '+' : '-';
+      const absHours = Math.abs(offsetHours);
+      const absMinutes = Math.abs(offsetMinutes);
+      return `${sign}${absHours.toString().padStart(2, '0')}:${absMinutes.toString().padStart(2, '0')}`;
+    } catch {
+      return '+00:00';
+    }
+  };
+
+  // Get list of common timezones with their display names and offsets
+  const getTimezoneOptions = () => {
+    const timezones = [
+      'America/New_York', 'America/Chicago', 'America/Denver', 'America/Los_Angeles',
+      'America/Phoenix', 'America/Anchorage', 'America/Honolulu',
+      'Europe/London', 'Europe/Paris', 'Europe/Berlin', 'Europe/Rome', 'Europe/Madrid',
+      'Europe/Amsterdam', 'Europe/Brussels', 'Europe/Zurich', 'Europe/Vienna',
+      'Europe/Stockholm', 'Europe/Copenhagen', 'Europe/Oslo', 'Europe/Helsinki',
+      'Europe/Warsaw', 'Europe/Prague', 'Europe/Budapest', 'Europe/Athens',
+      'Europe/Moscow', 'Europe/Kiev', 'Europe/Istanbul',
+      'Asia/Dubai', 'Asia/Karachi', 'Asia/Kolkata', 'Asia/Dhaka',
+      'Asia/Bangkok', 'Asia/Singapore', 'Asia/Hong_Kong', 'Asia/Shanghai',
+      'Asia/Tokyo', 'Asia/Seoul', 'Asia/Jakarta', 'Asia/Manila',
+      'Australia/Sydney', 'Australia/Melbourne', 'Australia/Perth',
+      'Pacific/Auckland', 'Pacific/Fiji',
+      'Africa/Cairo', 'Africa/Johannesburg', 'Africa/Lagos',
+      'America/Sao_Paulo', 'America/Buenos_Aires', 'America/Lima',
+      'UTC'
+    ];
+    
+    return timezones.map(tz => {
+      const offset = getTimezoneOffset(tz);
+      // Format timezone name for display (e.g., "America/New_York" -> "New York (EST)")
+      const displayName = tz.split('/').pop().replace(/_/g, ' ');
+      return {
+        value: tz,
+        label: `${displayName} (UTC${offset})`,
+        offset: offset
+      };
+    }).sort((a, b) => {
+      // Sort by offset (UTC-12 to UTC+14)
+      const offsetA = parseInt(a.offset.replace(':', '').replace('+', ''));
+      const offsetB = parseInt(b.offset.replace(':', '').replace('+', ''));
+      return offsetA - offsetB;
+    });
+  };
+
+  // Initialize selected timezone for anonymous users - default to Moscow
+  useEffect(() => {
+    if (!hasToken && !selectedTimezone) {
+      setSelectedTimezone('Europe/Moscow');
+    }
+  }, [hasToken, selectedTimezone]);
+
+  // Get current timezone being used for slot display
+  const getCurrentTimezone = () => {
+    if (userTimezone) {
+      return userTimezone;
+    }
+    if (selectedTimezone) {
+      return selectedTimezone;
+    }
+    // Default to Moscow for anonymous users
+    return 'Europe/Moscow';
+  };
+
   // Fetch available slots for a given date
   const fetchAvailableSlots = async (date) => {
     // Don't fetch if no session type is selected
@@ -192,16 +277,25 @@ const BookingPage = ({ sessionTypeId: propSessionTypeId, hideMyBookings = false 
       setError(null);
       const dateString = formatDateForAPI(date);
       
-      // Use user timezone from settings if available and user is logged in, otherwise use browser timezone
-      let timezone = 'UTC';
-      if (hasToken && userTimezone) {
+      // Use user timezone from settings if logged in, otherwise use selected timezone for anonymous users
+      let timezone = 'Europe/Moscow'; // Default to Moscow for anonymous users
+      if (userTimezone) {
         timezone = userTimezone;
-      } else {
-        try {
-          timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
-        } catch {
-          timezone = 'UTC'; // Final fallback
+      } else if (selectedTimezone) {
+        timezone = selectedTimezone;
+      }
+      
+      // Check cache first
+      const cachedData = getCachedSlots(sessionTypeId, dateString, timezone);
+      if (cachedData) {
+        // Handle BookingSuggestionsDto response
+        if (cachedData.slots && Array.isArray(cachedData.slots)) {
+          setAvailableSlots(cachedData.slots);
+        } else {
+          setAvailableSlots([]);
         }
+        setLoading(false);
+        return;
       }
       
       const response = await apiClient.get('/api/v1/public/booking/available/slot', {
@@ -216,8 +310,12 @@ const BookingPage = ({ sessionTypeId: propSessionTypeId, hideMyBookings = false 
       // Handle BookingSuggestionsDto response
       if (response.data && response.data.slots && Array.isArray(response.data.slots)) {
         setAvailableSlots(response.data.slots);
+        // Cache the response data
+        setCachedSlots(sessionTypeId, dateString, timezone, response.data);
       } else {
         setAvailableSlots([]);
+        // Cache empty result too
+        setCachedSlots(sessionTypeId, dateString, timezone, { slots: [] });
       }
     } catch (err) {
       console.error('Error fetching available slots:', err);
@@ -245,6 +343,7 @@ const BookingPage = ({ sessionTypeId: propSessionTypeId, hideMyBookings = false 
     try {
       setLoadingBookings(true);
       setBookingsError(null);
+      
       const response = await apiClient.get('/api/v1/session/booking/group', {
         params: {
           status: 'PENDING_APPROVAL,CONFIRMED',
@@ -273,25 +372,34 @@ const BookingPage = ({ sessionTypeId: propSessionTypeId, hideMyBookings = false 
     } finally {
       setLoadingBookings(false);
     }
-  }, []);
+  }, [hasToken]);
 
   // Fetch past bookings (reusable function)
-  const fetchPastBookings = useCallback(async () => {
+  const fetchPastBookings = useCallback(async (signal = null) => {
     try {
       setLoadingPastBookings(true);
       setPastBookingsError(null);
-      const response = await apiClient.get('/api/v1/session/booking', {
+      
+      const requestConfig = {
         params: {
           status: 'DECLINED,CANCELLED,COMPLETED',
         },
         timeout: 10000,
-      });
+      };
+      if (signal) {
+        requestConfig.signal = signal;
+      }
+      const response = await apiClient.get('/api/v1/session/booking', requestConfig);
       if (response.data && Array.isArray(response.data)) {
         setPastBookings(response.data);
       } else {
         setPastBookings([]);
       }
     } catch (err) {
+      // Don't set error if request was aborted
+      if (err.name === 'AbortError' || err.name === 'CanceledError' || err.code === 'ERR_CANCELED') {
+        return;
+      }
       console.error('Error fetching past bookings:', err);
       let errorMessage = 'Failed to load past bookings. Please try again later.';
       if (err.code === 'ECONNABORTED') {
@@ -308,7 +416,7 @@ const BookingPage = ({ sessionTypeId: propSessionTypeId, hideMyBookings = false 
     } finally {
       setLoadingPastBookings(false);
     }
-  }, []);
+  }, [hasToken]);
 
   // Fetch session types if not provided as prop
   useEffect(() => {
@@ -397,20 +505,23 @@ const BookingPage = ({ sessionTypeId: propSessionTypeId, hideMyBookings = false 
   }, []);
 
   // Fetch user settings and bookings automatically when user is logged in
+  // Always fetch fresh settings (never cache)
   useEffect(() => {
     if (hasToken) {
+      // Always fetch fresh settings to get current timezone
       fetchUserSettings();
       fetchBookings();
     } else {
+      // Clear timezone when logged out
+      setUserTimezone(null);
       setGroupedBookings({});
       setBookingsError(null);
       setLoadingBookings(false);
     }
   }, [hasToken, fetchBookings]);
 
-  // Fetch slots on component mount and when date changes
-  // Track last fetched date to prevent duplicate calls
-  const lastFetchedDateRef = useRef(null);
+  // Track last fetched date and sessionTypeId to prevent duplicate calls
+  const lastFetchedRef = useRef({ date: null, sessionTypeId: null });
 
   // Update sessionTypeId when prop changes
   useEffect(() => {
@@ -419,18 +530,66 @@ const BookingPage = ({ sessionTypeId: propSessionTypeId, hideMyBookings = false 
     }
   }, [propSessionTypeId]);
 
+  // Track if dialog was just opened to clear cache on fresh open
+  const prevDialogOpenRef = useRef(false);
+
+  // Fetch slots when New Booking dialog opens OR when hideMyBookings is true (form shown directly)
   useEffect(() => {
+    // Only fetch if dialog is open OR if hideMyBookings is true (form shown directly)
+    const shouldShowForm = newBookingDialogOpen || (hideMyBookings && propSessionTypeId);
+    
+    if (!shouldShowForm) {
+      // Reset last fetched when dialog closes
+      lastFetchedRef.current = { date: null, sessionTypeId: null, timezone: null };
+      // Clear slots when dialog closes
+      setAvailableSlots([]);
+      setError(null);
+      // Clear cache when popup is closed
+      clearAllCache();
+      prevDialogOpenRef.current = false;
+      return;
+    }
+
+    // If dialog just opened (was closed, now open), clear cache to ensure fresh data
+    const dialogJustOpened = !prevDialogOpenRef.current && shouldShowForm;
+    if (dialogJustOpened) {
+      clearAllCache();
+      lastFetchedRef.current = { date: null, sessionTypeId: null, timezone: null };
+    }
+    prevDialogOpenRef.current = shouldShowForm;
+
+    // If user is logged in but timezone not loaded yet, fetch settings first
+    if (hasToken && !userTimezone) {
+      fetchUserSettings();
+      return; // Wait for timezone to load before fetching slots
+    }
+
     const dateString = formatDateForAPI(selectedDate);
-    // Only fetch if the date string is different from the last fetched one and sessionTypeId is available
-    if (lastFetchedDateRef.current !== dateString && sessionTypeId) {
-      lastFetchedDateRef.current = dateString;
+    const currentTimezone = getCurrentTimezone();
+    // Fetch if date, sessionTypeId, or timezone changed from last fetch, and sessionTypeId is available
+    const lastFetched = lastFetchedRef.current;
+    const dateChanged = lastFetched.date !== dateString;
+    const sessionTypeChanged = lastFetched.sessionTypeId !== sessionTypeId;
+    const timezoneChanged = lastFetched.timezone !== currentTimezone;
+    const isInitialLoad = lastFetched.date === null && lastFetched.sessionTypeId === null;
+    
+    // Fetch on initial dialog open or when date/sessionType/timezone changes
+    if ((isInitialLoad || dateChanged || sessionTypeChanged || timezoneChanged) && sessionTypeId) {
+      lastFetchedRef.current = { date: dateString, sessionTypeId, timezone: currentTimezone };
       fetchAvailableSlots(selectedDate);
     }
-  }, [selectedDate, hasToken, userTimezone, sessionTypeId]);
+  }, [newBookingDialogOpen, hideMyBookings, propSessionTypeId, selectedDate, sessionTypeId, userTimezone, selectedTimezone, hasToken]);
 
   // Handle date selection
   const handleDateChange = (newDate) => {
     setSelectedDate(newDate);
+  };
+
+  // Handle new booking dialog close
+  const handleNewBookingDialogClose = () => {
+    setNewBookingDialogOpen(false);
+    // Clear cache when popup is closed
+    clearAllCache();
   };
 
   // Handle slot selection
@@ -527,6 +686,19 @@ const BookingPage = ({ sessionTypeId: propSessionTypeId, hideMyBookings = false 
         }
       }
       
+      // Check cache first
+      const cachedData = getCachedSlots(sessionTypeId, dateString, timezone);
+      if (cachedData) {
+        // Handle BookingSuggestionsDto response
+        if (cachedData.slots && Array.isArray(cachedData.slots)) {
+          setUpdateAvailableSlots(cachedData.slots);
+        } else {
+          setUpdateAvailableSlots([]);
+        }
+        setUpdateLoadingSlots(false);
+        return;
+      }
+      
       const response = await apiClient.get('/api/v1/public/booking/available/slot', {
         params: {
           sessionTypeId,
@@ -539,8 +711,12 @@ const BookingPage = ({ sessionTypeId: propSessionTypeId, hideMyBookings = false 
       // Handle BookingSuggestionsDto response
       if (response.data && response.data.slots && Array.isArray(response.data.slots)) {
         setUpdateAvailableSlots(response.data.slots);
+        // Cache the response data
+        setCachedSlots(sessionTypeId, dateString, timezone, response.data);
       } else {
         setUpdateAvailableSlots([]);
+        // Cache empty result too
+        setCachedSlots(sessionTypeId, dateString, timezone, { slots: [] });
       }
     } catch (err) {
       console.error('Error fetching available slots for update:', err);
@@ -587,6 +763,8 @@ const BookingPage = ({ sessionTypeId: propSessionTypeId, hideMyBookings = false 
     setUpdateAvailableSlots([]);
     setUpdateSlotError(null);
     setUpdateSessionTypeId(null);
+    // Clear cache when update dialog closes
+    clearAllCache();
   };
 
   // Handle booking update confirmation
@@ -620,6 +798,12 @@ const BookingPage = ({ sessionTypeId: propSessionTypeId, hideMyBookings = false 
         await fetchBookings(); // Refresh bookings list when user is logged in
         await fetchPastBookings(); // Refresh past sessions
       }
+      // Invalidate cache for the date that was updated to refresh slots
+      const dateString = formatDateForAPI(updateSelectedDate);
+      const currentTimezone = getCurrentTimezone();
+      if (updateSessionTypeId) {
+        invalidateCache(updateSessionTypeId, dateString, currentTimezone);
+      }
       await fetchAvailableSlots(selectedDate); // Refresh available slots
     } catch (err) {
       console.error('Error updating booking:', err);
@@ -629,6 +813,12 @@ const BookingPage = ({ sessionTypeId: propSessionTypeId, hideMyBookings = false 
         errorMessage = 'Request timed out. Please try again.';
       } else if (err.response) {
         errorMessage = err.response.data?.message || `Server error: ${err.response.status}`;
+        // If update failed (e.g., slot was already booked), invalidate cache to refresh
+        const dateString = formatDateForAPI(updateSelectedDate);
+        const currentTimezone = getCurrentTimezone();
+        if (updateSessionTypeId) {
+          invalidateCache(updateSessionTypeId, dateString, currentTimezone);
+        }
       } else if (err.request) {
         errorMessage = 'Unable to reach the server. Please check your connection.';
       } else {
@@ -680,6 +870,10 @@ const BookingPage = ({ sessionTypeId: propSessionTypeId, hideMyBookings = false 
         await fetchBookings(); // Refresh bookings list when user is logged in
         await fetchPastBookings(); // Refresh past sessions to show canceled booking
       }
+      // Invalidate cache for the date that was canceled to refresh slots
+      const dateString = formatDateForAPI(selectedDate);
+      const currentTimezone = getCurrentTimezone();
+      invalidateCache(sessionTypeId, dateString, currentTimezone);
       await fetchAvailableSlots(selectedDate); // Refresh available slots
     } catch (err) {
       console.error('Error cancelling booking:', err);
@@ -752,11 +946,15 @@ const BookingPage = ({ sessionTypeId: propSessionTypeId, hideMyBookings = false 
 
       // Success - close dialog and refresh bookings and slots
       handleDialogClose();
-      setNewBookingDialogOpen(false); // Close new booking dialog
+      handleNewBookingDialogClose(); // Close new booking dialog (also clears cache)
       setSuccessMessage('Booking created successfully!');
       if (hasToken) {
         await fetchBookings(); // Refresh bookings list when user is logged in
       }
+      // Invalidate cache for the date that was booked to refresh slots
+      const dateString = formatDateForAPI(selectedDate);
+      const currentTimezone = getCurrentTimezone();
+      invalidateCache(sessionTypeId, dateString, currentTimezone);
       await fetchAvailableSlots(selectedDate); // Refresh available slots
     } catch (err) {
       console.error('Error creating booking:', err);
@@ -766,6 +964,10 @@ const BookingPage = ({ sessionTypeId: propSessionTypeId, hideMyBookings = false 
         errorMessage = 'Request timed out. Please try again.';
       } else if (err.response) {
         errorMessage = err.response.data?.message || `Server error: ${err.response.status}`;
+        // If booking failed (e.g., slot was already booked), invalidate cache to refresh
+        const dateString = formatDateForAPI(selectedDate);
+        const currentTimezone = getCurrentTimezone();
+        invalidateCache(sessionTypeId, dateString, currentTimezone);
       } else if (err.request) {
         errorMessage = 'Unable to reach the server. Please check your connection.';
       } else {
@@ -850,10 +1052,22 @@ const BookingPage = ({ sessionTypeId: propSessionTypeId, hideMyBookings = false 
   const formatTimeFromInstant = (instantString) => {
     if (!instantString) return 'N/A';
     try {
-      // Always display in 24-hour format (HH:mm)
-      return dayjs(instantString).format('HH:mm');
+      // Parse UTC time from API
+      const utcTime = dayjs.utc(instantString);
+      
+      // Convert to user's timezone if available, otherwise use selected timezone for anonymous users
+      let timezone = userTimezone || selectedTimezone || 'Europe/Moscow';
+      
+      // Convert UTC to user's timezone and format as HH:mm
+      const localTime = utcTime.tz(timezone);
+      return localTime.format('HH:mm');
     } catch {
-      return instantString;
+      // Fallback: try without timezone conversion
+      try {
+        return dayjs(instantString).format('HH:mm');
+      } catch {
+        return instantString;
+      }
     }
   };
 
@@ -862,13 +1076,26 @@ const BookingPage = ({ sessionTypeId: propSessionTypeId, hideMyBookings = false 
     return dayjs(date).format('MMMM D, YYYY');
   };
 
-  // Format instant for display (24-hour format)
+  // Format instant for display (24-hour format) using user's timezone
   const formatInstant = (instantString) => {
     if (!instantString) return 'N/A';
     try {
-      return dayjs(instantString).format('MMMM D, YYYY HH:mm');
+      // Parse UTC time from API
+      const utcTime = dayjs.utc(instantString);
+      
+      // Convert to user's timezone if available, otherwise use selected timezone for anonymous users
+      let timezone = userTimezone || selectedTimezone || 'Europe/Moscow';
+      
+      // Convert UTC to user's timezone
+      const localTime = utcTime.tz(timezone);
+      return localTime.format('MMMM D, YYYY HH:mm');
     } catch {
-      return instantString;
+      // Fallback: try without timezone conversion
+      try {
+        return dayjs(instantString).format('MMMM D, YYYY HH:mm');
+      } catch {
+        return instantString;
+      }
     }
   };
 
@@ -919,18 +1146,43 @@ const BookingPage = ({ sessionTypeId: propSessionTypeId, hideMyBookings = false 
   // Handle tab change
   const handleTabChange = (event, newValue) => {
     setActiveTab(newValue);
-    // Fetch past bookings when switching to Past Sessions tab
-    if (newValue === 1 && hasToken && pastBookings.length === 0 && !loadingPastBookings) {
-      fetchPastBookings();
-    }
   };
 
-  // Fetch past bookings when component mounts if user is already on Past Sessions tab
+  // Fetch past bookings when switching to Past Sessions tab
+  const hasFetchedPastBookingsRef = useRef(false);
+  const lastActiveTabRef = useRef(activeTab);
+  
   useEffect(() => {
-    if (hasToken && activeTab === 1 && pastBookings.length === 0 && !loadingPastBookings) {
-      fetchPastBookings();
+    // Reset fetch flag when switching tabs
+    if (lastActiveTabRef.current !== activeTab) {
+      hasFetchedPastBookingsRef.current = false;
+      lastActiveTabRef.current = activeTab;
     }
-  }, [hasToken, activeTab, pastBookings.length, loadingPastBookings, fetchPastBookings]);
+
+    // Only fetch if:
+    // 1. User has token
+    // 2. On Past Sessions tab (activeTab === 1)
+    // 3. Haven't fetched yet for this tab visit
+    // 4. Not currently loading
+    if (hasToken && activeTab === 1 && !loadingPastBookings && !hasFetchedPastBookingsRef.current) {
+      let isMounted = true;
+      const controller = new AbortController();
+
+      const fetchData = async () => {
+        hasFetchedPastBookingsRef.current = true;
+        await fetchPastBookings(controller.signal);
+        if (!isMounted) return;
+      };
+
+      fetchData();
+
+      return () => {
+        isMounted = false;
+        controller.abort();
+      };
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [hasToken, activeTab]);
 
   return (
     <LocalizationProvider dateAdapter={AdapterDayjs} adapterLocale="en-gb">
@@ -1170,8 +1422,8 @@ const BookingPage = ({ sessionTypeId: propSessionTypeId, hideMyBookings = false 
           </>
         )}
 
-        {/* New Booking Button - shown when user is not logged in or hideMyBookings is true */}
-        {(!hasToken || hideMyBookings) && (
+        {/* New Booking Button - shown when user is not logged in (but not when hideMyBookings is true) */}
+        {!hasToken && !hideMyBookings && (
           <Box sx={{ display: 'flex', justifyContent: 'flex-end', mb: 2 }}>
             <Button
               variant="contained"
@@ -1185,18 +1437,12 @@ const BookingPage = ({ sessionTypeId: propSessionTypeId, hideMyBookings = false 
           </Box>
         )}
 
-        {/* New Booking Dialog */}
-        <Dialog 
-          open={newBookingDialogOpen} 
-          onClose={() => setNewBookingDialogOpen(false)} 
-          maxWidth="md" 
-          fullWidth
-        >
-          <DialogTitle>Book a Session</DialogTitle>
-          <DialogContent>
+        {/* Booking Form - shown directly when hideMyBookings is true, otherwise in dialog */}
+        {hideMyBookings ? (
+          <Box>
             {/* Session Type Selection - only show if not provided as prop */}
             {!propSessionTypeId && (
-              <Box sx={{ mb: 3, mt: 2 }}>
+              <Box sx={{ mb: 3 }}>
                 {loadingSessionTypes ? (
                   <Box sx={{ display: 'flex', justifyContent: 'center', py: 2 }}>
                     <CircularProgress />
@@ -1258,6 +1504,36 @@ const BookingPage = ({ sessionTypeId: propSessionTypeId, hideMyBookings = false 
                   Available Times on {formatDateForDisplay(selectedDate)}
                 </Typography>
 
+                {/* Timezone selector for anonymous users, info message for logged-in users */}
+                {(loading || availableSlots.length > 0) && (
+                  !hasToken ? (
+                    <FormControl sx={{ mb: 2, width: '100%' }}>
+                      <InputLabel>Timezone</InputLabel>
+                      <Select
+                        value={selectedTimezone || ''}
+                        onChange={(e) => {
+                          setSelectedTimezone(e.target.value);
+                          // Re-fetch slots with new timezone
+                          if (sessionTypeId) {
+                            lastFetchedRef.current = { date: null, sessionTypeId: null };
+                          }
+                        }}
+                        label="Timezone"
+                      >
+                        {getTimezoneOptions().map((tz) => (
+                          <MenuItem key={tz.value} value={tz.value}>
+                            {tz.label}
+                          </MenuItem>
+                        ))}
+                      </Select>
+                    </FormControl>
+                  ) : (
+                    <Alert severity="info" sx={{ mb: 2 }}>
+                      Slots are shown in {getCurrentTimezone()} ({getTimezoneOffset(getCurrentTimezone())})
+                    </Alert>
+                  )
+                )}
+
                 {error && (
                   <Alert severity="error" sx={{ mb: 2 }}>
                     {error}
@@ -1313,17 +1589,178 @@ const BookingPage = ({ sessionTypeId: propSessionTypeId, hideMyBookings = false 
                 )}
               </Grid>
             </Grid>
-          </DialogContent>
-          <DialogActions>
-            <Button 
-              onClick={() => setNewBookingDialogOpen(false)} 
-              color="inherit"
-              sx={{ textTransform: 'none' }}
-            >
-              Close
-            </Button>
-          </DialogActions>
-        </Dialog>
+          </Box>
+        ) : (
+          /* New Booking Dialog - shown when hideMyBookings is false */
+          <Dialog 
+            open={newBookingDialogOpen} 
+            onClose={handleNewBookingDialogClose} 
+            maxWidth="md" 
+            fullWidth
+          >
+            <DialogTitle>Book a Session</DialogTitle>
+            <DialogContent>
+              {/* Session Type Selection - only show if not provided as prop */}
+              {!propSessionTypeId && (
+                <Box sx={{ mb: 3, mt: 2 }}>
+                  {loadingSessionTypes ? (
+                    <Box sx={{ display: 'flex', justifyContent: 'center', py: 2 }}>
+                      <CircularProgress />
+                    </Box>
+                  ) : sessionTypesError ? (
+                    <Alert severity="error" sx={{ mb: 2 }}>
+                      {sessionTypesError}
+                    </Alert>
+                  ) : sessionTypes.length > 0 ? (
+                    <FormControl sx={{ minWidth: 300, width: '100%' }}>
+                      <InputLabel>Select Session Type</InputLabel>
+                      <Select
+                        value={sessionTypeId || ''}
+                        onChange={(e) => setSessionTypeId(e.target.value)}
+                        label="Select Session Type"
+                      >
+                        {sessionTypes.map((st) => (
+                          <MenuItem key={st.id || st.sessionTypeId} value={st.id || st.sessionTypeId}>
+                            {formatSessionTypeDisplay(st)}
+                          </MenuItem>
+                        ))}
+                      </Select>
+                    </FormControl>
+                  ) : (
+                    <Alert severity="info">
+                      No session types available at this time.
+                    </Alert>
+                  )}
+                </Box>
+              )}
+
+              <Grid container spacing={3} sx={{ mt: propSessionTypeId ? 0 : 2 }}>
+                {/* Left Column - Date Calendar */}
+                <Grid item xs={12} md={6}>
+                  <Box
+                    sx={{
+                      display: 'flex',
+                      justifyContent: 'center',
+                      border: 1,
+                      borderColor: 'divider',
+                      borderRadius: 2,
+                      p: 2,
+                      bgcolor: 'background.paper',
+                    }}
+                  >
+                    <DateCalendar
+                      value={selectedDate}
+                      onChange={handleDateChange}
+                      minDate={dayjs()}
+                      sx={{ width: '100%' }}
+                      firstDayOfWeek={1}
+                    />
+                  </Box>
+                </Grid>
+
+                {/* Right Column - Available Slots */}
+                <Grid item xs={12} md={6}>
+                  <Typography variant="h6" gutterBottom>
+                    Available Times on {formatDateForDisplay(selectedDate)}
+                  </Typography>
+
+                  {/* Timezone selector for anonymous users, info message for logged-in users */}
+                  {(loading || availableSlots.length > 0) && (
+                    !hasToken ? (
+                      <FormControl sx={{ mb: 2, width: '100%' }}>
+                        <InputLabel>Timezone</InputLabel>
+                        <Select
+                          value={selectedTimezone || ''}
+                          onChange={(e) => {
+                            setSelectedTimezone(e.target.value);
+                            // Reset last fetched to trigger re-fetch with new timezone
+                            if (sessionTypeId) {
+                              lastFetchedRef.current = { date: null, sessionTypeId: null, timezone: null };
+                            }
+                          }}
+                          label="Timezone"
+                        >
+                          {getTimezoneOptions().map((tz) => (
+                            <MenuItem key={tz.value} value={tz.value}>
+                              {tz.label}
+                            </MenuItem>
+                          ))}
+                        </Select>
+                      </FormControl>
+                    ) : (
+                      <Alert severity="info" sx={{ mb: 2 }}>
+                        Slots are shown in {getCurrentTimezone()} ({getTimezoneOffset(getCurrentTimezone())})
+                      </Alert>
+                    )
+                  )}
+
+                  {error && (
+                    <Alert severity="error" sx={{ mb: 2 }}>
+                      {error}
+                    </Alert>
+                  )}
+
+                  {loading ? (
+                    <Box
+                      sx={{
+                        display: 'flex',
+                        justifyContent: 'center',
+                        alignItems: 'center',
+                        minHeight: 200,
+                      }}
+                    >
+                      <CircularProgress />
+                    </Box>
+                  ) : availableSlots.length > 0 ? (
+                    <List>
+                      {availableSlots.map((slot, index) => {
+                        const startTime = slot.startTime 
+                          ? formatTime(slot.startTime) 
+                          : (slot.startTimeInstant ? formatTimeFromInstant(slot.startTimeInstant) : 'N/A');
+                        const endTime = slot.endTime 
+                          ? formatTime(slot.endTime) 
+                          : 'N/A';
+                        
+                        return (
+                          <ListItemButton
+                            key={slot.startTimeInstant || `slot-${index}`}
+                            onClick={() => handleSlotClick(slot)}
+                            sx={{
+                              border: 1,
+                              borderColor: 'divider',
+                              borderRadius: 1,
+                              mb: 1,
+                              '&:hover': {
+                                bgcolor: 'action.hover',
+                              },
+                            }}
+                          >
+                            <Typography variant="body1">
+                              {startTime}{endTime !== 'N/A' ? ` - ${endTime}` : ''}
+                            </Typography>
+                          </ListItemButton>
+                        );
+                      })}
+                    </List>
+                  ) : (
+                    <Alert severity="info">
+                      No available sessions on this day. Please select another day.
+                    </Alert>
+                  )}
+                </Grid>
+              </Grid>
+            </DialogContent>
+            <DialogActions>
+              <Button 
+                onClick={handleNewBookingDialogClose} 
+                color="inherit"
+                sx={{ textTransform: 'none' }}
+              >
+                Close
+              </Button>
+            </DialogActions>
+          </Dialog>
+        )}
 
         {/* Booking Confirmation Dialog */}
         <Dialog open={openDialog} onClose={handleDialogClose} maxWidth="sm" fullWidth>

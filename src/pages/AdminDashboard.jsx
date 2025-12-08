@@ -52,6 +52,7 @@ dayjs.extend(utc);
 dayjs.extend(timezone);
 import apiClient from '../utils/api';
 import { fetchWithAuth, getToken, fetchUserSettings } from '../utils/api';
+import { getCachedSlots, setCachedSlots } from '../utils/bookingSlotCache';
 import CreateTagForm from '../components/CreateTagForm';
 import BookingsManagement from '../components/BookingsManagement';
 
@@ -385,10 +386,17 @@ const PastSessions = () => {
     setPage(value - 1); // MUI Pagination is 1-based, API is 0-based
   };
 
+  // Format date and time in admin's timezone
   const formatDateTime = (instantString) => {
     if (!instantString) return 'N/A';
     try {
-      return dayjs(instantString).format('MMM DD, YYYY HH:mm');
+      if (userTimezone) {
+        // Convert UTC time to admin's timezone
+        return dayjs.utc(instantString).tz(userTimezone).format('MMM DD, YYYY HH:mm');
+      } else {
+        // Fallback to browser timezone if admin timezone not loaded yet
+        return dayjs(instantString).format('MMM DD, YYYY HH:mm');
+      }
     } catch {
       return instantString;
     }
@@ -1073,57 +1081,94 @@ const AdminDashboard = () => {
     }
   };
 
-  const fetchBookingSlots = async (date, sessionTypeId) => {
-    if (!sessionTypeId) {
+  // Fetch slots when session type or date changes
+  useEffect(() => {
+    if (!selectedSessionTypeId || !bookingSelectedDate || !userTimezone) {
+      // Clear slots if required data is not available
       setBookingAvailableSlots([]);
       setBookingSlotsError(null);
       return;
     }
 
-    setLoadingBookingSlots(true);
-    setBookingSlotsError(null);
-    try {
-      const dateString = dayjs(date).format('YYYY-MM-DD');
-      const timezone = userTimezone || Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC';
-      
-      const response = await apiClient.get('/api/v1/public/booking/available/slot', {
-        params: {
-          sessionTypeId,
-          suggestedDate: dateString,
-          timezone,
-        },
-        timeout: 10000,
-      });
-      
-      if (response.data && response.data.slots && Array.isArray(response.data.slots)) {
-        setBookingAvailableSlots(response.data.slots);
-      } else {
-        setBookingAvailableSlots([]);
-      }
-    } catch (err) {
-      console.error('Error fetching available slots:', err);
-      let errorMessage = 'Failed to load available slots. Please try again later.';
-      if (err.code === 'ECONNABORTED') {
-        errorMessage = 'Request timed out. Please try again.';
-      } else if (err.response) {
-        errorMessage = err.response.data?.message || `Server error: ${err.response.status}`;
-      } else if (err.request) {
-        errorMessage = 'Unable to reach the server. Please check your connection.';
-      } else {
-        errorMessage = err.message || errorMessage;
-      }
-      setBookingSlotsError(errorMessage);
-      setBookingAvailableSlots([]);
-    } finally {
-      setLoadingBookingSlots(false);
-    }
-  };
+    let isMounted = true;
+    const controller = new AbortController();
 
-  // Fetch slots when session type or date changes
-  useEffect(() => {
-    if (selectedSessionTypeId && bookingSelectedDate && userTimezone) {
-      fetchBookingSlots(bookingSelectedDate, selectedSessionTypeId);
-    }
+    const fetchBookingSlots = async () => {
+      setLoadingBookingSlots(true);
+      setBookingSlotsError(null);
+      
+      try {
+        const dateString = dayjs(bookingSelectedDate).format('YYYY-MM-DD');
+        const timezone = userTimezone || Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC';
+        
+        // Check cache first
+        const cachedData = getCachedSlots(selectedSessionTypeId, dateString, timezone);
+        if (cachedData) {
+          if (!isMounted) return;
+          if (cachedData.slots && Array.isArray(cachedData.slots)) {
+            setBookingAvailableSlots(cachedData.slots);
+          } else {
+            setBookingAvailableSlots([]);
+          }
+          setLoadingBookingSlots(false);
+          return;
+        }
+        
+        const response = await apiClient.get('/api/v1/public/booking/available/slot', {
+          params: {
+            sessionTypeId: selectedSessionTypeId,
+            suggestedDate: dateString,
+            timezone,
+          },
+          signal: controller.signal,
+          timeout: 10000,
+        });
+        
+        if (!isMounted) return;
+        
+        if (response.data && response.data.slots && Array.isArray(response.data.slots)) {
+          setBookingAvailableSlots(response.data.slots);
+          // Cache the response data
+          setCachedSlots(selectedSessionTypeId, dateString, timezone, response.data);
+        } else {
+          setBookingAvailableSlots([]);
+          // Cache empty result too
+          setCachedSlots(selectedSessionTypeId, dateString, timezone, { slots: [] });
+        }
+      } catch (err) {
+        // Don't set error if request was aborted
+        if (err.name === 'AbortError' || err.name === 'CanceledError' || err.code === 'ERR_CANCELED') {
+          return;
+        }
+        
+        if (!isMounted) return;
+        
+        console.error('Error fetching available slots:', err);
+        let errorMessage = 'Failed to load available slots. Please try again later.';
+        if (err.code === 'ECONNABORTED') {
+          errorMessage = 'Request timed out. Please try again.';
+        } else if (err.response) {
+          errorMessage = err.response.data?.message || `Server error: ${err.response.status}`;
+        } else if (err.request) {
+          errorMessage = 'Unable to reach the server. Please check your connection.';
+        } else {
+          errorMessage = err.message || errorMessage;
+        }
+        setBookingSlotsError(errorMessage);
+        setBookingAvailableSlots([]);
+      } finally {
+        if (isMounted) {
+          setLoadingBookingSlots(false);
+        }
+      }
+    };
+
+    fetchBookingSlots();
+
+    return () => {
+      isMounted = false;
+      controller.abort();
+    };
   }, [selectedSessionTypeId, bookingSelectedDate, userTimezone]);
 
   const handleBookingDateChange = (newDate) => {
@@ -1314,10 +1359,17 @@ const AdminDashboard = () => {
     }
   };
 
+  // Format time from instant in admin's timezone
   const formatTimeFromInstant = (instantString) => {
     if (!instantString) return 'N/A';
     try {
-      return dayjs(instantString).format('HH:mm');
+      if (userTimezone) {
+        // Convert UTC time to admin's timezone
+        return dayjs.utc(instantString).tz(userTimezone).format('HH:mm');
+      } else {
+        // Fallback to browser timezone if admin timezone not loaded yet
+        return dayjs(instantString).format('HH:mm');
+      }
     } catch {
       return instantString;
     }
@@ -1325,6 +1377,24 @@ const AdminDashboard = () => {
 
   const formatDateForDisplay = (date) => {
     return dayjs(date).format('MMMM D, YYYY');
+  };
+
+  // Helper function to get UTC offset for a timezone
+  const getTimezoneOffset = (timezone) => {
+    try {
+      const now = new Date();
+      const utcDate = new Date(now.toLocaleString('en-US', { timeZone: 'UTC' }));
+      const tzDate = new Date(now.toLocaleString('en-US', { timeZone: timezone }));
+      const offsetMs = tzDate - utcDate;
+      const offsetHours = Math.floor(offsetMs / (1000 * 60 * 60));
+      const offsetMinutes = Math.floor((offsetMs % (1000 * 60 * 60)) / (1000 * 60));
+      const sign = offsetHours >= 0 ? '+' : '-';
+      const absHours = Math.abs(offsetHours);
+      const absMinutes = Math.abs(offsetMinutes);
+      return `${sign}${absHours.toString().padStart(2, '0')}:${absMinutes.toString().padStart(2, '0')}`;
+    } catch {
+      return '+00:00';
+    }
   };
 
   // Common timezones with unique UTC offsets (one representative per offset)
@@ -1948,8 +2018,8 @@ const AdminDashboard = () => {
                   borderRadius: 2,
                   p: 2,
                   bgcolor: 'background.paper',
-                  opacity: selectedSessionTypeId ? 1 : 0.6,
-                  pointerEvents: selectedSessionTypeId ? 'auto' : 'none',
+                  opacity: (selectedSessionTypeId && selectedClientId) ? 1 : 0.6,
+                  pointerEvents: (selectedSessionTypeId && selectedClientId) ? 'auto' : 'none',
                 }}
               >
                 <DateCalendar
@@ -1958,12 +2028,17 @@ const AdminDashboard = () => {
                   minDate={dayjs()}
                   sx={{ width: '100%' }}
                   firstDayOfWeek={1}
-                  disabled={!selectedSessionTypeId}
+                  disabled={!selectedSessionTypeId || !selectedClientId}
                 />
               </Box>
               {!selectedSessionTypeId && (
                 <Typography variant="body2" color="text.secondary" sx={{ mt: 1, textAlign: 'center' }}>
                   Please select a session type to enable date selection
+                </Typography>
+              )}
+              {selectedSessionTypeId && !selectedClientId && (
+                <Typography variant="body2" color="text.secondary" sx={{ mt: 1, textAlign: 'center' }}>
+                  Please select a client to enable date selection
                 </Typography>
               )}
             </Grid>
@@ -1972,6 +2047,12 @@ const AdminDashboard = () => {
               <Typography variant="h6" gutterBottom>
                 Available Times on {formatDateForDisplay(bookingSelectedDate)}
               </Typography>
+
+              {userTimezone && (
+                <Alert severity="info" sx={{ mb: 2 }}>
+                  Slots are shown in your timezone: <strong>{userTimezone}</strong> ({getTimezoneOffset(userTimezone)})
+                </Alert>
+              )}
 
               {!selectedSessionTypeId ? (
                 <Alert severity="info">

@@ -4,6 +4,7 @@ import utc from 'dayjs/plugin/utc';
 import timezone from 'dayjs/plugin/timezone';
 import { fetchAdminGroupedBookings, fetchWithAuth, getToken, fetchUserSettings } from '../utils/api';
 import apiClient from '../utils/api';
+import { getCachedSlots, setCachedSlots, invalidateCache, clearAllCache } from '../utils/bookingSlotCache';
 
 // Extend dayjs with timezone support
 dayjs.extend(utc);
@@ -36,6 +37,7 @@ import {
   ListItemButton,
   TextField,
   IconButton,
+  Tooltip,
 } from '@mui/material';
 import { DateCalendar } from '@mui/x-date-pickers/DateCalendar';
 import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
@@ -47,6 +49,7 @@ import FilterAltIcon from '@mui/icons-material/FilterAlt';
 import ClearIcon from '@mui/icons-material/Clear';
 import ArrowUpwardIcon from '@mui/icons-material/ArrowUpward';
 import ArrowDownwardIcon from '@mui/icons-material/ArrowDownward';
+import WarningIcon from '@mui/icons-material/Warning';
 
 const STATUS_COLORS = {
   PENDING_APPROVAL: 'warning',
@@ -461,6 +464,21 @@ const BookingsManagement = () => {
         const dateString = formatDateForAPI(rescheduleSelectedDate);
         const timezone = userTimezone || Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC';
         
+        // Check cache first
+        const cachedData = getCachedSlots(rescheduleSessionTypeId, dateString, timezone);
+        if (cachedData) {
+          if (!isMounted) return;
+          if (cachedData.slots && Array.isArray(cachedData.slots)) {
+            setRescheduleAvailableSlots(cachedData.slots);
+          } else {
+            setRescheduleAvailableSlots([]);
+          }
+          if (isMounted) {
+            setRescheduleLoadingSlots(false);
+          }
+          return;
+        }
+        
         const response = await apiClient.get('/api/v1/public/booking/available/slot', {
           params: {
             sessionTypeId: rescheduleSessionTypeId,
@@ -475,8 +493,12 @@ const BookingsManagement = () => {
         
         if (response.data && response.data.slots && Array.isArray(response.data.slots)) {
           setRescheduleAvailableSlots(response.data.slots);
+          // Cache the response data
+          setCachedSlots(rescheduleSessionTypeId, dateString, timezone, response.data);
         } else {
           setRescheduleAvailableSlots([]);
+          // Cache empty result too
+          setCachedSlots(rescheduleSessionTypeId, dateString, timezone, { slots: [] });
         }
       } catch (err) {
         // Don't set error if request was aborted
@@ -516,11 +538,17 @@ const BookingsManagement = () => {
     };
   }, [rescheduleSessionTypeId, rescheduleSelectedDate, userTimezone]);
 
-  // Format date and time
+  // Format date and time in admin's timezone
   const formatDateTime = (instantString) => {
     if (!instantString) return 'N/A';
     try {
-      return dayjs(instantString).format('MMM DD, YYYY HH:mm');
+      if (userTimezone) {
+        // Convert UTC time to admin's timezone
+        return dayjs.utc(instantString).tz(userTimezone).format('MMM DD, YYYY HH:mm');
+      } else {
+        // Fallback to browser timezone if admin timezone not loaded yet
+        return dayjs(instantString).format('MMM DD, YYYY HH:mm');
+      }
     } catch {
       return instantString;
     }
@@ -567,11 +595,17 @@ const BookingsManagement = () => {
     return dayjs(date).format('YYYY-MM-DD');
   };
 
-  // Format time from instant
+  // Format time from instant in admin's timezone
   const formatTimeFromInstant = (instantString) => {
     if (!instantString) return 'N/A';
     try {
-      return dayjs(instantString).format('HH:mm');
+      if (userTimezone) {
+        // Convert UTC time to admin's timezone
+        return dayjs.utc(instantString).tz(userTimezone).format('HH:mm');
+      } else {
+        // Fallback to browser timezone if admin timezone not loaded yet
+        return dayjs(instantString).format('HH:mm');
+      }
     } catch {
       return instantString;
     }
@@ -648,6 +682,18 @@ const BookingsManagement = () => {
       
       const timezone = userTimezone || Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC';
       
+      // Check cache first
+      const cachedData = getCachedSlots(sessionTypeId, dateString, timezone);
+      if (cachedData) {
+        if (cachedData.slots && Array.isArray(cachedData.slots)) {
+          setRescheduleAvailableSlots(cachedData.slots);
+        } else {
+          setRescheduleAvailableSlots([]);
+        }
+        setRescheduleLoadingSlots(false);
+        return;
+      }
+      
       const response = await apiClient.get('/api/v1/public/booking/available/slot', {
         params: {
           sessionTypeId,
@@ -659,8 +705,12 @@ const BookingsManagement = () => {
       
       if (response.data && response.data.slots && Array.isArray(response.data.slots)) {
         setRescheduleAvailableSlots(response.data.slots);
+        // Cache the response data
+        setCachedSlots(sessionTypeId, dateString, timezone, response.data);
       } else {
         setRescheduleAvailableSlots([]);
+        // Cache empty result too
+        setCachedSlots(sessionTypeId, dateString, timezone, { slots: [] });
       }
     } catch (err) {
       console.error('Error fetching available slots for reschedule:', err);
@@ -842,6 +892,8 @@ const BookingsManagement = () => {
     setRescheduleSessionTypeId(null);
     setShowCustomTimePicker(false);
     setCustomStartTime(null);
+    // Clear cache when reschedule dialog closes
+    clearAllCache();
   };
 
   // Handle booking reschedule confirmation
@@ -897,6 +949,12 @@ const BookingsManagement = () => {
       // Success - close dialog and refresh bookings
       handleRescheduleDialogClose();
       setSuccessMessage('Booking updated successfully');
+      // Invalidate cache for the date that was rescheduled to refresh slots
+      const dateString = formatDateForAPI(rescheduleSelectedDate);
+      const timezone = userTimezone || Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC';
+      if (rescheduleSessionTypeId) {
+        invalidateCache(rescheduleSessionTypeId, dateString, timezone);
+      }
       fetchBookings();
     } catch (err) {
       console.error('Error rescheduling booking:', err);
@@ -906,6 +964,12 @@ const BookingsManagement = () => {
         errorMessage = 'Request timed out. Please try again.';
       } else if (err.response) {
         errorMessage = err.response.data?.message || `Server error: ${err.response.status}`;
+        // If reschedule failed (e.g., slot was already booked), invalidate cache to refresh
+        const dateString = formatDateForAPI(rescheduleSelectedDate);
+        const timezone = userTimezone || Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC';
+        if (rescheduleSessionTypeId) {
+          invalidateCache(rescheduleSessionTypeId, dateString, timezone);
+        }
       } else if (err.request) {
         errorMessage = 'Unable to reach the server. Please check your connection.';
       } else {
@@ -974,18 +1038,57 @@ const BookingsManagement = () => {
     return endTime.isBefore(now);
   };
 
+  // Check if a PENDING_APPROVAL booking is less than 24 hours away
+  const isUrgent = (booking) => {
+    if (booking.status !== 'PENDING_APPROVAL' || !booking.startTimeInstant) {
+      return false;
+    }
+    try {
+      const startTime = userTimezone 
+        ? dayjs.utc(booking.startTimeInstant).tz(userTimezone)
+        : dayjs(booking.startTimeInstant);
+      const now = userTimezone 
+        ? dayjs().tz(userTimezone)
+        : dayjs();
+      const hoursUntilStart = startTime.diff(now, 'hour', true);
+      return hoursUntilStart > 0 && hoursUntilStart < 24;
+    } catch {
+      return false;
+    }
+  };
+
+  // Check if a PENDING_APPROVAL booking is in the past
+  const isPast = (booking) => {
+    if (booking.status !== 'PENDING_APPROVAL' || !booking.startTimeInstant) {
+      return false;
+    }
+    try {
+      const startTime = userTimezone 
+        ? dayjs.utc(booking.startTimeInstant).tz(userTimezone)
+        : dayjs(booking.startTimeInstant);
+      const now = userTimezone 
+        ? dayjs().tz(userTimezone)
+        : dayjs();
+      return startTime.isBefore(now);
+    } catch {
+      return false;
+    }
+  };
+
   // Render booking card
   const renderBookingCard = (booking) => {
     const validTransitions = getValidTransitions(booking.status);
     const canUpdate = validTransitions.length > 0;
     const overdue = isOverdue(booking);
+    const urgent = isUrgent(booking);
+    const past = isPast(booking);
 
     return (
       <Card 
         key={booking.id} 
         sx={{ 
           mb: 2,
-          bgcolor: overdue ? 'grey.300' : 'background.paper'
+          bgcolor: (overdue || past) ? 'grey.300' : 'background.paper'
         }}
       >
         <CardContent>
@@ -1004,6 +1107,19 @@ const BookingsManagement = () => {
                 size="small"
                 sx={{ bgcolor: 'grey.500', color: 'white' }}
               />
+            )}
+            {past && (
+              <Chip
+                label="Overdue"
+                color="default"
+                size="small"
+                sx={{ bgcolor: 'grey.500', color: 'white' }}
+              />
+            )}
+            {urgent && (
+              <Tooltip title="A decision must be taken ASAP">
+                <WarningIcon sx={{ color: 'error.main', fontSize: '1.5rem' }} />
+              </Tooltip>
             )}
             <Button
               size="small"

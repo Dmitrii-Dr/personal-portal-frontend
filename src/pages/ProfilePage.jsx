@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useMemo } from 'react';
-import { fetchWithAuth, fetchUserProfile, clearUserProfileCache, fetchUserSettings, clearUserSettingsCache } from '../utils/api';
+import { fetchWithAuth, fetchUserProfile, clearUserProfileCache, fetchUserSettings, clearUserSettingsCache, getToken } from '../utils/api';
 import {
   Box,
   Card,
@@ -120,6 +120,57 @@ const ProfilePage = () => {
     { code: 'USD', symbol: '$', displayName: 'USD' },
   ];
 
+  // Track current token to detect user changes
+  const [currentToken, setCurrentToken] = useState(getToken());
+
+  // Listen for token changes and clear cache when user changes
+  useEffect(() => {
+    const checkTokenChange = () => {
+      const newToken = getToken();
+      if (newToken !== currentToken) {
+        // Token changed - clear caches and reset state
+        clearUserProfileCache();
+        clearUserSettingsCache();
+        setProfile(null);
+        setSettings(null);
+        setFirstName('');
+        setLastName('');
+        setSettingsFormData({
+          timezone: '',
+          language: 'english',
+          currency: '',
+          emailNotificationEnabled: true,
+        });
+        setCurrentToken(newToken);
+        // The useEffects will automatically reload data when currentToken changes
+      }
+    };
+
+    const handleStorageChange = (e) => {
+      if (e.key === 'auth_token' || e.key === null) {
+        checkTokenChange();
+      }
+    };
+
+    const handleAuthChanged = () => {
+      checkTokenChange();
+    };
+
+    const handleTokenExpired = () => {
+      checkTokenChange();
+    };
+
+    window.addEventListener('storage', handleStorageChange);
+    window.addEventListener('auth-changed', handleAuthChanged);
+    window.addEventListener('token-expired', handleTokenExpired);
+
+    return () => {
+      window.removeEventListener('storage', handleStorageChange);
+      window.removeEventListener('auth-changed', handleAuthChanged);
+      window.removeEventListener('token-expired', handleTokenExpired);
+    };
+  }, [currentToken]);
+
   // Helper function to convert display name or code to code
   const normalizeCurrencyValue = (value) => {
     if (!value) return '';
@@ -137,10 +188,17 @@ const ProfilePage = () => {
     let isMounted = true;
 
     const load = async () => {
+      // Clear cache to ensure fresh data on each page load
+      clearUserProfileCache();
+      // Reset state to avoid showing stale data
+      setProfile(null);
+      setFirstName('');
+      setLastName('');
       setLoading(true);
       setError('');
+      
       try {
-        // Use cached fetchUserProfile which will reuse AppLayout's request if in progress
+        // Fetch fresh profile data
         const data = await fetchUserProfile();
         if (!isMounted) return;
         
@@ -167,27 +225,40 @@ const ProfilePage = () => {
     return () => {
       isMounted = false;
     };
-  }, []);
+  }, [currentToken]);
 
   // Fetch settings
   useEffect(() => {
     let isMounted = true;
 
     const loadSettings = async () => {
+      // Clear cache to ensure fresh data on each page load
+      clearUserSettingsCache();
+      // Reset state to avoid showing stale data
+      setSettings(null);
+      setSettingsFormData({
+        timezone: '',
+        language: 'english',
+        currency: '',
+        emailNotificationEnabled: true,
+      });
       setSettingsLoading(true);
       setSettingsError(null);
+      
       try {
-        // Use cached fetchUserSettings which prevents duplicate requests
+        // Fetch fresh settings data
         const data = await fetchUserSettings();
         if (!isMounted) return;
         
-        setSettings(data);
-        setSettingsFormData({
-          timezone: data.timezone || '',
-          language: data.language || 'english',
-          currency: normalizeCurrencyValue(data.currency),
-          emailNotificationEnabled: data.emailNotificationEnabled !== undefined ? data.emailNotificationEnabled : true,
-        });
+        if (data) {
+          setSettings(data);
+          setSettingsFormData({
+            timezone: data.timezone || '',
+            language: data.language || 'english',
+            currency: normalizeCurrencyValue(data.currency),
+            emailNotificationEnabled: data.emailNotificationEnabled !== undefined ? data.emailNotificationEnabled : true,
+          });
+        }
       } catch (err) {
         if (!isMounted) return;
         
@@ -205,7 +276,7 @@ const ProfilePage = () => {
     return () => {
       isMounted = false;
     };
-  }, []);
+  }, [currentToken]);
 
   const validate = () => {
     let ok = true;
