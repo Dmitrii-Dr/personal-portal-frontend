@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { setToken } from '../utils/api';
 import {
@@ -13,6 +13,9 @@ import {
   CircularProgress,
   Box,
   Link as MuiLink,
+  Checkbox,
+  FormControlLabel,
+  Typography,
 } from '@mui/material';
 
 const SignUpModal = ({ open, onClose, onSwitchToLogin }) => {
@@ -24,6 +27,8 @@ const SignUpModal = ({ open, onClose, onSwitchToLogin }) => {
     confirmPassword: '',
     firstName: '',
     lastName: '',
+    agreedPersonal: false,
+    agreedPsy: false,
   });
   const [errors, setErrors] = useState({
     email: '',
@@ -31,6 +36,8 @@ const SignUpModal = ({ open, onClose, onSwitchToLogin }) => {
     confirmPassword: '',
     firstName: '',
     lastName: '',
+    agreedPersonal: '',
+    agreedPsy: '',
   });
   const [loading, setLoading] = useState(false);
   const [submitError, setSubmitError] = useState('');
@@ -57,6 +64,22 @@ const SignUpModal = ({ open, onClose, onSwitchToLogin }) => {
     setSubmitError('');
   };
 
+  const handleCheckboxChange = (e) => {
+    const { name, checked } = e.target;
+    setFormData((prev) => ({
+      ...prev,
+      [name]: checked,
+    }));
+    if (errors[name]) {
+      setErrors((prev) => ({
+        ...prev,
+        [name]: '',
+      }));
+    }
+  };
+
+
+
   const validateForm = () => {
     const newErrors = {
       email: '',
@@ -64,6 +87,8 @@ const SignUpModal = ({ open, onClose, onSwitchToLogin }) => {
       confirmPassword: '',
       firstName: '',
       lastName: '',
+      agreedPersonal: '',
+      agreedPsy: '',
     };
     let isValid = true;
 
@@ -101,6 +126,20 @@ const SignUpModal = ({ open, onClose, onSwitchToLogin }) => {
       isValid = false;
     }
 
+    if (!formData.agreedPersonal) {
+      newErrors.agreedPersonal = t('auth.agreePersonalRequired', 'You must agree to the processing of personal data');
+      isValid = false;
+    }
+
+    if (!formData.agreedPsy) {
+      newErrors.agreedPsy = t('auth.agreePsyRequired', 'You must agree to the informed voluntary consent');
+      isValid = false;
+    }
+
+
+
+
+
     setErrors(newErrors);
     return isValid;
   };
@@ -134,7 +173,7 @@ const SignUpModal = ({ open, onClose, onSwitchToLogin }) => {
         const errorData = await response.json().catch(() => ({}));
         throw new Error(
           errorData.message ||
-            `Sign up failed: ${response.status} ${response.statusText}`
+          `Sign up failed: ${response.status} ${response.statusText}`
         );
       }
 
@@ -325,6 +364,52 @@ const SignUpModal = ({ open, onClose, onSwitchToLogin }) => {
             disabled={loading || success}
             inputProps={{ maxLength: 100 }}
           />
+
+          <Box sx={{ mt: 2 }}>
+            <FormControlLabel
+              control={
+                <Checkbox
+                  checked={formData.agreedPersonal}
+                  onChange={handleCheckboxChange}
+                  name="agreedPersonal"
+                  color="primary"
+                  disabled={loading || success}
+                />
+              }
+              label={
+                <Typography variant="body2">
+                  {t('auth.agreePersonalData', 'I agree to the')} <MuiLink component={Link} to="/agreement/personal" target="_blank">{t('auth.agreementPersonalData', 'Agreement on Personal Data Processing')}</MuiLink>
+                </Typography>
+              }
+            />
+            {errors.agreedPersonal && (
+              <Typography variant="caption" color="error" display="block">
+                {errors.agreedPersonal}
+              </Typography>
+            )}
+
+            <FormControlLabel
+              control={
+                <Checkbox
+                  checked={formData.agreedPsy}
+                  onChange={handleCheckboxChange}
+                  name="agreedPsy"
+                  color="primary"
+                  disabled={loading || success}
+                />
+              }
+              label={
+                <Typography variant="body2">
+                  {t('auth.agreeInformedConsent', 'I agree to the')} <MuiLink component={Link} to="/agreement/psy" target="_blank">{t('auth.informedConsent', 'Informed Voluntary Consent to Psychological Help')}</MuiLink>
+                </Typography>
+              }
+            />
+            {errors.agreedPsy && (
+              <Typography variant="caption" color="error" display="block">
+                {errors.agreedPsy}
+              </Typography>
+            )}
+          </Box>
 
           <Button
             type="submit"

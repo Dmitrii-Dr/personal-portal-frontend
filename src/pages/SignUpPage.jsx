@@ -11,6 +11,8 @@ import {
   Alert,
   CircularProgress,
   Link as MuiLink,
+  Checkbox,
+  FormControlLabel,
 } from '@mui/material';
 
 const SignUpPage = () => {
@@ -22,6 +24,8 @@ const SignUpPage = () => {
     confirmPassword: '',
     firstName: '',
     lastName: '',
+    agreedPersonal: false,
+    agreedPsy: false,
   });
   const [errors, setErrors] = useState({
     email: '',
@@ -29,6 +33,8 @@ const SignUpPage = () => {
     confirmPassword: '',
     firstName: '',
     lastName: '',
+    agreedPersonal: '',
+    agreedPsy: '',
   });
   const [loading, setLoading] = useState(false);
   const [submitError, setSubmitError] = useState('');
@@ -55,6 +61,20 @@ const SignUpPage = () => {
     setSubmitError('');
   };
 
+  const handleCheckboxChange = (e) => {
+    const { name, checked } = e.target;
+    setFormData((prev) => ({
+      ...prev,
+      [name]: checked,
+    }));
+    if (errors[name]) {
+      setErrors((prev) => ({
+        ...prev,
+        [name]: '',
+      }));
+    }
+  };
+
   const validateForm = () => {
     const newErrors = {
       email: '',
@@ -62,6 +82,8 @@ const SignUpPage = () => {
       confirmPassword: '',
       firstName: '',
       lastName: '',
+      agreedPersonal: '',
+      agreedPsy: '',
     };
     let isValid = true;
 
@@ -99,6 +121,16 @@ const SignUpPage = () => {
       isValid = false;
     }
 
+    if (!formData.agreedPersonal) {
+      newErrors.agreedPersonal = 'You must agree to the processing of personal data';
+      isValid = false;
+    }
+
+    if (!formData.agreedPsy) {
+      newErrors.agreedPsy = 'You must agree to the informed voluntary consent';
+      isValid = false;
+    }
+
     setErrors(newErrors);
     return isValid;
   };
@@ -132,14 +164,14 @@ const SignUpPage = () => {
         const errorData = await response.json().catch(() => ({}));
         throw new Error(
           errorData.message ||
-            `Sign up failed: ${response.status} ${response.statusText}`
+          `Sign up failed: ${response.status} ${response.statusText}`
         );
       }
 
       // Check if signup response includes a token
       const responseData = await response.json().catch(() => ({}));
       const signupToken = responseData.token || responseData.accessToken;
-      
+
       // Save token if available
       if (signupToken) {
         setToken(signupToken);
@@ -313,6 +345,52 @@ const SignUpPage = () => {
               disabled={loading || success}
               inputProps={{ maxLength: 100 }}
             />
+
+            <Box sx={{ mt: 2 }}>
+              <FormControlLabel
+                control={
+                  <Checkbox
+                    checked={formData.agreedPersonal}
+                    onChange={handleCheckboxChange}
+                    name="agreedPersonal"
+                    color="primary"
+                    disabled={loading || success}
+                  />
+                }
+                label={
+                  <Typography variant="body2">
+                    I agree to the <MuiLink component={Link} to="/agreement/personal" target="_blank">Agreement on Personal Data Processing</MuiLink>
+                  </Typography>
+                }
+              />
+              {errors.agreedPersonal && (
+                <Typography variant="caption" color="error" display="block">
+                  {errors.agreedPersonal}
+                </Typography>
+              )}
+
+              <FormControlLabel
+                control={
+                  <Checkbox
+                    checked={formData.agreedPsy}
+                    onChange={handleCheckboxChange}
+                    name="agreedPsy"
+                    color="primary"
+                    disabled={loading || success}
+                  />
+                }
+                label={
+                  <Typography variant="body2">
+                    I agree to the <MuiLink component={Link} to="/agreement/psy" target="_blank">Informed Voluntary Consent to Psychological Help</MuiLink>
+                  </Typography>
+                }
+              />
+              {errors.agreedPsy && (
+                <Typography variant="caption" color="error" display="block">
+                  {errors.agreedPsy}
+                </Typography>
+              )}
+            </Box>
 
             <Button
               type="submit"

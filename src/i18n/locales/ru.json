@@ -77,7 +77,13 @@
     "signUpDescription": "Создайте новый аккаунт для начала работы",
     "accountCreatedSuccess": "Аккаунт успешно создан!",
     "creatingAccount": "Создание аккаунта...",
-    "signIn": "Войти"
+    "signIn": "Войти",
+    "agreePersonalData": "Я согласен с",
+    "agreementPersonalData": "Соглашением об обработке персональных данных",
+    "agreeInformedConsent": "Я согласен с",
+    "informedConsent": "Информированным добровольным согласием на психологическую помощь",
+    "agreePersonalRequired": "Вы должны согласиться с обработкой персональных данных",
+    "agreePsyRequired": "Вы должны согласиться с информированным добровольным согласием"
   },
   "userMenu": {
     "myProfile": "Мой профиль",
@@ -765,4 +771,3 @@
     }
   }
 }
-

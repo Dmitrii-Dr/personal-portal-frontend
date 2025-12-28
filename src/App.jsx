@@ -16,6 +16,8 @@ import AdminGalleryPage from './pages/AdminGalleryPage';
 import AboutMePage from './pages/AboutMePage';
 import SessionsConfigurationPage from './pages/SessionsConfigurationPage';
 import ResetPasswordPage from './pages/ResetPasswordPage';
+import AgreementPersonalPage from './pages/AgreementPersonalPage';
+import AgreementPsyPage from './pages/AgreementPsyPage';
 import AdminRoute from './components/AdminRoute';
 import AdminRedirect from './components/AdminRedirect';
 import ErrorBoundary from './components/ErrorBoundary';
@@ -279,7 +281,7 @@ const HomePage = () => {
               Loading...
             </>
           ) : (
-            {/* Translation handled in component */}
+            {/* Translation handled in component */ }
           )}
         </Button>
       </Box>
@@ -436,7 +438,7 @@ const LoginPage = () => {
   });
   const [loading, setLoading] = useState(false);
   const [submitError, setSubmitError] = useState('');
-  
+
   // Get return path from location state
   const returnTo = location.state?.returnTo || '/booking';
 
@@ -511,29 +513,29 @@ const LoginPage = () => {
         const errorData = await response.json().catch(() => ({}));
         throw new Error(
           errorData.message ||
-            `Login failed: ${response.status} ${response.statusText}`
+          `Login failed: ${response.status} ${response.statusText}`
         );
       }
 
       const data = await response.json();
-      
+
       // Save token to sessionStorage
       if (data.token) {
         setToken(data.token);
         // Dispatch custom event to notify AppLayout of auth change
         window.dispatchEvent(new Event('auth-changed'));
-        
+
         // Check if user has admin role - check both response roles and token
         const responseRoles = data.roles || [];
         const tokenRoles = getRolesFromToken(data.token);
         const allRoles = [...new Set([...responseRoles, ...tokenRoles])]; // Combine and deduplicate
         const isAdmin = allRoles.includes('ROLE_ADMIN') || allRoles.includes('ADMIN_ROLE');
-        
+
         console.log('Response roles:', responseRoles);
         console.log('Token roles:', tokenRoles);
         console.log('All roles:', allRoles);
         console.log('Is admin?', isAdmin);
-        
+
         if (isAdmin) {
           // Admin user - redirect to admin dashboard
           console.log('Redirecting to /admin/dashboard');
@@ -666,6 +668,8 @@ function App() {
                 <Route path="/booking" element={<BookingPage />} />
                 <Route path="/login" element={<LoginPage />} />
                 <Route path="/signup" element={<SignUpPage />} />
+                <Route path="/agreement/personal" element={<AgreementPersonalPage />} />
+                <Route path="/agreement/psy" element={<AgreementPsyPage />} />
                 <Route path="/reset-password" element={<ResetPasswordPage />} />
                 <Route path="/profile" element={<ProfilePage />} />
                 <Route path="/about-me" element={<AboutMePage />} />
