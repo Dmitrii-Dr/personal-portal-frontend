@@ -6,6 +6,7 @@ import { getCachedSlots, setCachedSlots } from '../utils/bookingSlotCache';
 import AvailabilityRuleComponent from '../components/AvailabilityRuleComponent';
 import AvailabilityOverrideComponent from '../components/AvailabilityOverrideComponent';
 import BookingSettings from '../components/BookingSettings';
+import UserAgreementsSection from '../components/UserAgreementsSection';
 import {
   Box,
   Typography,
@@ -117,7 +118,7 @@ const getTimezoneWithOffset = (timezone) => {
 
 const SessionsConfigurationPage = () => {
   const { t } = useTranslation();
-  
+
   // Session types state
   const [sessionTypes, setSessionTypes] = useState([]);
   const [loadingSessionTypes, setLoadingSessionTypes] = useState(false);
@@ -294,7 +295,7 @@ const SessionsConfigurationPage = () => {
         Tenge: sessionType.prices?.Tenge ?? 0,
         USD: sessionType.prices?.USD ?? 0,
       };
-      
+
       setSessionTypeForm({
         name: sessionType.name || '',
         description: sessionType.description || '',
@@ -338,7 +339,7 @@ const SessionsConfigurationPage = () => {
       const prices = {};
       const requiredCurrencies = ['Rubles', 'Tenge', 'USD'];
       let hasInvalidPrice = false;
-      
+
       requiredCurrencies.forEach((currency) => {
         const value = sessionTypeForm.prices?.[currency];
         // Convert to number, default to 0 if empty/null/undefined
@@ -512,9 +513,9 @@ const SessionsConfigurationPage = () => {
                                   </Typography>
                                 )}
                                 <Box sx={{ display: 'flex', gap: 1, mt: 0.5, flexWrap: 'wrap' }}>
-                                  <Chip 
-                                    label={sessionType.active !== false ? t('admin.sessionConfiguration.active') : t('admin.sessionConfiguration.inactive')} 
-                                    size="small" 
+                                  <Chip
+                                    label={sessionType.active !== false ? t('admin.sessionConfiguration.active') : t('admin.sessionConfiguration.inactive')}
+                                    size="small"
                                     color={sessionType.active !== false ? 'success' : 'default'}
                                   />
                                   <Chip label={`${sessionType.durationMinutes} min`} size="small" />
@@ -560,6 +561,11 @@ const SessionsConfigurationPage = () => {
                   )}
                 </CardContent>
               </Card>
+            </Grid>
+
+            {/* User Agreements Section */}
+            <Grid item xs={12}>
+              <UserAgreementsSection />
             </Grid>
 
             {/* Booking Settings Section */}
@@ -669,8 +675,8 @@ const SessionsConfigurationPage = () => {
                             const startTime = slot.startTime
                               ? formatTime(slot.startTime)
                               : slot.startTimeInstant
-                              ? formatTimeFromInstant(slot.startTimeInstant)
-                              : 'N/A';
+                                ? formatTimeFromInstant(slot.startTimeInstant)
+                                : 'N/A';
                             const endTime = slot.endTime ? formatTime(slot.endTime) : 'N/A';
 
                             return (

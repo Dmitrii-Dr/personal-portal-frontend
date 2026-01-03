@@ -51,6 +51,8 @@ import { DateCalendar } from '@mui/x-date-pickers/DateCalendar';
 import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
 import { AdapterDayjs } from '@mui/x-date-pickers/AdapterDayjs';
 import AddIcon from '@mui/icons-material/Add';
+import KeyboardArrowDownIcon from '@mui/icons-material/KeyboardArrowDown';
+import KeyboardArrowUpIcon from '@mui/icons-material/KeyboardArrowUp';
 
 const BookingPage = ({ sessionTypeId: propSessionTypeId, hideMyBookings = false }) => {
   const { t, i18n: i18nInstance } = useTranslation();
@@ -96,8 +98,11 @@ const BookingPage = ({ sessionTypeId: propSessionTypeId, hideMyBookings = false 
   const [updateSessionTypeId, setUpdateSessionTypeId] = useState(null); // Matched session type ID for update
   const [newBookingDialogOpen, setNewBookingDialogOpen] = useState(false);
   const [successMessage, setSuccessMessage] = useState(null);
+  const [showScrollTop, setShowScrollTop] = useState(false);
+  const [showScrollBottom, setShowScrollBottom] = useState(false);
+  const slotsScrollRef = useRef(null);
   const navigate = useNavigate();
-  
+
   const PENDING_BOOKING_KEY = 'pending_booking';
 
   // Format date to YYYY-MM-DD for API
@@ -111,7 +116,7 @@ const BookingPage = ({ sessionTypeId: propSessionTypeId, hideMyBookings = false 
     if (!hasToken) {
       return;
     }
-    
+
     try {
       const data = await fetchUserSettingsCached();
       if (data) {
@@ -152,7 +157,7 @@ const BookingPage = ({ sessionTypeId: propSessionTypeId, hideMyBookings = false 
     const name = sessionType.name || '';
     const duration = sessionType.durationMinutes || 60;
     let priceDisplay = '';
-    
+
     if (userCurrency && sessionType.prices && sessionType.prices[userCurrency] !== undefined) {
       const price = sessionType.prices[userCurrency];
       const symbol = getCurrencySymbol(userCurrency);
@@ -161,7 +166,7 @@ const BookingPage = ({ sessionTypeId: propSessionTypeId, hideMyBookings = false 
       // Fallback to old price field if available
       priceDisplay = `${sessionType.price}$`;
     }
-    
+
     if (priceDisplay) {
       return `${name}. ${duration} min. ${priceDisplay}`;
     } else {
@@ -174,20 +179,20 @@ const BookingPage = ({ sessionTypeId: propSessionTypeId, hideMyBookings = false 
     if (!sessionPrices || typeof sessionPrices !== 'object') {
       return null;
     }
-    
+
     // Get the first key-value pair from sessionPrices
     const currencies = Object.keys(sessionPrices);
     if (currencies.length === 0) {
       return null;
     }
-    
+
     const firstCurrency = currencies[0];
     const price = sessionPrices[firstCurrency];
-    
+
     if (price === null || price === undefined) {
       return null;
     }
-    
+
     const symbol = getCurrencySymbol(firstCurrency);
     return `${price}${symbol}`;
   };
@@ -212,27 +217,37 @@ const BookingPage = ({ sessionTypeId: propSessionTypeId, hideMyBookings = false 
 
   // Get list of common timezones with their display names and offsets
   const getTimezoneOptions = () => {
+    // Simplified list with one representative timezone per major offset
     const timezones = [
-      'America/New_York', 'America/Chicago', 'America/Denver', 'America/Los_Angeles',
-      'America/Phoenix', 'America/Anchorage', 'America/Honolulu',
-      'Europe/London', 'Europe/Paris', 'Europe/Berlin', 'Europe/Rome', 'Europe/Madrid',
-      'Europe/Amsterdam', 'Europe/Brussels', 'Europe/Zurich', 'Europe/Vienna',
-      'Europe/Stockholm', 'Europe/Copenhagen', 'Europe/Oslo', 'Europe/Helsinki',
-      'Europe/Warsaw', 'Europe/Prague', 'Europe/Budapest', 'Europe/Athens',
-      'Europe/Moscow', 'Europe/Kiev', 'Europe/Istanbul',
-      'Asia/Dubai', 'Asia/Karachi', 'Asia/Kolkata', 'Asia/Dhaka',
-      'Asia/Bangkok', 'Asia/Singapore', 'Asia/Hong_Kong', 'Asia/Shanghai',
-      'Asia/Tokyo', 'Asia/Seoul', 'Asia/Jakarta', 'Asia/Manila',
-      'Australia/Sydney', 'Australia/Melbourne', 'Australia/Perth',
-      'Pacific/Auckland', 'Pacific/Fiji',
-      'Africa/Cairo', 'Africa/Johannesburg', 'Africa/Lagos',
-      'America/Sao_Paulo', 'America/Buenos_Aires', 'America/Lima',
-      'UTC'
+      'Pacific/Honolulu',      // UTC-10
+      'America/Anchorage',     // UTC-09
+      'America/Los_Angeles',   // UTC-08
+      'America/Denver',        // UTC-07
+      'America/Chicago',       // UTC-06
+      'America/New_York',      // UTC-05
+      'America/Caracas',       // UTC-04
+      'America/Sao_Paulo',     // UTC-03
+      'Atlantic/South_Georgia', // UTC-02
+      'Atlantic/Azores',       // UTC-01
+      'UTC',                   // UTC+00
+      'Europe/London',         // UTC+00/+01
+      'Europe/Paris',          // UTC+01/+02
+      'Europe/Athens',         // UTC+02/+03
+      'Europe/Moscow',         // UTC+03
+      'Asia/Dubai',            // UTC+04
+      'Asia/Karachi',          // UTC+05
+      'Asia/Kolkata',          // UTC+05:30
+      'Asia/Dhaka',            // UTC+06
+      'Asia/Bangkok',          // UTC+07
+      'Asia/Shanghai',         // UTC+08
+      'Asia/Tokyo',            // UTC+09
+      'Australia/Sydney',      // UTC+10/+11
+      'Pacific/Auckland',      // UTC+12/+13
     ];
-    
+
     return timezones.map(tz => {
       const offset = getTimezoneOffset(tz);
-      // Format timezone name for display (e.g., "America/New_York" -> "New York (EST)")
+      // Format timezone name for display (e.g., "America/New_York" -> "New York")
       const displayName = tz.split('/').pop().replace(/_/g, ' ');
       return {
         value: tz,
@@ -280,7 +295,7 @@ const BookingPage = ({ sessionTypeId: propSessionTypeId, hideMyBookings = false 
       setLoading(true);
       setError(null);
       const dateString = formatDateForAPI(date);
-      
+
       // Use user timezone from settings if logged in, otherwise use selected timezone for anonymous users
       let timezone = 'Europe/Moscow'; // Default to Moscow for anonymous users
       if (userTimezone) {
@@ -288,7 +303,7 @@ const BookingPage = ({ sessionTypeId: propSessionTypeId, hideMyBookings = false 
       } else if (selectedTimezone) {
         timezone = selectedTimezone;
       }
-      
+
       // Check cache first
       const cachedData = getCachedSlots(sessionTypeId, dateString, timezone);
       if (cachedData) {
@@ -301,7 +316,7 @@ const BookingPage = ({ sessionTypeId: propSessionTypeId, hideMyBookings = false 
         setLoading(false);
         return;
       }
-      
+
       const response = await apiClient.get('/api/v1/public/booking/available/slot', {
         params: {
           sessionTypeId,
@@ -310,7 +325,7 @@ const BookingPage = ({ sessionTypeId: propSessionTypeId, hideMyBookings = false 
         },
         timeout: 10000,
       });
-      
+
       // Handle BookingSuggestionsDto response
       if (response.data && response.data.slots && Array.isArray(response.data.slots)) {
         setAvailableSlots(response.data.slots);
@@ -324,7 +339,7 @@ const BookingPage = ({ sessionTypeId: propSessionTypeId, hideMyBookings = false 
     } catch (err) {
       console.error('Error fetching available slots:', err);
       let errorMessage = 'Failed to load available slots. Please try again later.';
-      
+
       if (err.code === 'ECONNABORTED') {
         errorMessage = 'Request timed out. Please try again.';
       } else if (err.response) {
@@ -334,7 +349,7 @@ const BookingPage = ({ sessionTypeId: propSessionTypeId, hideMyBookings = false 
       } else {
         errorMessage = err.message || errorMessage;
       }
-      
+
       setError(errorMessage);
       setAvailableSlots([]);
     } finally {
@@ -347,7 +362,7 @@ const BookingPage = ({ sessionTypeId: propSessionTypeId, hideMyBookings = false 
     try {
       setLoadingBookings(true);
       setBookingsError(null);
-      
+
       const response = await apiClient.get('/api/v1/session/booking/group', {
         params: {
           status: 'PENDING_APPROVAL,CONFIRMED',
@@ -383,7 +398,7 @@ const BookingPage = ({ sessionTypeId: propSessionTypeId, hideMyBookings = false 
     try {
       setLoadingPastBookings(true);
       setPastBookingsError(null);
-      
+
       const requestConfig = {
         params: {
           status: 'DECLINED,CANCELLED,COMPLETED',
@@ -442,7 +457,7 @@ const BookingPage = ({ sessionTypeId: propSessionTypeId, hideMyBookings = false 
           timeout: 10000,
         });
         if (!isMounted) return;
-        
+
         if (response.data && Array.isArray(response.data)) {
           setSessionTypes(response.data);
           // Set first session type as default if available
@@ -457,9 +472,9 @@ const BookingPage = ({ sessionTypeId: propSessionTypeId, hideMyBookings = false 
         if (error.name === 'AbortError' || error.name === 'CanceledError' || error.code === 'ERR_CANCELED') {
           return;
         }
-        
+
         if (!isMounted) return;
-        
+
         console.error('Error fetching session types:', error);
         setSessionTypesError(error.message || 'Failed to load session types');
         setSessionTypes([]);
@@ -469,9 +484,9 @@ const BookingPage = ({ sessionTypeId: propSessionTypeId, hideMyBookings = false 
         }
       }
     };
-    
+
     fetchSessionTypes();
-    
+
     return () => {
       isMounted = false;
       controller.abort();
@@ -484,24 +499,24 @@ const BookingPage = ({ sessionTypeId: propSessionTypeId, hideMyBookings = false 
       const tokenExists = !!getToken();
       setHasToken(tokenExists);
     };
-    
+
     checkToken();
-    
+
     // Listen for storage changes (e.g., when login happens in another tab)
     const handleStorageChange = (e) => {
       if (e.key === 'auth_token' || e.key === null) {
         checkToken();
       }
     };
-    
+
     // Listen for custom event when login happens in same tab
     const handleAuthChanged = () => {
       checkToken();
     };
-    
+
     window.addEventListener('storage', handleStorageChange);
     window.addEventListener('auth-changed', handleAuthChanged);
-    
+
     return () => {
       window.removeEventListener('storage', handleStorageChange);
       window.removeEventListener('auth-changed', handleAuthChanged);
@@ -541,7 +556,7 @@ const BookingPage = ({ sessionTypeId: propSessionTypeId, hideMyBookings = false 
   useEffect(() => {
     // Only fetch if dialog is open OR if hideMyBookings is true (form shown directly)
     const shouldShowForm = newBookingDialogOpen || (hideMyBookings && propSessionTypeId);
-    
+
     if (!shouldShowForm) {
       // Reset last fetched when dialog closes
       lastFetchedRef.current = { date: null, sessionTypeId: null, timezone: null };
@@ -576,13 +591,28 @@ const BookingPage = ({ sessionTypeId: propSessionTypeId, hideMyBookings = false 
     const sessionTypeChanged = lastFetched.sessionTypeId !== sessionTypeId;
     const timezoneChanged = lastFetched.timezone !== currentTimezone;
     const isInitialLoad = lastFetched.date === null && lastFetched.sessionTypeId === null;
-    
+
     // Fetch on initial dialog open or when date/sessionType/timezone changes
     if ((isInitialLoad || dateChanged || sessionTypeChanged || timezoneChanged) && sessionTypeId) {
       lastFetchedRef.current = { date: dateString, sessionTypeId, timezone: currentTimezone };
       fetchAvailableSlots(selectedDate);
     }
   }, [newBookingDialogOpen, hideMyBookings, propSessionTypeId, selectedDate, sessionTypeId, userTimezone, selectedTimezone, hasToken]);
+
+  // Update scroll indicators when slots change
+  useEffect(() => {
+    if (slotsScrollRef.current && availableSlots.length > 4) {
+      const element = slotsScrollRef.current;
+      const isAtTop = element.scrollTop === 0;
+      const isAtBottom = element.scrollHeight - element.scrollTop === element.clientHeight;
+
+      setShowScrollTop(!isAtTop);
+      setShowScrollBottom(!isAtBottom);
+    } else {
+      setShowScrollTop(false);
+      setShowScrollBottom(false);
+    }
+  }, [availableSlots]);
 
   // Handle date selection
   const handleDateChange = (newDate) => {
@@ -636,7 +666,7 @@ const BookingPage = ({ sessionTypeId: propSessionTypeId, hideMyBookings = false 
     setUpdateBookingError(null);
     setUpdateSessionTypeId(null);
     setUpdateDialogOpen(true);
-    
+
     // Fetch active session types and match by name to find the session type ID
     try {
       const response = await apiClient.get('/api/v1/public/session/type', {
@@ -660,7 +690,7 @@ const BookingPage = ({ sessionTypeId: propSessionTypeId, hideMyBookings = false 
       }
     } catch (err) {
       console.error('Error fetching session types for update:', err);
-        setUpdateSlotError(t('pages.booking.failedToLoadSessionTypesRetry'));
+      setUpdateSlotError(t('pages.booking.failedToLoadSessionTypesRetry'));
     }
   };
 
@@ -677,7 +707,7 @@ const BookingPage = ({ sessionTypeId: propSessionTypeId, hideMyBookings = false 
       setUpdateLoadingSlots(true);
       setUpdateSlotError(null);
       const dateString = formatDateForAPI(date);
-      
+
       // Use user timezone from settings if available and user is logged in, otherwise use browser timezone
       let timezone = 'UTC';
       if (hasToken && userTimezone) {
@@ -689,7 +719,7 @@ const BookingPage = ({ sessionTypeId: propSessionTypeId, hideMyBookings = false 
           timezone = 'UTC'; // Final fallback
         }
       }
-      
+
       // Check cache first
       const cachedData = getCachedSlots(sessionTypeId, dateString, timezone);
       if (cachedData) {
@@ -702,7 +732,7 @@ const BookingPage = ({ sessionTypeId: propSessionTypeId, hideMyBookings = false 
         setUpdateLoadingSlots(false);
         return;
       }
-      
+
       const response = await apiClient.get('/api/v1/public/booking/available/slot', {
         params: {
           sessionTypeId,
@@ -711,7 +741,7 @@ const BookingPage = ({ sessionTypeId: propSessionTypeId, hideMyBookings = false 
         },
         timeout: 10000,
       });
-      
+
       // Handle BookingSuggestionsDto response
       if (response.data && response.data.slots && Array.isArray(response.data.slots)) {
         setUpdateAvailableSlots(response.data.slots);
@@ -725,7 +755,7 @@ const BookingPage = ({ sessionTypeId: propSessionTypeId, hideMyBookings = false 
     } catch (err) {
       console.error('Error fetching available slots for update:', err);
       let errorMessage = 'Failed to load available slots. Please try again later.';
-      
+
       if (err.code === 'ECONNABORTED') {
         errorMessage = 'Request timed out. Please try again.';
       } else if (err.response) {
@@ -735,7 +765,7 @@ const BookingPage = ({ sessionTypeId: propSessionTypeId, hideMyBookings = false 
       } else {
         errorMessage = err.message || errorMessage;
       }
-      
+
       setUpdateSlotError(errorMessage);
       setUpdateAvailableSlots([]);
     } finally {
@@ -812,7 +842,7 @@ const BookingPage = ({ sessionTypeId: propSessionTypeId, hideMyBookings = false 
     } catch (err) {
       console.error('Error updating booking:', err);
       let errorMessage = t('pages.booking.failedToUpdateBooking');
-      
+
       if (err.code === 'ECONNABORTED') {
         errorMessage = 'Request timed out. Please try again.';
       } else if (err.response) {
@@ -828,7 +858,7 @@ const BookingPage = ({ sessionTypeId: propSessionTypeId, hideMyBookings = false 
       } else {
         errorMessage = err.message || errorMessage;
       }
-      
+
       setUpdateBookingError(errorMessage);
     } finally {
       setUpdatingBooking(false);
@@ -852,7 +882,7 @@ const BookingPage = ({ sessionTypeId: propSessionTypeId, hideMyBookings = false 
     try {
       let response;
       const status = bookingToCancel.status?.toUpperCase();
-      
+
       // Use POST for PENDING_APPROVAL or PENDING status, DELETE for others
       if (status === 'PENDING_APPROVAL' || status === 'PENDING') {
         response = await apiClient.post(`/api/v1/session/booking/${bookingToCancel.id}/cancel`, {}, {
@@ -882,7 +912,7 @@ const BookingPage = ({ sessionTypeId: propSessionTypeId, hideMyBookings = false 
     } catch (err) {
       console.error('Error cancelling booking:', err);
       let errorMessage = t('pages.booking.failedToCancelBooking');
-      
+
       if (err.code === 'ECONNABORTED') {
         errorMessage = 'Request timed out. Please try again.';
       } else if (err.response) {
@@ -892,7 +922,7 @@ const BookingPage = ({ sessionTypeId: propSessionTypeId, hideMyBookings = false 
       } else {
         errorMessage = err.message || errorMessage;
       }
-      
+
       alert(errorMessage);
     } finally {
       setCancelling(false);
@@ -916,7 +946,7 @@ const BookingPage = ({ sessionTypeId: propSessionTypeId, hideMyBookings = false 
         selectedDate: formatDateForAPI(selectedDate),
       };
       sessionStorage.setItem(PENDING_BOOKING_KEY, JSON.stringify(pendingBooking));
-      
+
       // Show login/signup dialog
       setLoginRequiredDialogOpen(true);
       return;
@@ -963,7 +993,7 @@ const BookingPage = ({ sessionTypeId: propSessionTypeId, hideMyBookings = false 
     } catch (err) {
       console.error('Error creating booking:', err);
       let errorMessage = t('pages.booking.bookingFailed');
-      
+
       if (err.code === 'ECONNABORTED') {
         errorMessage = 'Request timed out. Please try again.';
       } else if (err.response) {
@@ -977,7 +1007,7 @@ const BookingPage = ({ sessionTypeId: propSessionTypeId, hideMyBookings = false 
       } else {
         errorMessage = err.message || errorMessage;
       }
-      
+
       setBookingError(errorMessage);
     } finally {
       setSubmittingBooking(false);
@@ -988,7 +1018,7 @@ const BookingPage = ({ sessionTypeId: propSessionTypeId, hideMyBookings = false 
   const completePendingBooking = useCallback(async () => {
     const pendingBookingStr = sessionStorage.getItem(PENDING_BOOKING_KEY);
     const token = getToken();
-    
+
     // Only proceed if we have both pending booking and a valid token
     if (!pendingBookingStr || !hasToken || !token) {
       return;
@@ -996,7 +1026,7 @@ const BookingPage = ({ sessionTypeId: propSessionTypeId, hideMyBookings = false 
 
     try {
       const pendingBooking = JSON.parse(pendingBookingStr);
-      
+
       const payload = {
         sessionTypeId: pendingBooking.sessionTypeId,
         startTimeInstant: pendingBooking.startTimeInstant,
@@ -1058,10 +1088,10 @@ const BookingPage = ({ sessionTypeId: propSessionTypeId, hideMyBookings = false 
     try {
       // Parse UTC time from API
       const utcTime = dayjs.utc(instantString);
-      
+
       // Convert to user's timezone if available, otherwise use selected timezone for anonymous users
       let timezone = userTimezone || selectedTimezone || 'Europe/Moscow';
-      
+
       // Convert UTC to user's timezone and format as HH:mm
       const localTime = utcTime.tz(timezone);
       return localTime.format('HH:mm');
@@ -1088,10 +1118,10 @@ const BookingPage = ({ sessionTypeId: propSessionTypeId, hideMyBookings = false 
       const locale = i18nInstance.language === 'ru' ? 'ru' : 'en-gb';
       // Parse UTC time from API
       const utcTime = dayjs.utc(instantString);
-      
+
       // Convert to user's timezone if available, otherwise use selected timezone for anonymous users
       let timezone = userTimezone || selectedTimezone || 'Europe/Moscow';
-      
+
       // Convert UTC to user's timezone and format with locale
       const localTime = utcTime.tz(timezone);
       return localTime.locale(locale).format('MMMM D, YYYY, HH:mm');
@@ -1103,6 +1133,60 @@ const BookingPage = ({ sessionTypeId: propSessionTypeId, hideMyBookings = false 
       } catch {
         return instantString;
       }
+    }
+  };
+
+  // Format time range, showing date only once if both times are on the same day
+  const formatTimeRange = (startInstant, endInstant) => {
+    if (!startInstant || !endInstant) return 'N/A';
+    try {
+      const locale = i18nInstance.language === 'ru' ? 'ru' : 'en-gb';
+      const timezone = userTimezone || selectedTimezone || 'Europe/Moscow';
+
+      const startTime = dayjs.utc(startInstant).tz(timezone);
+      const endTime = dayjs.utc(endInstant).tz(timezone);
+
+      // Check if both times are on the same day
+      const sameDay = startTime.format('YYYY-MM-DD') === endTime.format('YYYY-MM-DD');
+
+      if (sameDay) {
+        // Show date once with locale-specific format
+        let dateStr;
+        if (locale === 'ru') {
+          // Russian format: "9 Января, 2026"
+          const day = startTime.format('D');
+          const month = startTime.locale(locale).format('MMMM');
+          const year = startTime.format('YYYY');
+          // Capitalize first letter of month
+          const capitalizedMonth = month.charAt(0).toUpperCase() + month.slice(1);
+          dateStr = `${day} ${capitalizedMonth}, ${year}`;
+        } else {
+          // English format: "January 9, 2026"
+          dateStr = startTime.locale(locale).format('MMMM D, YYYY');
+        }
+        const startTimeStr = startTime.format('HH:mm');
+        const endTimeStr = endTime.format('HH:mm');
+        return `${dateStr}, ${startTimeStr} - ${endTimeStr}`;
+      } else {
+        // Different days: show full format for both
+        if (locale === 'ru') {
+          // Russian format for both dates
+          const formatRuDate = (time) => {
+            const day = time.format('D');
+            const month = time.locale(locale).format('MMMM');
+            const year = time.format('YYYY');
+            const capitalizedMonth = month.charAt(0).toUpperCase() + month.slice(1);
+            const timeStr = time.format('HH:mm');
+            return `${day} ${capitalizedMonth}, ${year}, ${timeStr}`;
+          };
+          return `${formatRuDate(startTime)} - ${formatRuDate(endTime)}`;
+        } else {
+          return `${startTime.locale(locale).format('MMMM D, YYYY, HH:mm')} - ${endTime.locale(locale).format('MMMM D, YYYY, HH:mm')}`;
+        }
+      }
+    } catch {
+      // Fallback to showing both separately
+      return `${formatInstant(startInstant)} - ${formatInstant(endInstant)}`;
     }
   };
 
@@ -1168,7 +1252,7 @@ const BookingPage = ({ sessionTypeId: propSessionTypeId, hideMyBookings = false 
   // Fetch past bookings when switching to Past Sessions tab
   const hasFetchedPastBookingsRef = useRef(false);
   const lastActiveTabRef = useRef(activeTab);
-  
+
   useEffect(() => {
     // Reset fetch flag when switching tabs
     if (lastActiveTabRef.current !== activeTab) {
@@ -1256,9 +1340,9 @@ const BookingPage = ({ sessionTypeId: propSessionTypeId, hideMyBookings = false 
                       getActiveBookings().map((booking) => {
                         const isPast = isPastBooking(booking);
                         return (
-                          <Card 
-                            key={booking.id} 
-                            sx={{ 
+                          <Card
+                            key={booking.id}
+                            sx={{
                               mb: 2,
                               bgcolor: isPast ? 'grey.200' : 'background.paper',
                             }}
@@ -1280,7 +1364,7 @@ const BookingPage = ({ sessionTypeId: propSessionTypeId, hideMyBookings = false 
                                     )}
                                   </Box>
                                   <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
-                                    {formatInstant(booking.startTimeInstant)} - {formatInstant(booking.endTimeInstant)}
+                                    {formatTimeRange(booking.startTimeInstant, booking.endTimeInstant)}
                                   </Typography>
                                 </Box>
                                 <Box sx={{ display: 'flex', gap: 1, alignItems: 'center' }}>
@@ -1300,61 +1384,61 @@ const BookingPage = ({ sessionTypeId: propSessionTypeId, hideMyBookings = false 
                                   )}
                                 </Box>
                               </Box>
-                            {booking.clientMessage && (
-                              <>
-                                <Divider sx={{ my: 1 }} />
-                                <Typography variant="body2" color="text.secondary">
-                                  <strong>Message:</strong> {booking.clientMessage}
-                                </Typography>
-                              </>
-                            )}
-                            <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 1 }}>
-                              {t('pages.booking.created')} {formatInstant(booking.createdAt)}
-                            </Typography>
-                            <Box sx={{ display: 'flex', justifyContent: 'flex-end', gap: 1, mt: 2 }}>
-                              {booking.status?.toUpperCase() === 'CONFIRMED' ? (
-                                <Tooltip title={t('pages.booking.cancelTooltip')}>
-                                  <span>
+                              {booking.clientMessage && (
+                                <>
+                                  <Divider sx={{ my: 1 }} />
+                                  <Typography variant="body2" color="text.secondary">
+                                    <strong>Message:</strong> {booking.clientMessage}
+                                  </Typography>
+                                </>
+                              )}
+                              <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 1 }}>
+                                {t('pages.booking.created')} {formatInstant(booking.createdAt)}
+                              </Typography>
+                              <Box sx={{ display: 'flex', justifyContent: 'flex-end', gap: 1, mt: 2 }}>
+                                {booking.status?.toUpperCase() === 'CONFIRMED' ? (
+                                  <Tooltip title={t('pages.booking.cancelTooltip')}>
+                                    <span>
+                                      <Button
+                                        variant="outlined"
+                                        color="error"
+                                        size="small"
+                                        disabled={true}
+                                        sx={{ textTransform: 'none' }}
+                                      >
+                                        {t('pages.booking.cancelBooking')}
+                                      </Button>
+                                    </span>
+                                  </Tooltip>
+                                ) : (
+                                  <>
+                                    {(booking.status?.toUpperCase() === 'PENDING_APPROVAL' || booking.status?.toUpperCase() === 'PENDING') && (
+                                      <Button
+                                        variant="outlined"
+                                        color="primary"
+                                        size="small"
+                                        onClick={() => handleUpdateClick(booking)}
+                                        disabled={updatingBooking || isPast}
+                                        sx={{ textTransform: 'none' }}
+                                      >
+                                        {t('pages.booking.updateSessionDateTime')}
+                                      </Button>
+                                    )}
                                     <Button
                                       variant="outlined"
                                       color="error"
                                       size="small"
-                                      disabled={true}
+                                      onClick={() => handleCancelClick(booking)}
+                                      disabled={cancelling || isPast}
                                       sx={{ textTransform: 'none' }}
                                     >
                                       {t('pages.booking.cancelBooking')}
                                     </Button>
-                                  </span>
-                                </Tooltip>
-                              ) : (
-                                <>
-                                  {(booking.status?.toUpperCase() === 'PENDING_APPROVAL' || booking.status?.toUpperCase() === 'PENDING') && (
-                                    <Button
-                                      variant="outlined"
-                                      color="primary"
-                                      size="small"
-                                      onClick={() => handleUpdateClick(booking)}
-                                      disabled={updatingBooking || isPast}
-                                      sx={{ textTransform: 'none' }}
-                                    >
-                                      {t('pages.booking.updateSessionDateTime')}
-                                    </Button>
-                                  )}
-                                  <Button
-                                    variant="outlined"
-                                    color="error"
-                                    size="small"
-                                    onClick={() => handleCancelClick(booking)}
-                                    disabled={cancelling || isPast}
-                                    sx={{ textTransform: 'none' }}
-                                  >
-                                    {t('pages.booking.cancelBooking')}
-                                  </Button>
-                                </>
-                              )}
-                            </Box>
-                          </CardContent>
-                        </Card>
+                                  </>
+                                )}
+                              </Box>
+                            </CardContent>
+                          </Card>
                         );
                       })
                     ) : (
@@ -1403,7 +1487,7 @@ const BookingPage = ({ sessionTypeId: propSessionTypeId, hideMyBookings = false 
                                   )}
                                 </Box>
                                 <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
-                                  {formatInstant(booking.startTimeInstant)} - {formatInstant(booking.endTimeInstant)}
+                                  {formatTimeRange(booking.startTimeInstant, booking.endTimeInstant)}
                                 </Typography>
                               </Box>
                               <Chip
@@ -1518,7 +1602,7 @@ const BookingPage = ({ sessionTypeId: propSessionTypeId, hideMyBookings = false 
               {/* Right Column - Available Slots */}
               <Grid item xs={12} md={6}>
                 <Typography variant="h6" gutterBottom>
-                      {t('pages.booking.availableTimes')} {formatDateForDisplay(selectedDate)}
+                  {t('pages.booking.availableTimes')} {formatDateForDisplay(selectedDate)}
                 </Typography>
 
                 {/* Timezone selector for anonymous users, info message for logged-in users */}
@@ -1546,7 +1630,7 @@ const BookingPage = ({ sessionTypeId: propSessionTypeId, hideMyBookings = false 
                     </FormControl>
                   ) : (
                     <Alert severity="info" sx={{ mb: 2 }}>
-                      Slots are shown in {getCurrentTimezone()} ({getTimezoneOffset(getCurrentTimezone())})
+                      {t('pages.booking.slotsTimezone', { timezone: `${getCurrentTimezone()} (${getTimezoneOffset(getCurrentTimezone())})` })}
                     </Alert>
                   )
                 )}
@@ -1569,37 +1653,95 @@ const BookingPage = ({ sessionTypeId: propSessionTypeId, hideMyBookings = false 
                     <CircularProgress />
                   </Box>
                 ) : availableSlots.length > 0 ? (
-                  <List>
-                    {availableSlots.map((slot, index) => {
-                      const startTime = slot.startTime 
-                        ? formatTime(slot.startTime) 
-                        : (slot.startTimeInstant ? formatTimeFromInstant(slot.startTimeInstant) : 'N/A');
-                      const endTime = slot.endTime 
-                        ? formatTime(slot.endTime) 
-                        : 'N/A';
-                      
-                      return (
-                        <ListItemButton
-                          key={slot.startTimeInstant || `slot-${index}`}
-                          onClick={() => handleSlotClick(slot)}
-                          sx={{
-                            border: 1,
-                            borderColor: 'divider',
-                            borderRadius: 1,
-                            mb: 1,
-                            '&:hover': {
-                              bgcolor: 'action.hover',
-                            },
-                          }}
-                        >
-                          <Typography variant="body1">
-                            {startTime}{endTime !== 'N/A' ? ` - ${endTime}` : ''}
-                          </Typography>
-                        </ListItemButton>
-                      );
-                    })}
-                  </List>
-                  ) : (
+                  <Box sx={{ position: 'relative' }}>
+                    <Box
+                      ref={slotsScrollRef}
+                      sx={{ maxHeight: '240px', overflowY: 'auto', pr: 1 }}
+                      onScroll={(e) => {
+                        const element = e.target;
+                        const isAtTop = element.scrollTop === 0;
+                        const isAtBottom = element.scrollHeight - element.scrollTop === element.clientHeight;
+
+                        setShowScrollTop(!isAtTop && availableSlots.length > 4);
+                        setShowScrollBottom(!isAtBottom && availableSlots.length > 4);
+                      }}
+                    >
+                      <List>
+                        {availableSlots.map((slot, index) => {
+                          const startTime = slot.startTime
+                            ? formatTime(slot.startTime)
+                            : (slot.startTimeInstant ? formatTimeFromInstant(slot.startTimeInstant) : 'N/A');
+                          const endTime = slot.endTime
+                            ? formatTime(slot.endTime)
+                            : 'N/A';
+
+                          return (
+                            <ListItemButton
+                              key={slot.startTimeInstant || `slot-${index}`}
+                              onClick={() => handleSlotClick(slot)}
+                              sx={{
+                                border: 1,
+                                borderColor: 'divider',
+                                borderRadius: 1,
+                                mb: 1,
+                                '&:hover': {
+                                  bgcolor: 'action.hover',
+                                },
+                              }}
+                            >
+                              <Typography variant="body1">
+                                {startTime}{endTime !== 'N/A' ? ` - ${endTime}` : ''}
+                              </Typography>
+                            </ListItemButton>
+                          );
+                        })}
+                      </List>
+                    </Box>
+                    {/* Top scroll indicator */}
+                    {showScrollTop && (
+                      <Box
+                        sx={{
+                          position: 'absolute',
+                          top: 0,
+                          left: 0,
+                          right: 0,
+                          height: '40px',
+                          background: 'linear-gradient(to top, transparent, rgba(255,255,255,0.8))',
+                          display: 'flex',
+                          justifyContent: 'center',
+                          alignItems: 'flex-start',
+                          pointerEvents: 'none',
+                          pt: 0.5,
+                          borderRadius: '4px 4px 0 0',
+                        }}
+                      >
+                        <KeyboardArrowUpIcon sx={{ color: 'text.secondary', opacity: 0.7 }} />
+                      </Box>
+                    )}
+                    {/* Bottom scroll indicator */}
+                    {showScrollBottom && (
+                      <Box
+                        sx={{
+                          position: 'absolute',
+                          bottom: 0,
+                          left: 0,
+                          right: 0,
+                          height: '40px',
+                          background: 'linear-gradient(to bottom, transparent, rgba(255,255,255,0.8))',
+                          display: 'flex',
+                          justifyContent: 'center',
+                          alignItems: 'flex-end',
+                          pointerEvents: 'none',
+                          pb: 0.5,
+                          borderRadius: '0 0 4px 4px',
+                        }}
+                      >
+                        <KeyboardArrowDownIcon sx={{ color: 'text.secondary', opacity: 0.7 }} />
+                      </Box>
+                    )}
+                  </Box>
+
+                ) : (
                   <Alert severity="info">
                     {t('pages.booking.noAvailableSessions')}
                   </Alert>
@@ -1609,14 +1751,14 @@ const BookingPage = ({ sessionTypeId: propSessionTypeId, hideMyBookings = false 
           </Box>
         ) : (
           /* New Booking Dialog - shown when hideMyBookings is false */
-          <Dialog 
-            open={newBookingDialogOpen} 
-            onClose={handleNewBookingDialogClose} 
-            maxWidth="md" 
+          <Dialog
+            open={newBookingDialogOpen}
+            onClose={handleNewBookingDialogClose}
+            maxWidth="md"
             fullWidth
           >
             <DialogTitle>{t('landing.booking.title')}</DialogTitle>
-            <DialogContent>
+            <DialogContent sx={{ pb: 4, minHeight: '620px' }}>
               {/* Session Type Selection - only show if not provided as prop */}
               {!propSessionTypeId && (
                 <Box sx={{ mb: 3, mt: 2 }}>
@@ -1678,7 +1820,7 @@ const BookingPage = ({ sessionTypeId: propSessionTypeId, hideMyBookings = false 
                 {/* Right Column - Available Slots */}
                 <Grid item xs={12} md={6}>
                   <Typography variant="h6" gutterBottom>
-                      {t('pages.booking.availableTimes')} {formatDateForDisplay(selectedDate)}
+                    {t('pages.booking.availableTimes')} {formatDateForDisplay(selectedDate)}
                   </Typography>
 
                   {/* Timezone selector for anonymous users, info message for logged-in users */}
@@ -1731,13 +1873,13 @@ const BookingPage = ({ sessionTypeId: propSessionTypeId, hideMyBookings = false 
                   ) : availableSlots.length > 0 ? (
                     <List>
                       {availableSlots.map((slot, index) => {
-                        const startTime = slot.startTime 
-                          ? formatTime(slot.startTime) 
+                        const startTime = slot.startTime
+                          ? formatTime(slot.startTime)
                           : (slot.startTimeInstant ? formatTimeFromInstant(slot.startTimeInstant) : 'N/A');
-                        const endTime = slot.endTime 
-                          ? formatTime(slot.endTime) 
+                        const endTime = slot.endTime
+                          ? formatTime(slot.endTime)
                           : 'N/A';
-                        
+
                         return (
                           <ListItemButton
                             key={slot.startTimeInstant || `slot-${index}`}
@@ -1768,8 +1910,8 @@ const BookingPage = ({ sessionTypeId: propSessionTypeId, hideMyBookings = false 
               </Grid>
             </DialogContent>
             <DialogActions>
-              <Button 
-                onClick={handleNewBookingDialogClose} 
+              <Button
+                onClick={handleNewBookingDialogClose}
                 color="inherit"
                 sx={{ textTransform: 'none' }}
               >
@@ -1788,8 +1930,8 @@ const BookingPage = ({ sessionTypeId: propSessionTypeId, hideMyBookings = false 
                 <>
                   {t('pages.booking.confirmBookingMessage')}{' '}
                   <strong>
-                    {dialogSlot.startTime 
-                      ? formatTime(dialogSlot.startTime) 
+                    {dialogSlot.startTime
+                      ? formatTime(dialogSlot.startTime)
                       : formatTimeFromInstant(dialogSlot.startTimeInstant)}
                   </strong>{' '}
                   {dialogSlot.endTime && (
@@ -1801,7 +1943,7 @@ const BookingPage = ({ sessionTypeId: propSessionTypeId, hideMyBookings = false 
                 </>
               )}
             </DialogContentText>
-            
+
             {bookingError && (
               <Alert severity="error" sx={{ mb: 2 }}>
                 {bookingError}
@@ -1832,16 +1974,16 @@ const BookingPage = ({ sessionTypeId: propSessionTypeId, hideMyBookings = false 
             />
           </DialogContent>
           <DialogActions>
-            <Button 
-              onClick={handleDialogClose} 
+            <Button
+              onClick={handleDialogClose}
               color="inherit"
               disabled={submittingBooking}
             >
               {t('common.cancel')}
             </Button>
-            <Button 
-              onClick={handleConfirmBooking} 
-              color="primary" 
+            <Button
+              onClick={handleConfirmBooking}
+              color="primary"
               variant="contained"
               disabled={submittingBooking || !selectedSlot || !selectedSlot.startTimeInstant}
             >
@@ -1872,8 +2014,8 @@ const BookingPage = ({ sessionTypeId: propSessionTypeId, hideMyBookings = false 
                   {t('pages.booking.selectedSlot')}:
                 </Typography>
                 <Typography variant="body1" sx={{ mt: 0.5 }}>
-                  {dialogSlot.startTime 
-                    ? formatTime(dialogSlot.startTime) 
+                  {dialogSlot.startTime
+                    ? formatTime(dialogSlot.startTime)
                     : formatTimeFromInstant(dialogSlot.startTimeInstant)}
                   {dialogSlot.endTime && ` - ${formatTime(dialogSlot.endTime)}`}
                   {' '}on {formatDateForDisplay(selectedDate)}
@@ -2027,14 +2169,14 @@ const BookingPage = ({ sessionTypeId: propSessionTypeId, hideMyBookings = false 
                     ) : updateAvailableSlots.length > 0 ? (
                       <List>
                         {updateAvailableSlots.map((slot, index) => {
-                          const startTime = slot.startTime 
-                            ? formatTime(slot.startTime) 
+                          const startTime = slot.startTime
+                            ? formatTime(slot.startTime)
                             : (slot.startTimeInstant ? formatTimeFromInstant(slot.startTimeInstant) : 'N/A');
-                          const endTime = slot.endTime 
-                            ? formatTime(slot.endTime) 
+                          const endTime = slot.endTime
+                            ? formatTime(slot.endTime)
                             : 'N/A';
                           const isSelected = updateSelectedSlot?.startTimeInstant === slot.startTimeInstant;
-                          
+
                           return (
                             <ListItemButton
                               key={slot.startTimeInstant || `slot-${index}`}
@@ -2092,17 +2234,17 @@ const BookingPage = ({ sessionTypeId: propSessionTypeId, hideMyBookings = false 
             )}
           </DialogContent>
           <DialogActions>
-            <Button 
-              onClick={handleUpdateDialogClose} 
+            <Button
+              onClick={handleUpdateDialogClose}
               color="inherit"
               disabled={updatingBooking}
               sx={{ textTransform: 'none' }}
             >
               {t('common.cancel')}
             </Button>
-            <Button 
-              onClick={handleConfirmUpdate} 
-              color="primary" 
+            <Button
+              onClick={handleConfirmUpdate}
+              color="primary"
               variant="contained"
               disabled={updatingBooking || !updateSelectedSlot || !updateSelectedSlot.startTimeInstant}
               sx={{ textTransform: 'none' }}
@@ -2132,7 +2274,7 @@ const BookingPage = ({ sessionTypeId: propSessionTypeId, hideMyBookings = false 
           </Alert>
         </Snackbar>
       </Box>
-    </LocalizationProvider>
+    </LocalizationProvider >
   );
 };
 

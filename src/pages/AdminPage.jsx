@@ -30,7 +30,7 @@ const AdminPage = () => {
   useEffect(() => {
     const checkAccess = () => {
       const token = getToken();
-      
+
       if (!token) {
         // No token - show login form
         setChecking(false);
@@ -121,18 +121,18 @@ const AdminPage = () => {
         const errorData = await response.json().catch(() => ({}));
         throw new Error(
           errorData.message ||
-            `Login failed: ${response.status} ${response.statusText}`
+          `Login failed: ${response.status} ${response.statusText}`
         );
       }
 
       const data = await response.json();
-      
+
       // Save token to sessionStorage
       if (data.token) {
         setToken(data.token);
         // Dispatch custom event to notify AppLayout of auth change
         window.dispatchEvent(new Event('auth-changed'));
-        
+
         // Check if user has admin role
         if (hasAdminRole(data.token)) {
           // Has admin role - redirect to dashboard
@@ -208,6 +208,7 @@ const AdminPage = () => {
               required
               autoComplete="email"
               disabled={loading}
+              variant="outlined"
             />
 
             <TextField
@@ -224,6 +225,7 @@ const AdminPage = () => {
               required
               autoComplete="current-password"
               disabled={loading}
+              variant="outlined"
             />
 
             <Button

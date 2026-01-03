@@ -59,21 +59,20 @@ import BookingsManagement from '../components/BookingsManagement';
 
 const PastSessions = () => {
   const { t } = useTranslation();
-  
+
   // Helper function to get translated status label
   const getStatusLabel = (status) => {
     if (!status) return t('pages.booking.status.UNKNOWN');
     const statusKey = `pages.booking.status.${status}`;
     return t(statusKey, { defaultValue: status.replace(/_/g, ' ') });
   };
-  
+
   const [status, setStatus] = useState('COMPLETED');
   const [bookings, setBookings] = useState([]);
-  const [allBookings, setAllBookings] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [page, setPage] = useState(0);
-  const [size] = useState(10);
+  const [size, setSize] = useState(10);
   const [totalPages, setTotalPages] = useState(0);
   const [totalElements, setTotalElements] = useState(0);
   const [startDate, setStartDate] = useState(null);
@@ -84,7 +83,6 @@ const PastSessions = () => {
   const mountedRef = useRef(true);
   const fetchingParamsRef = useRef(null);
   const fetchingPromiseRef = useRef(null);
-  const allBookingsRef = useRef([]);
 
   useEffect(() => {
     mountedRef.current = true;
@@ -115,10 +113,13 @@ const PastSessions = () => {
     if (!currency) return '';
     const currencyMap = {
       'Rubles': '₽',
+      'RUB': '₽',
       'Tenge': '₸',
+      'KZT': '₸',
       'USD': '$',
+      'EUR': '€',
     };
-    return currencyMap[currency] || '';
+    return currencyMap[currency] || currencyMap[currency.toUpperCase()] || '';
   };
 
   // Get first price from sessionPrices object and format it
@@ -126,20 +127,20 @@ const PastSessions = () => {
     if (!sessionPrices || typeof sessionPrices !== 'object') {
       return null;
     }
-    
+
     // Get the first key-value pair from sessionPrices
     const currencies = Object.keys(sessionPrices);
     if (currencies.length === 0) {
       return null;
     }
-    
+
     const firstCurrency = currencies[0];
     const price = sessionPrices[firstCurrency];
-    
+
     if (price === null || price === undefined) {
       return null;
     }
-    
+
     const symbol = getCurrencySymbol(firstCurrency);
     return `${price}${symbol}`;
   };
@@ -162,7 +163,7 @@ const PastSessions = () => {
     if (start && userTimezone) {
       const startDateStr = dayjs(start).format('YYYY-MM-DD');
       const endDateStr = end ? dayjs(end).format('YYYY-MM-DD') : startDateStr;
-      
+
       const actualStartStr = startDateStr <= endDateStr ? startDateStr : endDateStr;
       const actualEndStr = startDateStr <= endDateStr ? endDateStr : startDateStr;
 
@@ -170,12 +171,12 @@ const PastSessions = () => {
         if (!booking.startTimeInstant) {
           return false;
         }
-        
+
         try {
           const bookingUtc = dayjs.utc(booking.startTimeInstant);
           const bookingInTimezone = bookingUtc.tz(userTimezone);
           const bookingDateStr = bookingInTimezone.format('YYYY-MM-DD');
-          
+
           return bookingDateStr >= actualStartStr && bookingDateStr <= actualEndStr;
         } catch (error) {
           console.error('Error parsing booking date:', booking.startTimeInstant, error);
@@ -198,9 +199,9 @@ const PastSessions = () => {
   // Handle date selection from calendar
   const handleDateSelect = (date) => {
     if (!date) return;
-    
+
     const selectedDay = dayjs(date).startOf('day');
-    
+
     if (!startDate) {
       setStartDate(selectedDay);
       setEndDate(selectedDay);
@@ -208,7 +209,7 @@ const PastSessions = () => {
     } else {
       const startDay = dayjs(startDate).startOf('day');
       const isSingleDay = endDate && dayjs(startDate).isSame(endDate, 'day');
-      
+
       if (selectedDay.isSame(startDay) && isSingleDay) {
         setStartDate(null);
         setEndDate(null);
@@ -264,19 +265,19 @@ const PastSessions = () => {
   // Determine which predefined filter is active
   const getActiveFilter = () => {
     if (!startDate || !endDate) return null;
-    
+
     const today = dayjs().startOf('day');
     const startDay = dayjs(startDate).startOf('day');
     const endDay = dayjs(endDate).startOf('day');
-    
+
     const startStr = startDay.format('YYYY-MM-DD');
     const endStr = endDay.format('YYYY-MM-DD');
     const todayStr = today.format('YYYY-MM-DD');
-    
+
     if (startStr === todayStr && endStr === todayStr) {
       return 'today';
     }
-    
+
     const startOfWeek = today.startOf('week');
     const endOfWeek = today.endOf('week');
     const startOfWeekStr = startOfWeek.format('YYYY-MM-DD');
@@ -284,7 +285,7 @@ const PastSessions = () => {
     if (startStr === startOfWeekStr && endStr === endOfWeekStr) {
       return 'thisWeek';
     }
-    
+
     const startOfMonth = today.startOf('month');
     const endOfMonth = today.endOf('month');
     const startOfMonthStr = startOfMonth.format('YYYY-MM-DD');
@@ -292,36 +293,30 @@ const PastSessions = () => {
     if (startStr === startOfMonthStr && endStr === endOfMonthStr) {
       return 'thisMonth';
     }
-    
+
     return null;
   };
 
-  // Apply filter when dates or page change
-  useEffect(() => {
-    const currentBookings = allBookingsRef.current;
-    if (currentBookings.length > 0) {
-      applyDateFilter(currentBookings, startDate, endDate);
-    }
-  }, [startDate, endDate, userTimezone, page, size]);
+
 
   useEffect(() => {
     const paramsKey = `${status}-${page}-${size}`;
-    
+
     // Skip if we're already fetching the same parameters
     if (fetchingParamsRef.current === paramsKey && fetchingPromiseRef.current) {
       return;
     }
-    
+
     // Mark these parameters as being fetched
     fetchingParamsRef.current = paramsKey;
-    
+
     // Increment request ID for this fetch
     const currentRequestId = ++requestIdRef.current;
-    
+
     const fetchPastSessions = async () => {
       setLoading(true);
       setError(null);
-      
+
       try {
         const response = await fetchWithAuth(
           `/api/v1/admin/session/booking/status/${status}?page=${page}&size=${size}`
@@ -331,32 +326,26 @@ const PastSessions = () => {
           throw new Error(`Failed to load sessions: ${response.status} ${response.statusText}`);
         }
         const data = await response.json();
-        
+
         // Only update state if this is still the latest request and component is mounted
         if (currentRequestId !== requestIdRef.current || !mountedRef.current) {
           return;
         }
-        
-        // Handle paginated response
-        let fetchedBookings = [];
+
+        // Handle paginated response - use server-side pagination
         if (data.content && Array.isArray(data.content)) {
-          fetchedBookings = data.content;
+          setBookings(data.content);
           setTotalPages(data.totalPages || 0);
           setTotalElements(data.totalElements || 0);
         } else if (Array.isArray(data)) {
-          fetchedBookings = data;
+          setBookings(data);
           setTotalPages(1);
           setTotalElements(data.length);
         } else {
-          fetchedBookings = [];
+          setBookings([]);
           setTotalPages(0);
           setTotalElements(0);
         }
-
-        // Store all bookings and apply date filter and pagination
-        setAllBookings(fetchedBookings);
-        allBookingsRef.current = fetchedBookings;
-        applyDateFilter(fetchedBookings, startDate, endDate);
       } catch (err) {
         // Only update state if this is still the latest request and component is mounted
         if (currentRequestId !== requestIdRef.current || !mountedRef.current) {
@@ -382,7 +371,7 @@ const PastSessions = () => {
 
     // Store the promise and execute fetch
     fetchingPromiseRef.current = fetchPastSessions();
-    
+
     // Cleanup: don't clear refs here to prevent race condition with React StrictMode
     // The refs will be cleared in the finally block when the fetch completes
   }, [status, page, size]);
@@ -394,6 +383,11 @@ const PastSessions = () => {
 
   const handlePageChange = (event, value) => {
     setPage(value - 1); // MUI Pagination is 1-based, API is 0-based
+  };
+
+  const handleSizeChange = (event) => {
+    setSize(event.target.value);
+    setPage(0); // Reset to first page when size changes
   };
 
   // Format date and time in admin's timezone
@@ -443,7 +437,7 @@ const PastSessions = () => {
           </FormControl>
           {!loading && (
             <Typography variant="body2" color="text.secondary">
-              {totalElements === 1 
+              {totalElements === 1
                 ? t('admin.dashboard.totalSessions', { count: totalElements })
                 : t('admin.dashboard.totalSessionsPlural', { count: totalElements })}
             </Typography>
@@ -491,9 +485,9 @@ const PastSessions = () => {
               <Typography variant="body2" color="text.secondary">
                 {endDate && dayjs(startDate).format('YYYY-MM-DD') !== dayjs(endDate).format('YYYY-MM-DD') ? (
                   <>
-                    {t('admin.dashboard.fromTo', { 
-                      start: dayjs(startDate).format('MMM DD, YYYY'), 
-                      end: dayjs(endDate).format('MMM DD, YYYY') 
+                    {t('admin.dashboard.fromTo', {
+                      start: dayjs(startDate).format('MMM DD, YYYY'),
+                      end: dayjs(endDate).format('MMM DD, YYYY')
                     })}
                   </>
                 ) : (
@@ -578,7 +572,7 @@ const PastSessions = () => {
                   day: (ownerState) => {
                     const dayValue = dayjs(ownerState.day).startOf('day');
                     const dayStr = dayValue.format('YYYY-MM-DD');
-                    
+
                     let sx = {};
                     if (startDate && endDate) {
                       const startDay = dayjs(startDate).startOf('day');
@@ -587,7 +581,7 @@ const PastSessions = () => {
                       const endStr = endDay.format('YYYY-MM-DD');
                       const actualStart = startStr <= endStr ? startStr : endStr;
                       const actualEnd = startStr <= endStr ? endStr : startStr;
-                      
+
                       if (dayStr === actualStart && dayStr === actualEnd) {
                         sx = {
                           backgroundColor: 'primary.main',
@@ -643,7 +637,7 @@ const PastSessions = () => {
                         };
                       }
                     }
-                    
+
                     return { sx };
                   },
                 }}
@@ -652,128 +646,146 @@ const PastSessions = () => {
           </Popover>
         </Paper>
 
-      {error && (
-        <Alert severity="error" sx={{ mb: 2 }} onClose={() => setError(null)}>
-          {error}
-        </Alert>
-      )}
+        {error && (
+          <Alert severity="error" sx={{ mb: 2 }} onClose={() => setError(null)}>
+            {error}
+          </Alert>
+        )}
 
-      {loading ? (
-        <Box sx={{ display: 'flex', justifyContent: 'center', py: 4 }}>
-          <CircularProgress />
-        </Box>
-      ) : bookings.length === 0 ? (
-        <Alert severity="info">{t('admin.dashboard.noSessionsFound', { status: status.toLowerCase() })}</Alert>
-      ) : (
-        <>
-          <Grid container spacing={2}>
-            {bookings.map((booking) => (
-              <Grid item xs={12} key={booking.id}>
-                <Card>
-                  <CardContent>
-                    <Box sx={{ display: 'flex', gap: 1, alignItems: 'center', mb: 2 }}>
-                      <Chip
-                        label={getStatusLabel(booking.status)}
-                        color={STATUS_COLORS[booking.status] || 'default'}
-                        size="small"
-                      />
-                    </Box>
-                    
-                    <Box sx={{ mb: 1 }}>
-                      <Typography variant="h6">
-                        {getClientName(booking)}
-                      </Typography>
-                    </Box>
-                    
-                    <Box sx={{ mb: 2 }}>
-                      <Typography variant="body2" color="text.secondary">
-                        {booking.clientEmail}
-                      </Typography>
-                    </Box>
+        {loading ? (
+          <Box sx={{ display: 'flex', justifyContent: 'center', py: 4 }}>
+            <CircularProgress />
+          </Box>
+        ) : bookings.length === 0 ? (
+          <Alert severity="info">{t('admin.dashboard.noSessionsFound', { status: status.toLowerCase() })}</Alert>
+        ) : (
+          <>
+            <Grid container spacing={2}>
+              {bookings.map((booking) => (
+                <Grid item xs={12} key={booking.id}>
+                  <Card>
+                    <CardContent>
+                      <Box sx={{ display: 'flex', gap: 1, alignItems: 'center', mb: 2 }}>
+                        <Chip
+                          label={getStatusLabel(booking.status)}
+                          color={STATUS_COLORS[booking.status] || 'default'}
+                          size="small"
+                        />
+                      </Box>
 
-                    <Divider sx={{ my: 2 }} />
-
-                    <Grid container spacing={2}>
-                      <Grid item xs={12} sm={6}>
-                        <Typography variant="body2" color="text.secondary">
-                          {t('admin.dashboard.sessionTypeLabel').replace(' *', '')}
+                      <Box sx={{ mb: 1 }}>
+                        <Typography variant="h6">
+                          {getClientName(booking)}
                         </Typography>
-                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
-                          {booking.sessionDurationMinutes && (
-                            <Chip
-                              label={`${booking.sessionDurationMinutes} min`}
-                              size="small"
-                              sx={{ 
-                                height: 20, 
-                                fontSize: '0.65rem',
-                                '& .MuiChip-label': { px: 0.75 }
-                              }}
-                            />
-                          )}
-                          <Typography variant="body1">
-                            {booking.sessionName || 'N/A'}
+                      </Box>
+
+                      <Box sx={{ mb: 2 }}>
+                        <Typography variant="body2" color="text.secondary">
+                          {booking.clientEmail}
+                        </Typography>
+                      </Box>
+
+                      <Divider sx={{ my: 2 }} />
+
+                      <Grid container spacing={2}>
+                        <Grid item xs={12} sm={6}>
+                          <Typography variant="body2" color="text.secondary">
+                            {t('admin.dashboard.sessionTypeLabel').replace(' *', '')}
                           </Typography>
-                          {getBookingPriceDisplay(booking.sessionPrices) && (
-                            <Chip
-                              label={getBookingPriceDisplay(booking.sessionPrices)}
-                              size="small"
-                              color="primary"
-                              variant="outlined"
-                              sx={{ 
-                                height: 20, 
-                                fontSize: '0.65rem',
-                                '& .MuiChip-label': { px: 0.75 }
-                              }}
-                            />
-                          )}
-                        </Box>
+                          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
+                            {booking.sessionDurationMinutes && (
+                              <Chip
+                                label={`${booking.sessionDurationMinutes} min`}
+                                size="small"
+                                sx={{
+                                  height: 20,
+                                  fontSize: '0.65rem',
+                                  '& .MuiChip-label': { px: 0.75 }
+                                }}
+                              />
+                            )}
+                            <Typography variant="body1">
+                              {booking.sessionName || 'N/A'}
+                            </Typography>
+                            {getBookingPriceDisplay(booking.sessionPrices) && (
+                              <Chip
+                                label={getBookingPriceDisplay(booking.sessionPrices)}
+                                size="small"
+                                color="primary"
+                                variant="outlined"
+                                sx={{
+                                  height: 20,
+                                  fontSize: '0.65rem',
+                                  '& .MuiChip-label': { px: 0.75 }
+                                }}
+                              />
+                            )}
+                          </Box>
+                        </Grid>
+                        <Grid item xs={12} sm={6}>
+                          <Typography variant="body2" color="text.secondary">
+                            {t('admin.dashboard.startTime')}
+                          </Typography>
+                          <Typography variant="body1" gutterBottom>
+                            {formatDateTime(booking.startTimeInstant)}
+                          </Typography>
+                        </Grid>
+                        <Grid item xs={12} sm={6}>
+                          <Typography variant="body2" color="text.secondary">
+                            {t('admin.dashboard.endTime')}
+                          </Typography>
+                          <Typography variant="body1" gutterBottom>
+                            {formatDateTime(booking.endTimeInstant)}
+                          </Typography>
+                        </Grid>
+                        <Grid item xs={12} sm={6}>
+                          <Typography variant="body2" color="text.secondary">
+                            {t('admin.dashboard.createdAt')}
+                          </Typography>
+                          <Typography variant="body1" gutterBottom>
+                            {formatDateTime(booking.createdAt)}
+                          </Typography>
+                        </Grid>
                       </Grid>
-                      <Grid item xs={12} sm={6}>
-                        <Typography variant="body2" color="text.secondary">
-                          Start Time
-                        </Typography>
-                        <Typography variant="body1" gutterBottom>
-                          {formatDateTime(booking.startTimeInstant)}
-                        </Typography>
-                      </Grid>
-                      <Grid item xs={12} sm={6}>
-                        <Typography variant="body2" color="text.secondary">
-                          End Time
-                        </Typography>
-                        <Typography variant="body1" gutterBottom>
-                          {formatDateTime(booking.endTimeInstant)}
-                        </Typography>
-                      </Grid>
-                      <Grid item xs={12} sm={6}>
-                        <Typography variant="body2" color="text.secondary">
-                          Created At
-                        </Typography>
-                        <Typography variant="body1" gutterBottom>
-                          {formatDateTime(booking.createdAt)}
-                        </Typography>
-                      </Grid>
-                    </Grid>
-                  </CardContent>
-                </Card>
-              </Grid>
-            ))}
-          </Grid>
+                    </CardContent>
+                  </Card>
+                </Grid>
+              ))}
+            </Grid>
 
-          {totalPages > 1 && (
-            <Box sx={{ display: 'flex', justifyContent: 'center', mt: 4 }}>
-              <Pagination
-                count={totalPages}
-                page={page + 1} // MUI Pagination is 1-based
-                onChange={handlePageChange}
-                color="primary"
-                showFirstButton
-                showLastButton
-              />
+            {/* Pagination and Page Size Controls */}
+            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mt: 4, flexWrap: 'wrap', gap: 2 }}>
+              <FormControl size="small" sx={{ minWidth: 180 }}>
+                <InputLabel id="page-size-label">{t('admin.dashboard.pageSize')}</InputLabel>
+                <Select
+                  labelId="page-size-label"
+                  value={size}
+                  label={t('admin.dashboard.pageSize')}
+                  onChange={handleSizeChange}
+                >
+                  <MenuItem value={10}>10</MenuItem>
+                  <MenuItem value={25}>25</MenuItem>
+                  <MenuItem value={50}>50</MenuItem>
+                  <MenuItem value={100}>100</MenuItem>
+                </Select>
+              </FormControl>
+
+              {totalPages > 1 && (
+                <Pagination
+                  count={totalPages}
+                  page={page + 1} // MUI Pagination is 1-based
+                  onChange={handlePageChange}
+                  color="primary"
+                  showFirstButton
+                  showLastButton
+                  siblingCount={2}
+                  boundaryCount={1}
+                />
+              )}
             </Box>
-          )}
-        </>
-      )}
-    </Box>
+          </>
+        )}
+      </Box>
     </LocalizationProvider>
   );
 };
@@ -800,7 +812,7 @@ const AdminDashboard = () => {
   const [loadingTags, setLoadingTags] = useState(false);
   const [selectedTagIds, setSelectedTagIds] = useState([]);
   const [showCreateTagForm, setShowCreateTagForm] = useState(false);
-  
+
   // New Booking Dialog State
   const [newBookingOpen, setNewBookingOpen] = useState(false);
   const [bookingSessionTypes, setBookingSessionTypes] = useState([]);
@@ -826,7 +838,7 @@ const AdminDashboard = () => {
   const [customStartTime, setCustomStartTime] = useState(null);
   const [hourInput, setHourInput] = useState('00');
   const [minuteInput, setMinuteInput] = useState('00');
-  
+
   // Create New Client Dialog State
   const [createClientOpen, setCreateClientOpen] = useState(false);
   const [newClientData, setNewClientData] = useState({
@@ -980,7 +992,7 @@ const AdminDashboard = () => {
         const errorData = await response.json().catch(() => ({}));
         throw new Error(
           errorData.message ||
-            `Failed to create article: ${response.status} ${response.statusText}`
+          `Failed to create article: ${response.status} ${response.statusText}`
         );
       }
 
@@ -1112,11 +1124,11 @@ const AdminDashboard = () => {
     const fetchBookingSlots = async () => {
       setLoadingBookingSlots(true);
       setBookingSlotsError(null);
-      
+
       try {
         const dateString = dayjs(bookingSelectedDate).format('YYYY-MM-DD');
         const timezone = userTimezone || Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC';
-        
+
         // Check cache first
         const cachedData = getCachedSlots(selectedSessionTypeId, dateString, timezone);
         if (cachedData) {
@@ -1129,7 +1141,7 @@ const AdminDashboard = () => {
           setLoadingBookingSlots(false);
           return;
         }
-        
+
         const response = await apiClient.get('/api/v1/public/booking/available/slot', {
           params: {
             sessionTypeId: selectedSessionTypeId,
@@ -1139,9 +1151,9 @@ const AdminDashboard = () => {
           signal: controller.signal,
           timeout: 10000,
         });
-        
+
         if (!isMounted) return;
-        
+
         if (response.data && response.data.slots && Array.isArray(response.data.slots)) {
           setBookingAvailableSlots(response.data.slots);
           // Cache the response data
@@ -1156,9 +1168,9 @@ const AdminDashboard = () => {
         if (err.name === 'AbortError' || err.name === 'CanceledError' || err.code === 'ERR_CANCELED') {
           return;
         }
-        
+
         if (!isMounted) return;
-        
+
         console.error('Error fetching available slots:', err);
         let errorMessage = 'Failed to load available slots. Please try again later.';
         if (err.code === 'ECONNABORTED') {
@@ -1197,7 +1209,7 @@ const AdminDashboard = () => {
         .minute(customStartTime.minute())
         .second(0)
         .millisecond(0);
-      
+
       const customSlot = {
         startTimeInstant: combinedDateTime.toISOString(),
         startTime: `${String(customStartTime.hour()).padStart(2, '0')}:${String(customStartTime.minute()).padStart(2, '0')}`,
@@ -1216,7 +1228,7 @@ const AdminDashboard = () => {
         return;
       }
     }
-    
+
     setBookingError(null);
     setSelectedBookingSlot(slot);
     setShowCustomTimePicker(false);
@@ -1245,11 +1257,11 @@ const AdminDashboard = () => {
         .minute(newTime.minute())
         .second(0)
         .millisecond(0);
-      
+
       // Check if selected date is today and time is in the past
       const isToday = bookingSelectedDate.isSame(dayjs(), 'day');
       const isPastTime = isToday && combinedDateTime.isBefore(dayjs());
-      
+
       if (isPastTime) {
         setBookingError(t('admin.dashboard.cannotSelectPastTime'));
         // Still create the slot object but mark it as invalid
@@ -1260,9 +1272,9 @@ const AdminDashboard = () => {
         setSelectedBookingSlot(customSlot);
         return;
       }
-      
+
       setBookingError(null);
-      
+
       // Create a slot-like object with the combined datetime
       const customSlot = {
         startTimeInstant: combinedDateTime.toISOString(),
@@ -1275,14 +1287,14 @@ const AdminDashboard = () => {
   // Handle hour increment/decrement
   const handleHourChange = (increment) => {
     if (!customStartTime || !bookingSelectedDate) return;
-    
+
     let newHour;
     if (increment) {
       newHour = (customStartTime.hour() + 1) % 24;
     } else {
       newHour = (customStartTime.hour() - 1 + 24) % 24;
     }
-    
+
     const newTime = customStartTime.hour(newHour);
     handleCustomTimeChange(newTime);
   };
@@ -1290,14 +1302,14 @@ const AdminDashboard = () => {
   // Handle minute increment/decrement
   const handleMinuteChange = (increment) => {
     if (!customStartTime || !bookingSelectedDate) return;
-    
+
     let newMinute;
     if (increment) {
       newMinute = (customStartTime.minute() + 5) % 60;
     } else {
       newMinute = (customStartTime.minute() - 5 + 60) % 60;
     }
-    
+
     const newTime = customStartTime.minute(newMinute);
     handleCustomTimeChange(newTime);
   };
@@ -1313,7 +1325,7 @@ const AdminDashboard = () => {
   const handleHourInputBlur = () => {
     if (!customStartTime || !bookingSelectedDate) return;
     const hour = parseInt(hourInput, 10);
-    
+
     let finalHour;
     if (isNaN(hour) || hour < 0) {
       finalHour = 0;
@@ -1322,7 +1334,7 @@ const AdminDashboard = () => {
     } else {
       finalHour = hour;
     }
-    
+
     const newTime = customStartTime.hour(finalHour);
     handleCustomTimeChange(newTime);
   };
@@ -1338,7 +1350,7 @@ const AdminDashboard = () => {
   const handleMinuteInputBlur = () => {
     if (!customStartTime || !bookingSelectedDate) return;
     const minute = parseInt(minuteInput, 10);
-    
+
     let finalMinute;
     if (isNaN(minute) || minute < 0) {
       finalMinute = 0;
@@ -1347,7 +1359,7 @@ const AdminDashboard = () => {
     } else {
       finalMinute = minute;
     }
-    
+
     const newTime = customStartTime.minute(finalMinute);
     handleCustomTimeChange(newTime);
   };
@@ -1445,27 +1457,27 @@ const AdminDashboard = () => {
   // Group timezones by unique offset and keep only one representative per offset
   const getUniqueTimezoneOffsets = () => {
     const offsetMap = new Map();
-    
+
     COMMON_TIMEZONES.forEach((tz) => {
       if (!offsetMap.has(tz.offset)) {
         offsetMap.set(tz.offset, tz);
       }
     });
-    
+
     return Array.from(offsetMap.values()).sort((a, b) => {
       // Sort: UTC first, then positive offsets (highest first), then negative offsets (least negative first)
       if (a.offset === '+00:00') return -1;
       if (b.offset === '+00:00') return 1;
-      
+
       const offsetA = a.offset;
       const offsetB = b.offset;
-      
+
       // Both positive or both negative
-      if ((offsetA.startsWith('+') && offsetB.startsWith('+')) || 
-          (offsetA.startsWith('-') && offsetB.startsWith('-'))) {
+      if ((offsetA.startsWith('+') && offsetB.startsWith('+')) ||
+        (offsetA.startsWith('-') && offsetB.startsWith('-'))) {
         return offsetB.localeCompare(offsetA);
       }
-      
+
       // One positive, one negative
       if (offsetA.startsWith('+')) return -1;
       return 1;
@@ -1503,7 +1515,7 @@ const AdminDashboard = () => {
       setCreateClientError(t('admin.dashboard.emailRequired'));
       return;
     }
-    
+
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!emailRegex.test(newClientData.email.trim())) {
       setCreateClientError(t('admin.dashboard.emailInvalid'));
@@ -1560,10 +1572,10 @@ const AdminDashboard = () => {
 
       // UserResponse: { id, email, firstName, lastName, createdAt, updatedAt }
       const createdUser = await response.json();
-      
+
       // Refresh users list
       await fetchBookingUsers();
-      
+
       // Select the newly created user
       if (createdUser && createdUser.id) {
         setSelectedClientId(createdUser.id);
@@ -1639,7 +1651,7 @@ const AdminDashboard = () => {
     } catch (err) {
       console.error('Error creating booking:', err);
       let errorMessage = t('admin.dashboard.failedToCreateBooking');
-      
+
       if (err.code === 'ECONNABORTED') {
         errorMessage = t('admin.dashboard.requestTimeout');
       } else if (err.response) {
@@ -1649,7 +1661,7 @@ const AdminDashboard = () => {
       } else {
         errorMessage = err.message || errorMessage;
       }
-      
+
       setBookingError(errorMessage);
     } finally {
       setSubmittingBooking(false);
@@ -1699,965 +1711,965 @@ const AdminDashboard = () => {
           )}
         </Box>
 
-      <Divider sx={{ my: 4 }} />
+        <Divider sx={{ my: 4 }} />
 
-      {/* Add Post Dialog */}
-      <Dialog open={addPostOpen} onClose={handleAddPostClose} maxWidth="md" fullWidth>
-        <DialogTitle>{t('admin.dashboard.addNewArticle')}</DialogTitle>
-        <DialogContent>
-          {submitError && (
-            <Alert severity="error" sx={{ mb: 2 }}>
-              {submitError}
-            </Alert>
-          )}
-          {articleData.status === 'PUBLISHED' && selectedUserIds.length > 0 && (
-            <Alert severity="warning" sx={{ mb: 2 }}>
-              {t('admin.dashboard.usersWarning')}
-            </Alert>
-          )}
-          <Grid container spacing={2} sx={{ mt: 1 }}>
-            <Grid item xs={12}>
-              <TextField
-                autoFocus
-                fullWidth
-                label={t('admin.dashboard.titleLabel')}
-                variant="outlined"
-                value={articleData.title}
-                onChange={handleFieldChange('title')}
-                required
-                disabled={submitting}
-              />
-            </Grid>
-            <Grid item xs={12}>
-              <TextField
-                fullWidth
-                label={t('admin.dashboard.slugLabel')}
-                variant="outlined"
-                value={articleData.slug}
-                onChange={handleFieldChange('slug')}
-                required
-                disabled={submitting}
-                helperText={t('admin.dashboard.slugHelper')}
-              />
-            </Grid>
-            <Grid item xs={12}>
-              <TextField
-                fullWidth
-                label={t('admin.dashboard.contentLabel')}
-                variant="outlined"
-                multiline
-                rows={8}
-                value={articleData.content}
-                onChange={handleFieldChange('content')}
-                required
-                disabled={submitting}
-              />
-            </Grid>
-            <Grid item xs={12}>
-              <TextField
-                fullWidth
-                label={t('admin.dashboard.excerptLabel')}
-                variant="outlined"
-                multiline
-                rows={3}
-                value={articleData.excerpt}
-                onChange={handleFieldChange('excerpt')}
-                disabled={submitting}
-                helperText={t('admin.dashboard.excerptHelper')}
-              />
-            </Grid>
-            <Grid item xs={12}>
-              <FormControl fullWidth required>
-                <InputLabel>{t('admin.dashboard.statusLabel')}</InputLabel>
-                <Select
-                  value={articleData.status}
-                  onChange={handleFieldChange('status')}
-                  label={t('admin.dashboard.statusLabel')}
-                  disabled={submitting}
-                >
-                  <MenuItem value="DRAFT">{t('admin.dashboard.statusDraft')}</MenuItem>
-                  <MenuItem value="PUBLISHED">{t('admin.dashboard.statusPublished')}</MenuItem>
-                  <MenuItem value="PRIVATE">{t('admin.dashboard.statusPrivate')}</MenuItem>
-                  <MenuItem value="ARCHIVED">{t('admin.dashboard.statusArchived')}</MenuItem>
-                </Select>
-              </FormControl>
-            </Grid>
-            <Grid item xs={12}>
-              <FormControl fullWidth>
-                <InputLabel>{t('admin.dashboard.usersLabel')}</InputLabel>
-                <Select
-                  multiple
-                  value={selectedUserIds}
-                  onChange={handleUsersChange}
-                  label={t('admin.dashboard.usersLabel')}
-                  disabled={submitting || articleData.status === 'PUBLISHED' || loadingUsers}
-                  renderValue={(selected) => {
-                    if (!selected || selected.length === 0) return '';
-                    const names = selected
-                      .map((id) => {
-                        const u = availableUsers.find((au) => au.id === id);
-                        return u ? userFullName(u) : id;
-                      })
-                      .join(', ');
-                    return names;
-                  }}
-                >
-                  {loadingUsers && (
-                    <MenuItem disabled>
-                      <CircularProgress size={16} sx={{ mr: 1 }} /> Loading users...
-                    </MenuItem>
-                  )}
-                  {!loadingUsers &&
-                    availableUsers.map((user) => (
-                      <MenuItem key={user.id} value={user.id}>
-                        {userFullName(user)}
-                      </MenuItem>
-                    ))}
-                </Select>
-              </FormControl>
-              {usersError && (
-                <Alert severity="error" sx={{ mt: 1 }}>
-                  {usersError}
-                </Alert>
-              )}
-            </Grid>
-            <Grid item xs={12}>
-              <FormControl fullWidth>
-                <InputLabel>{t('admin.dashboard.tagsLabel')}</InputLabel>
-                <Select
-                  multiple
-                  value={selectedTagIds}
-                  onChange={(e) => {
-                    const value = e.target.value || [];
-                    setSelectedTagIds(typeof value === 'string' ? value.split(',') : value);
-                  }}
-                  label={t('admin.dashboard.tagsLabel')}
-                  disabled={submitting || loadingTags}
-                  renderValue={(selected) => {
-                    if (!selected || selected.length === 0) return '';
-                    return selected
-                      .map((id) => {
-                        const tag = availableTags.find((t) => t.tagId === id);
-                        return tag ? tag.name : id;
-                      })
-                      .join(', ');
-                  }}
-                >
-                  {loadingTags && (
-                    <MenuItem disabled>
-                      <CircularProgress size={16} sx={{ mr: 1 }} /> {t('admin.dashboard.loadingTags')}
-                    </MenuItem>
-                  )}
-                  {!loadingTags &&
-                    availableTags.map((tag) => (
-                      <MenuItem key={tag.tagId} value={tag.tagId}>
-                        {tag.name}
-                      </MenuItem>
-                    ))}
-                  <MenuItem
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      setShowCreateTagForm(true);
-                    }}
-                    sx={{ fontStyle: 'italic', color: 'primary.main' }}
-                  >
-                    + Create new tag
-                  </MenuItem>
-                </Select>
-              </FormControl>
-              {showCreateTagForm && (
-                <CreateTagForm
-                  onTagCreated={(tagId) => {
-                    setSelectedTagIds((prev) => [...prev, tagId]);
-                    setShowCreateTagForm(false);
-                  }}
-                  onCancel={() => setShowCreateTagForm(false)}
-                  availableTags={availableTags}
-                  setAvailableTags={setAvailableTags}
-                />
-              )}
-              {selectedTagIds.length > 0 && (
-                <Stack direction="row" spacing={1} sx={{ mt: 1, flexWrap: 'wrap', gap: 1 }}>
-                  {selectedTagIds.map((tagId) => {
-                    const tag = availableTags.find((t) => t.tagId === tagId);
-                    return tag ? (
-                      <Chip
-                        key={tagId}
-                        label={tag.name}
-                        size="small"
-                        onDelete={() => {
-                          setSelectedTagIds((prev) => prev.filter((id) => id !== tagId));
-                        }}
-                      />
-                    ) : null;
-                  })}
-                </Stack>
-              )}
-            </Grid>
-          </Grid>
-        </DialogContent>
-        <DialogActions>
-          <Button
-            onClick={handleAddPostClose}
-            sx={{ textTransform: 'none' }}
-            disabled={submitting}
-          >
-            Cancel
-          </Button>
-          <Button
-            onClick={handleSubmitPost}
-            variant="contained"
-            sx={{ textTransform: 'none' }}
-            disabled={
-              submitting ||
-              !articleData.title.trim() ||
-              !articleData.slug.trim() ||
-              !articleData.content.trim()
-            }
-          >
-            {submitting ? (
-              <>
-                <CircularProgress size={16} sx={{ mr: 1 }} />
-                {t('admin.dashboard.creatingArticle')}
-              </>
-            ) : (
-              t('admin.dashboard.createArticle')
+        {/* Add Post Dialog */}
+        <Dialog open={addPostOpen} onClose={handleAddPostClose} maxWidth="md" fullWidth>
+          <DialogTitle>{t('admin.dashboard.addNewArticle')}</DialogTitle>
+          <DialogContent>
+            {submitError && (
+              <Alert severity="error" sx={{ mb: 2 }}>
+                {submitError}
+              </Alert>
             )}
-          </Button>
-        </DialogActions>
-      </Dialog>
-
-      {/* New Booking Dialog */}
-      <Dialog open={newBookingOpen} onClose={handleNewBookingClose} maxWidth="md" fullWidth>
-        <DialogTitle>{t('landing.booking.title')}</DialogTitle>
-        <DialogContent>
-          {bookingError && (
-            <Alert severity="error" sx={{ mb: 2 }} onClose={() => setBookingError(null)}>
-              {bookingError}
-            </Alert>
-          )}
-
-          <Grid container spacing={2} sx={{ mt: 1 }}>
-            {/* Session Type Selection */}
-            <Grid item xs={12}>
-              <FormControl fullWidth required>
-                <InputLabel>{t('admin.dashboard.sessionTypeLabel')}</InputLabel>
-                <Select
-                  value={selectedSessionTypeId || ''}
-                  onChange={(e) => {
-                    setSelectedSessionTypeId(e.target.value);
-                    setSelectedBookingSlot(null);
-                    setBookingAvailableSlots([]);
-                  }}
-                  label={t('admin.dashboard.sessionTypeLabel')}
-                  disabled={submittingBooking || loadingSessionTypes}
-                >
-                  {loadingSessionTypes && (
-                    <MenuItem disabled>
-                      <CircularProgress size={16} sx={{ mr: 1 }} /> Loading session types...
-                    </MenuItem>
-                  )}
-                  {!loadingSessionTypes &&
-                    bookingSessionTypes.map((st) => (
-                      <MenuItem key={st.id || st.sessionTypeId} value={st.id || st.sessionTypeId}>
-                        {st.name} - ${st.price || 0} ({st.durationMinutes || 60} min)
-                      </MenuItem>
-                    ))}
-                </Select>
-              </FormControl>
-              {sessionTypesError && (
-                <Alert severity="error" sx={{ mt: 1 }}>
-                  {sessionTypesError}
-                </Alert>
-              )}
-            </Grid>
-
-            {/* Client Selection */}
-            <Grid item xs={12}>
-              <FormControl fullWidth>
-                <InputLabel>{t('admin.dashboard.clientLabel')}</InputLabel>
-                <Select
-                  value={selectedClientId}
-                  onChange={(e) => {
-                    const value = e.target.value;
-                    // Ignore the special create new value
-                    if (value !== '__create_new__') {
-                      setSelectedClientId(value);
-                    }
-                  }}
-                  label={t('admin.dashboard.clientLabel')}
-                  disabled={submittingBooking || loadingBookingUsers}
-                  renderValue={(selected) => {
-                    if (!selected) return '';
-                    const user = bookingAvailableUsers.find((u) => u.id === selected);
-                    return user ? userFullName(user) : selected;
-                  }}
-                >
-                  {loadingBookingUsers && (
-                    <MenuItem disabled>
-                      <CircularProgress size={16} sx={{ mr: 1 }} /> Loading users...
-                    </MenuItem>
-                  )}
-                  {!loadingBookingUsers &&
-                    bookingAvailableUsers.map((user) => (
-                      <MenuItem key={user.id} value={user.id}>
-                        {userFullName(user)}
-                      </MenuItem>
-                    ))}
-                  <MenuItem 
-                    value="__create_new__"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      handleCreateClientOpen();
-                    }}
-                    sx={{ fontStyle: 'italic', color: 'primary.main', borderTop: '1px solid', borderColor: 'divider', mt: 0.5 }}
-                  >
-                    + Create new client
-                  </MenuItem>
-                </Select>
-              </FormControl>
-              {bookingUsersError && (
-                <Alert severity="error" sx={{ mt: 1 }}>
-                  {bookingUsersError}
-                </Alert>
-              )}
-            </Grid>
-
-            {/* Date and Time Selection */}
-            <Grid item xs={12} md={6}>
-              <Box
-                sx={{
-                  display: 'flex',
-                  justifyContent: 'center',
-                  border: 1,
-                  borderColor: 'divider',
-                  borderRadius: 2,
-                  p: 2,
-                  bgcolor: 'background.paper',
-                  opacity: (selectedSessionTypeId && selectedClientId) ? 1 : 0.6,
-                  pointerEvents: (selectedSessionTypeId && selectedClientId) ? 'auto' : 'none',
-                }}
-              >
-                <DateCalendar
-                  value={bookingSelectedDate}
-                  onChange={handleBookingDateChange}
-                  minDate={dayjs()}
-                  sx={{ width: '100%' }}
-                  firstDayOfWeek={1}
-                  disabled={!selectedSessionTypeId || !selectedClientId}
+            {articleData.status === 'PUBLISHED' && selectedUserIds.length > 0 && (
+              <Alert severity="warning" sx={{ mb: 2 }}>
+                {t('admin.dashboard.usersWarning')}
+              </Alert>
+            )}
+            <Grid container spacing={2} sx={{ mt: 1 }}>
+              <Grid item xs={12}>
+                <TextField
+                  autoFocus
+                  fullWidth
+                  label={t('admin.dashboard.titleLabel')}
+                  variant="outlined"
+                  value={articleData.title}
+                  onChange={handleFieldChange('title')}
+                  required
+                  disabled={submitting}
                 />
-              </Box>
-              {!selectedSessionTypeId && (
-                <Typography variant="body2" color="text.secondary" sx={{ mt: 1, textAlign: 'center' }}>
-                  {t('admin.dashboard.selectSessionTypeForDate')}
-                </Typography>
-              )}
-              {selectedSessionTypeId && !selectedClientId && (
-                <Typography variant="body2" color="text.secondary" sx={{ mt: 1, textAlign: 'center' }}>
-                  {t('admin.dashboard.selectClientForDate')}
-                </Typography>
-              )}
-            </Grid>
-
-            <Grid item xs={12} md={6}>
-              <Typography variant="h6" gutterBottom>
-                {t('admin.dashboard.availableTimes')} {formatDateForDisplay(bookingSelectedDate)}
-              </Typography>
-
-              {userTimezone && (
-                <Alert severity="info" sx={{ mb: 2 }}>
-                  {t('admin.dashboard.slotsTimezone', { 
-                    timezone: userTimezone, 
-                    offset: getTimezoneOffset(userTimezone) 
-                  })}
-                </Alert>
-              )}
-
-              {!selectedSessionTypeId ? (
-                <Alert severity="info">
-                  {t('admin.dashboard.selectSessionType')}
-                </Alert>
-              ) : (
-                <>
-                  {bookingSlotsError && (
-                    <Alert severity="error" sx={{ mb: 2 }}>
-                      {bookingSlotsError}
-                    </Alert>
-                  )}
-
-                  {loadingBookingSlots ? (
-                    <Box
-                      sx={{
-                        display: 'flex',
-                        justifyContent: 'center',
-                        alignItems: 'center',
-                        minHeight: 200,
+              </Grid>
+              <Grid item xs={12}>
+                <TextField
+                  fullWidth
+                  label={t('admin.dashboard.slugLabel')}
+                  variant="outlined"
+                  value={articleData.slug}
+                  onChange={handleFieldChange('slug')}
+                  required
+                  disabled={submitting}
+                  helperText={t('admin.dashboard.slugHelper')}
+                />
+              </Grid>
+              <Grid item xs={12}>
+                <TextField
+                  fullWidth
+                  label={t('admin.dashboard.contentLabel')}
+                  variant="outlined"
+                  multiline
+                  rows={8}
+                  value={articleData.content}
+                  onChange={handleFieldChange('content')}
+                  required
+                  disabled={submitting}
+                />
+              </Grid>
+              <Grid item xs={12}>
+                <TextField
+                  fullWidth
+                  label={t('admin.dashboard.excerptLabel')}
+                  variant="outlined"
+                  multiline
+                  rows={3}
+                  value={articleData.excerpt}
+                  onChange={handleFieldChange('excerpt')}
+                  disabled={submitting}
+                  helperText={t('admin.dashboard.excerptHelper')}
+                />
+              </Grid>
+              <Grid item xs={12}>
+                <FormControl fullWidth required>
+                  <InputLabel>{t('admin.dashboard.statusLabel')}</InputLabel>
+                  <Select
+                    value={articleData.status}
+                    onChange={handleFieldChange('status')}
+                    label={t('admin.dashboard.statusLabel')}
+                    disabled={submitting}
+                  >
+                    <MenuItem value="DRAFT">{t('admin.dashboard.statusDraft')}</MenuItem>
+                    <MenuItem value="PUBLISHED">{t('admin.dashboard.statusPublished')}</MenuItem>
+                    <MenuItem value="PRIVATE">{t('admin.dashboard.statusPrivate')}</MenuItem>
+                    <MenuItem value="ARCHIVED">{t('admin.dashboard.statusArchived')}</MenuItem>
+                  </Select>
+                </FormControl>
+              </Grid>
+              <Grid item xs={12}>
+                <FormControl fullWidth>
+                  <InputLabel>{t('admin.dashboard.usersLabel')}</InputLabel>
+                  <Select
+                    multiple
+                    value={selectedUserIds}
+                    onChange={handleUsersChange}
+                    label={t('admin.dashboard.usersLabel')}
+                    disabled={submitting || articleData.status === 'PUBLISHED' || loadingUsers}
+                    renderValue={(selected) => {
+                      if (!selected || selected.length === 0) return '';
+                      const names = selected
+                        .map((id) => {
+                          const u = availableUsers.find((au) => au.id === id);
+                          return u ? userFullName(u) : id;
+                        })
+                        .join(', ');
+                      return names;
+                    }}
+                  >
+                    {loadingUsers && (
+                      <MenuItem disabled>
+                        <CircularProgress size={16} sx={{ mr: 1 }} /> Loading users...
+                      </MenuItem>
+                    )}
+                    {!loadingUsers &&
+                      availableUsers.map((user) => (
+                        <MenuItem key={user.id} value={user.id}>
+                          {userFullName(user)}
+                        </MenuItem>
+                      ))}
+                  </Select>
+                </FormControl>
+                {usersError && (
+                  <Alert severity="error" sx={{ mt: 1 }}>
+                    {usersError}
+                  </Alert>
+                )}
+              </Grid>
+              <Grid item xs={12}>
+                <FormControl fullWidth>
+                  <InputLabel>{t('admin.dashboard.tagsLabel')}</InputLabel>
+                  <Select
+                    multiple
+                    value={selectedTagIds}
+                    onChange={(e) => {
+                      const value = e.target.value || [];
+                      setSelectedTagIds(typeof value === 'string' ? value.split(',') : value);
+                    }}
+                    label={t('admin.dashboard.tagsLabel')}
+                    disabled={submitting || loadingTags}
+                    renderValue={(selected) => {
+                      if (!selected || selected.length === 0) return '';
+                      return selected
+                        .map((id) => {
+                          const tag = availableTags.find((t) => t.tagId === id);
+                          return tag ? tag.name : id;
+                        })
+                        .join(', ');
+                    }}
+                  >
+                    {loadingTags && (
+                      <MenuItem disabled>
+                        <CircularProgress size={16} sx={{ mr: 1 }} /> {t('admin.dashboard.loadingTags')}
+                      </MenuItem>
+                    )}
+                    {!loadingTags &&
+                      availableTags.map((tag) => (
+                        <MenuItem key={tag.tagId} value={tag.tagId}>
+                          {tag.name}
+                        </MenuItem>
+                      ))}
+                    <MenuItem
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setShowCreateTagForm(true);
                       }}
+                      sx={{ fontStyle: 'italic', color: 'primary.main' }}
                     >
-                      <CircularProgress />
-                    </Box>
-                  ) : bookingAvailableSlots.length > 0 ? (
-                    <List>
-                      {bookingAvailableSlots.map((slot, index) => {
-                        const startTime = slot.startTime 
-                          ? formatTime(slot.startTime) 
-                          : (slot.startTimeInstant ? formatTimeFromInstant(slot.startTimeInstant) : 'N/A');
-                        const endTime = slot.endTime 
-                          ? formatTime(slot.endTime) 
-                          : 'N/A';
-                        const isSelected = selectedBookingSlot?.startTimeInstant === slot.startTimeInstant && !showCustomTimePicker;
-                        
-                        // Check if slot is in the past (only for today)
-                        const isToday = bookingSelectedDate.isSame(dayjs(), 'day');
-                        const isPastSlot = isToday && slot.startTimeInstant && dayjs(slot.startTimeInstant).isBefore(dayjs());
-                        const isDisabled = isPastSlot;
-                        
-                        return (
-                          <ListItemButton
-                            key={slot.startTimeInstant || `slot-${index}`}
-                            onClick={() => !isDisabled && handleBookingSlotClick(slot)}
-                            selected={isSelected}
-                            disabled={isDisabled}
+                      + Create new tag
+                    </MenuItem>
+                  </Select>
+                </FormControl>
+                {showCreateTagForm && (
+                  <CreateTagForm
+                    onTagCreated={(tagId) => {
+                      setSelectedTagIds((prev) => [...prev, tagId]);
+                      setShowCreateTagForm(false);
+                    }}
+                    onCancel={() => setShowCreateTagForm(false)}
+                    availableTags={availableTags}
+                    setAvailableTags={setAvailableTags}
+                  />
+                )}
+                {selectedTagIds.length > 0 && (
+                  <Stack direction="row" spacing={1} sx={{ mt: 1, flexWrap: 'wrap', gap: 1 }}>
+                    {selectedTagIds.map((tagId) => {
+                      const tag = availableTags.find((t) => t.tagId === tagId);
+                      return tag ? (
+                        <Chip
+                          key={tagId}
+                          label={tag.name}
+                          size="small"
+                          onDelete={() => {
+                            setSelectedTagIds((prev) => prev.filter((id) => id !== tagId));
+                          }}
+                        />
+                      ) : null;
+                    })}
+                  </Stack>
+                )}
+              </Grid>
+            </Grid>
+          </DialogContent>
+          <DialogActions>
+            <Button
+              onClick={handleAddPostClose}
+              sx={{ textTransform: 'none' }}
+              disabled={submitting}
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={handleSubmitPost}
+              variant="contained"
+              sx={{ textTransform: 'none' }}
+              disabled={
+                submitting ||
+                !articleData.title.trim() ||
+                !articleData.slug.trim() ||
+                !articleData.content.trim()
+              }
+            >
+              {submitting ? (
+                <>
+                  <CircularProgress size={16} sx={{ mr: 1 }} />
+                  {t('admin.dashboard.creatingArticle')}
+                </>
+              ) : (
+                t('admin.dashboard.createArticle')
+              )}
+            </Button>
+          </DialogActions>
+        </Dialog>
+
+        {/* New Booking Dialog */}
+        <Dialog open={newBookingOpen} onClose={handleNewBookingClose} maxWidth="md" fullWidth>
+          <DialogTitle>{t('landing.booking.title')}</DialogTitle>
+          <DialogContent>
+            {bookingError && (
+              <Alert severity="error" sx={{ mb: 2 }} onClose={() => setBookingError(null)}>
+                {bookingError}
+              </Alert>
+            )}
+
+            <Grid container spacing={2} sx={{ mt: 1 }}>
+              {/* Session Type Selection */}
+              <Grid item xs={12}>
+                <FormControl fullWidth required>
+                  <InputLabel>{t('admin.dashboard.sessionTypeLabel')}</InputLabel>
+                  <Select
+                    value={selectedSessionTypeId || ''}
+                    onChange={(e) => {
+                      setSelectedSessionTypeId(e.target.value);
+                      setSelectedBookingSlot(null);
+                      setBookingAvailableSlots([]);
+                    }}
+                    label={t('admin.dashboard.sessionTypeLabel')}
+                    disabled={submittingBooking || loadingSessionTypes}
+                  >
+                    {loadingSessionTypes && (
+                      <MenuItem disabled>
+                        <CircularProgress size={16} sx={{ mr: 1 }} /> Loading session types...
+                      </MenuItem>
+                    )}
+                    {!loadingSessionTypes &&
+                      bookingSessionTypes.map((st) => (
+                        <MenuItem key={st.id || st.sessionTypeId} value={st.id || st.sessionTypeId}>
+                          {st.name} - ${st.price || 0} ({st.durationMinutes || 60} min)
+                        </MenuItem>
+                      ))}
+                  </Select>
+                </FormControl>
+                {sessionTypesError && (
+                  <Alert severity="error" sx={{ mt: 1 }}>
+                    {sessionTypesError}
+                  </Alert>
+                )}
+              </Grid>
+
+              {/* Client Selection */}
+              <Grid item xs={12}>
+                <FormControl fullWidth>
+                  <InputLabel>{t('admin.dashboard.clientLabel')}</InputLabel>
+                  <Select
+                    value={selectedClientId}
+                    onChange={(e) => {
+                      const value = e.target.value;
+                      // Ignore the special create new value
+                      if (value !== '__create_new__') {
+                        setSelectedClientId(value);
+                      }
+                    }}
+                    label={t('admin.dashboard.clientLabel')}
+                    disabled={submittingBooking || loadingBookingUsers}
+                    renderValue={(selected) => {
+                      if (!selected) return '';
+                      const user = bookingAvailableUsers.find((u) => u.id === selected);
+                      return user ? userFullName(user) : selected;
+                    }}
+                  >
+                    {loadingBookingUsers && (
+                      <MenuItem disabled>
+                        <CircularProgress size={16} sx={{ mr: 1 }} /> Loading users...
+                      </MenuItem>
+                    )}
+                    {!loadingBookingUsers &&
+                      bookingAvailableUsers.map((user) => (
+                        <MenuItem key={user.id} value={user.id}>
+                          {userFullName(user)}
+                        </MenuItem>
+                      ))}
+                    <MenuItem
+                      value="__create_new__"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleCreateClientOpen();
+                      }}
+                      sx={{ fontStyle: 'italic', color: 'primary.main', borderTop: '1px solid', borderColor: 'divider', mt: 0.5 }}
+                    >
+                      + Create new client
+                    </MenuItem>
+                  </Select>
+                </FormControl>
+                {bookingUsersError && (
+                  <Alert severity="error" sx={{ mt: 1 }}>
+                    {bookingUsersError}
+                  </Alert>
+                )}
+              </Grid>
+
+              {/* Date and Time Selection */}
+              <Grid item xs={12} md={6}>
+                <Box
+                  sx={{
+                    display: 'flex',
+                    justifyContent: 'center',
+                    border: 1,
+                    borderColor: 'divider',
+                    borderRadius: 2,
+                    p: 2,
+                    bgcolor: 'background.paper',
+                    opacity: (selectedSessionTypeId && selectedClientId) ? 1 : 0.6,
+                    pointerEvents: (selectedSessionTypeId && selectedClientId) ? 'auto' : 'none',
+                  }}
+                >
+                  <DateCalendar
+                    value={bookingSelectedDate}
+                    onChange={handleBookingDateChange}
+                    minDate={dayjs()}
+                    sx={{ width: '100%' }}
+                    firstDayOfWeek={1}
+                    disabled={!selectedSessionTypeId || !selectedClientId}
+                  />
+                </Box>
+                {!selectedSessionTypeId && (
+                  <Typography variant="body2" color="text.secondary" sx={{ mt: 1, textAlign: 'center' }}>
+                    {t('admin.dashboard.selectSessionTypeForDate')}
+                  </Typography>
+                )}
+                {selectedSessionTypeId && !selectedClientId && (
+                  <Typography variant="body2" color="text.secondary" sx={{ mt: 1, textAlign: 'center' }}>
+                    {t('admin.dashboard.selectClientForDate')}
+                  </Typography>
+                )}
+              </Grid>
+
+              <Grid item xs={12} md={6}>
+                <Typography variant="h6" gutterBottom>
+                  {t('admin.dashboard.availableTimes')} {formatDateForDisplay(bookingSelectedDate)}
+                </Typography>
+
+                {userTimezone && (
+                  <Alert severity="info" sx={{ mb: 2 }}>
+                    {t('admin.dashboard.slotsTimezone', {
+                      timezone: userTimezone,
+                      offset: getTimezoneOffset(userTimezone)
+                    })}
+                  </Alert>
+                )}
+
+                {!selectedSessionTypeId ? (
+                  <Alert severity="info">
+                    {t('admin.dashboard.selectSessionType')}
+                  </Alert>
+                ) : (
+                  <>
+                    {bookingSlotsError && (
+                      <Alert severity="error" sx={{ mb: 2 }}>
+                        {bookingSlotsError}
+                      </Alert>
+                    )}
+
+                    {loadingBookingSlots ? (
+                      <Box
+                        sx={{
+                          display: 'flex',
+                          justifyContent: 'center',
+                          alignItems: 'center',
+                          minHeight: 200,
+                        }}
+                      >
+                        <CircularProgress />
+                      </Box>
+                    ) : bookingAvailableSlots.length > 0 ? (
+                      <List>
+                        {bookingAvailableSlots.map((slot, index) => {
+                          const startTime = slot.startTime
+                            ? formatTime(slot.startTime)
+                            : (slot.startTimeInstant ? formatTimeFromInstant(slot.startTimeInstant) : 'N/A');
+                          const endTime = slot.endTime
+                            ? formatTime(slot.endTime)
+                            : 'N/A';
+                          const isSelected = selectedBookingSlot?.startTimeInstant === slot.startTimeInstant && !showCustomTimePicker;
+
+                          // Check if slot is in the past (only for today)
+                          const isToday = bookingSelectedDate.isSame(dayjs(), 'day');
+                          const isPastSlot = isToday && slot.startTimeInstant && dayjs(slot.startTimeInstant).isBefore(dayjs());
+                          const isDisabled = isPastSlot;
+
+                          return (
+                            <ListItemButton
+                              key={slot.startTimeInstant || `slot-${index}`}
+                              onClick={() => !isDisabled && handleBookingSlotClick(slot)}
+                              selected={isSelected}
+                              disabled={isDisabled}
+                              sx={{
+                                border: 1,
+                                borderColor: isSelected ? 'primary.main' : (isDisabled ? 'error.light' : 'divider'),
+                                borderRadius: 1,
+                                mb: 1,
+                                bgcolor: isSelected ? 'action.selected' : (isDisabled ? 'action.disabledBackground' : 'transparent'),
+                                opacity: isDisabled ? 0.5 : 1,
+                                '&:hover': {
+                                  bgcolor: isDisabled ? 'action.disabledBackground' : 'action.hover',
+                                },
+                                '&.Mui-disabled': {
+                                  opacity: 0.5,
+                                },
+                              }}
+                            >
+                              <Typography variant="body1" color={isDisabled ? 'text.disabled' : 'text.primary'}>
+                                {startTime}{endTime !== 'N/A' ? ` - ${endTime}` : ''}
+                                {isDisabled && ` ${t('admin.dashboard.past')}`}
+                              </Typography>
+                            </ListItemButton>
+                          );
+                        })}
+                        {/* Create new slot option */}
+                        <ListItemButton
+                          onClick={handleCreateNewSlotClick}
+                          selected={showCustomTimePicker}
+                          sx={{
+                            border: 1,
+                            borderColor: showCustomTimePicker ? 'primary.main' : 'divider',
+                            borderStyle: 'dashed',
+                            borderRadius: 1,
+                            mb: 1,
+                            bgcolor: showCustomTimePicker ? 'action.selected' : 'transparent',
+                            '&:hover': {
+                              bgcolor: 'action.hover',
+                            },
+                          }}
+                        >
+                          <Typography variant="body1" sx={{ fontStyle: 'italic' }}>
+                            {t('admin.dashboard.createNewSlot')}
+                          </Typography>
+                        </ListItemButton>
+                        {/* Custom time picker */}
+                        {showCustomTimePicker && (
+                          <Box
                             sx={{
-                              border: 1,
-                              borderColor: isSelected ? 'primary.main' : (isDisabled ? 'error.light' : 'divider'),
-                              borderRadius: 1,
-                              mb: 1,
-                              bgcolor: isSelected ? 'action.selected' : (isDisabled ? 'action.disabledBackground' : 'transparent'),
-                              opacity: isDisabled ? 0.5 : 1,
-                              '&:hover': {
-                                bgcolor: isDisabled ? 'action.disabledBackground' : 'action.hover',
-                              },
-                              '&.Mui-disabled': {
-                                opacity: 0.5,
-                              },
+                              mt: 1,
+                              p: 2,
+                              border: 2,
+                              borderColor: 'primary.main',
+                              borderRadius: 2,
+                              bgcolor: 'background.paper',
+                              boxShadow: 2
                             }}
                           >
-                            <Typography variant="body1" color={isDisabled ? 'text.disabled' : 'text.primary'}>
-                              {startTime}{endTime !== 'N/A' ? ` - ${endTime}` : ''}
-                              {isDisabled && ` ${t('admin.dashboard.past')}`}
+                            <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+                              {t('admin.dashboard.enterTime')}
                             </Typography>
-                          </ListItemButton>
-                        );
-                      })}
-                      {/* Create new slot option */}
-                      <ListItemButton
-                        onClick={handleCreateNewSlotClick}
-                        selected={showCustomTimePicker}
-                        sx={{
-                          border: 1,
-                          borderColor: showCustomTimePicker ? 'primary.main' : 'divider',
-                          borderStyle: 'dashed',
-                          borderRadius: 1,
-                          mb: 1,
-                          bgcolor: showCustomTimePicker ? 'action.selected' : 'transparent',
-                          '&:hover': {
-                            bgcolor: 'action.hover',
-                          },
-                        }}
-                      >
-                        <Typography variant="body1" sx={{ fontStyle: 'italic' }}>
-                          {t('admin.dashboard.createNewSlot')}
-                        </Typography>
-                      </ListItemButton>
-                      {/* Custom time picker */}
-                      {showCustomTimePicker && (
-                        <Box 
-                          sx={{ 
-                            mt: 1, 
-                            p: 2, 
-                            border: 2, 
-                            borderColor: 'primary.main', 
-                            borderRadius: 2, 
-                            bgcolor: 'background.paper',
-                            boxShadow: 2
+                            <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 1, mb: 2 }}>
+                              {/* Hours */}
+                              <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+                                <IconButton
+                                  size="small"
+                                  onClick={() => handleHourChange(true)}
+                                  sx={{ mb: 0.5 }}
+                                >
+                                  <ArrowUpwardIcon fontSize="small" />
+                                </IconButton>
+                                <TextField
+                                  value={hourInput}
+                                  onChange={(e) => handleHourInputChange(e.target.value)}
+                                  onFocus={(e) => e.target.select()}
+                                  onBlur={handleHourInputBlur}
+                                  inputProps={{
+                                    style: {
+                                      textAlign: 'center',
+                                      fontSize: '2rem',
+                                      fontWeight: 'bold',
+                                      padding: '16px',
+                                    },
+                                    maxLength: 2,
+                                  }}
+                                  autoComplete="off"
+                                  sx={{
+                                    width: 80,
+                                    '& .MuiOutlinedInput-root': {
+                                      border: 1,
+                                      borderColor: 'divider',
+                                      borderRadius: 1,
+                                      bgcolor: 'grey.100',
+                                      '&:hover': {
+                                        borderColor: 'primary.main',
+                                      },
+                                      '&.Mui-focused': {
+                                        borderColor: 'primary.main',
+                                        bgcolor: 'grey.100',
+                                      },
+                                      '& fieldset': {
+                                        border: 'none',
+                                      },
+                                    },
+                                  }}
+                                />
+                                <IconButton
+                                  size="small"
+                                  onClick={() => handleHourChange(false)}
+                                  sx={{ mt: 0.5 }}
+                                >
+                                  <ArrowDownwardIcon fontSize="small" />
+                                </IconButton>
+                              </Box>
+
+                              <Typography variant="h4" sx={{ mx: 1 }}>
+                                :
+                              </Typography>
+
+                              {/* Minutes */}
+                              <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+                                <IconButton
+                                  size="small"
+                                  onClick={() => handleMinuteChange(true)}
+                                  sx={{ mb: 0.5 }}
+                                >
+                                  <ArrowUpwardIcon fontSize="small" />
+                                </IconButton>
+                                <TextField
+                                  value={minuteInput}
+                                  onChange={(e) => handleMinuteInputChange(e.target.value)}
+                                  onFocus={(e) => e.target.select()}
+                                  onBlur={handleMinuteInputBlur}
+                                  inputProps={{
+                                    style: {
+                                      textAlign: 'center',
+                                      fontSize: '2rem',
+                                      fontWeight: 'bold',
+                                      padding: '16px',
+                                    },
+                                    maxLength: 2,
+                                  }}
+                                  autoComplete="off"
+                                  sx={{
+                                    width: 80,
+                                    '& .MuiOutlinedInput-root': {
+                                      border: 1,
+                                      borderColor: 'divider',
+                                      borderRadius: 1,
+                                      bgcolor: 'grey.100',
+                                      '&:hover': {
+                                        borderColor: 'primary.main',
+                                      },
+                                      '&.Mui-focused': {
+                                        borderColor: 'primary.main',
+                                        bgcolor: 'grey.100',
+                                      },
+                                      '& fieldset': {
+                                        border: 'none',
+                                      },
+                                    },
+                                  }}
+                                />
+                                <IconButton
+                                  size="small"
+                                  onClick={() => handleMinuteChange(false)}
+                                  sx={{ mt: 0.5 }}
+                                >
+                                  <ArrowDownwardIcon fontSize="small" />
+                                </IconButton>
+                              </Box>
+                            </Box>
+
+                            {/* Now and Clear buttons */}
+                            <Box sx={{ display: 'flex', justifyContent: 'space-between', gap: 1 }}>
+                              <Button
+                                size="small"
+                                onClick={handleSetNow}
+                                sx={{ color: 'primary.main', textTransform: 'none' }}
+                              >
+                                {t('admin.dashboard.now')}
+                              </Button>
+                              <Button
+                                size="small"
+                                onClick={handleClearTime}
+                                sx={{ color: 'primary.main', textTransform: 'none' }}
+                              >
+                                {t('admin.dashboard.clear')}
+                              </Button>
+                            </Box>
+                          </Box>
+                        )}
+                      </List>
+                    ) : (
+                      <>
+                        <Alert severity="info" sx={{ mb: 2 }}>
+                          No available sessions on this day. Please select another day.
+                        </Alert>
+                        {/* Create new slot option even when no slots available */}
+                        <ListItemButton
+                          onClick={handleCreateNewSlotClick}
+                          selected={showCustomTimePicker}
+                          sx={{
+                            border: 1,
+                            borderColor: showCustomTimePicker ? 'primary.main' : 'divider',
+                            borderStyle: 'dashed',
+                            borderRadius: 1,
+                            bgcolor: showCustomTimePicker ? 'action.selected' : 'transparent',
+                            '&:hover': {
+                              bgcolor: 'action.hover',
+                            },
                           }}
                         >
-                          <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-                            {t('admin.dashboard.enterTime')}
+                          <Typography variant="body1" sx={{ fontStyle: 'italic' }}>
+                            {t('admin.dashboard.createNewSlot')}
                           </Typography>
-                          <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 1, mb: 2 }}>
-                            {/* Hours */}
-                            <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-                              <IconButton 
-                                size="small" 
-                                onClick={() => handleHourChange(true)}
-                                sx={{ mb: 0.5 }}
-                              >
-                                <ArrowUpwardIcon fontSize="small" />
-                              </IconButton>
-                              <TextField
-                                value={hourInput}
-                                onChange={(e) => handleHourInputChange(e.target.value)}
-                                onFocus={(e) => e.target.select()}
-                                onBlur={handleHourInputBlur}
-                                inputProps={{
-                                  style: {
-                                    textAlign: 'center',
-                                    fontSize: '2rem',
-                                    fontWeight: 'bold',
-                                    padding: '16px',
-                                  },
-                                  maxLength: 2,
-                                }}
-                                autoComplete="off"
-                                sx={{
-                                  width: 80,
-                                  '& .MuiOutlinedInput-root': {
-                                    border: 1,
-                                    borderColor: 'divider',
-                                    borderRadius: 1,
-                                    bgcolor: 'grey.100',
-                                    '&:hover': {
-                                      borderColor: 'primary.main',
-                                    },
-                                    '&.Mui-focused': {
-                                      borderColor: 'primary.main',
-                                      bgcolor: 'grey.100',
-                                    },
-                                    '& fieldset': {
-                                      border: 'none',
-                                    },
-                                  },
-                                }}
-                              />
-                              <IconButton 
-                                size="small" 
-                                onClick={() => handleHourChange(false)}
-                                sx={{ mt: 0.5 }}
-                              >
-                                <ArrowDownwardIcon fontSize="small" />
-                              </IconButton>
-                            </Box>
-                            
-                            <Typography variant="h4" sx={{ mx: 1 }}>
-                              :
+                        </ListItemButton>
+                        {/* Custom time picker */}
+                        {showCustomTimePicker && (
+                          <Box
+                            sx={{
+                              mt: 1,
+                              p: 2,
+                              border: 2,
+                              borderColor: 'primary.main',
+                              borderRadius: 2,
+                              bgcolor: 'background.paper',
+                              boxShadow: 2
+                            }}
+                          >
+                            <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+                              {t('admin.dashboard.enterTime')}
                             </Typography>
-                            
-                            {/* Minutes */}
-                            <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-                              <IconButton 
-                                size="small" 
-                                onClick={() => handleMinuteChange(true)}
-                                sx={{ mb: 0.5 }}
-                              >
-                                <ArrowUpwardIcon fontSize="small" />
-                              </IconButton>
-                              <TextField
-                                value={minuteInput}
-                                onChange={(e) => handleMinuteInputChange(e.target.value)}
-                                onFocus={(e) => e.target.select()}
-                                onBlur={handleMinuteInputBlur}
-                                inputProps={{
-                                  style: {
-                                    textAlign: 'center',
-                                    fontSize: '2rem',
-                                    fontWeight: 'bold',
-                                    padding: '16px',
-                                  },
-                                  maxLength: 2,
-                                }}
-                                autoComplete="off"
-                                sx={{
-                                  width: 80,
-                                  '& .MuiOutlinedInput-root': {
-                                    border: 1,
-                                    borderColor: 'divider',
-                                    borderRadius: 1,
-                                    bgcolor: 'grey.100',
-                                    '&:hover': {
-                                      borderColor: 'primary.main',
+                            <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 1, mb: 2 }}>
+                              {/* Hours */}
+                              <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+                                <IconButton
+                                  size="small"
+                                  onClick={() => handleHourChange(true)}
+                                  sx={{ mb: 0.5 }}
+                                >
+                                  <ArrowUpwardIcon fontSize="small" />
+                                </IconButton>
+                                <TextField
+                                  value={hourInput}
+                                  onChange={(e) => handleHourInputChange(e.target.value)}
+                                  onFocus={(e) => e.target.select()}
+                                  onBlur={handleHourInputBlur}
+                                  inputProps={{
+                                    style: {
+                                      textAlign: 'center',
+                                      fontSize: '2rem',
+                                      fontWeight: 'bold',
+                                      padding: '16px',
                                     },
-                                    '&.Mui-focused': {
-                                      borderColor: 'primary.main',
+                                    maxLength: 2,
+                                  }}
+                                  autoComplete="off"
+                                  sx={{
+                                    width: 80,
+                                    '& .MuiOutlinedInput-root': {
+                                      border: 1,
+                                      borderColor: 'divider',
+                                      borderRadius: 1,
                                       bgcolor: 'grey.100',
+                                      '&:hover': {
+                                        borderColor: 'primary.main',
+                                      },
+                                      '&.Mui-focused': {
+                                        borderColor: 'primary.main',
+                                        bgcolor: 'grey.100',
+                                      },
+                                      '& fieldset': {
+                                        border: 'none',
+                                      },
                                     },
-                                    '& fieldset': {
-                                      border: 'none',
+                                  }}
+                                />
+                                <IconButton
+                                  size="small"
+                                  onClick={() => handleHourChange(false)}
+                                  sx={{ mt: 0.5 }}
+                                >
+                                  <ArrowDownwardIcon fontSize="small" />
+                                </IconButton>
+                              </Box>
+
+                              <Typography variant="h4" sx={{ mx: 1 }}>
+                                :
+                              </Typography>
+
+                              {/* Minutes */}
+                              <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+                                <IconButton
+                                  size="small"
+                                  onClick={() => handleMinuteChange(true)}
+                                  sx={{ mb: 0.5 }}
+                                >
+                                  <ArrowUpwardIcon fontSize="small" />
+                                </IconButton>
+                                <TextField
+                                  value={minuteInput}
+                                  onChange={(e) => handleMinuteInputChange(e.target.value)}
+                                  onFocus={(e) => e.target.select()}
+                                  onBlur={handleMinuteInputBlur}
+                                  inputProps={{
+                                    style: {
+                                      textAlign: 'center',
+                                      fontSize: '2rem',
+                                      fontWeight: 'bold',
+                                      padding: '16px',
                                     },
-                                  },
-                                }}
-                              />
-                              <IconButton 
-                                size="small" 
-                                onClick={() => handleMinuteChange(false)}
-                                sx={{ mt: 0.5 }}
+                                    maxLength: 2,
+                                  }}
+                                  autoComplete="off"
+                                  sx={{
+                                    width: 80,
+                                    '& .MuiOutlinedInput-root': {
+                                      border: 1,
+                                      borderColor: 'divider',
+                                      borderRadius: 1,
+                                      bgcolor: 'grey.100',
+                                      '&:hover': {
+                                        borderColor: 'primary.main',
+                                      },
+                                      '&.Mui-focused': {
+                                        borderColor: 'primary.main',
+                                        bgcolor: 'grey.100',
+                                      },
+                                      '& fieldset': {
+                                        border: 'none',
+                                      },
+                                    },
+                                  }}
+                                />
+                                <IconButton
+                                  size="small"
+                                  onClick={() => handleMinuteChange(false)}
+                                  sx={{ mt: 0.5 }}
+                                >
+                                  <ArrowDownwardIcon fontSize="small" />
+                                </IconButton>
+                              </Box>
+                            </Box>
+
+                            {/* Now and Clear buttons */}
+                            <Box sx={{ display: 'flex', justifyContent: 'space-between', gap: 1 }}>
+                              <Button
+                                size="small"
+                                onClick={handleSetNow}
+                                sx={{ color: 'primary.main', textTransform: 'none' }}
                               >
-                                <ArrowDownwardIcon fontSize="small" />
-                              </IconButton>
+                                {t('admin.dashboard.now')}
+                              </Button>
+                              <Button
+                                size="small"
+                                onClick={handleClearTime}
+                                sx={{ color: 'primary.main', textTransform: 'none' }}
+                              >
+                                {t('admin.dashboard.clear')}
+                              </Button>
                             </Box>
                           </Box>
-                          
-                          {/* Now and Clear buttons */}
-                          <Box sx={{ display: 'flex', justifyContent: 'space-between', gap: 1 }}>
-                            <Button
-                              size="small"
-                              onClick={handleSetNow}
-                              sx={{ color: 'primary.main', textTransform: 'none' }}
-                            >
-                              {t('admin.dashboard.now')}
-                            </Button>
-                            <Button
-                              size="small"
-                              onClick={handleClearTime}
-                              sx={{ color: 'primary.main', textTransform: 'none' }}
-                            >
-                              {t('admin.dashboard.clear')}
-                            </Button>
-                          </Box>
-                        </Box>
-                      )}
-                    </List>
-                  ) : (
-                    <>
-                      <Alert severity="info" sx={{ mb: 2 }}>
-                        No available sessions on this day. Please select another day.
-                      </Alert>
-                      {/* Create new slot option even when no slots available */}
-                      <ListItemButton
-                        onClick={handleCreateNewSlotClick}
-                        selected={showCustomTimePicker}
-                        sx={{
-                          border: 1,
-                          borderColor: showCustomTimePicker ? 'primary.main' : 'divider',
-                          borderStyle: 'dashed',
-                          borderRadius: 1,
-                          bgcolor: showCustomTimePicker ? 'action.selected' : 'transparent',
-                          '&:hover': {
-                            bgcolor: 'action.hover',
-                          },
-                        }}
-                      >
-                        <Typography variant="body1" sx={{ fontStyle: 'italic' }}>
-                          {t('admin.dashboard.createNewSlot')}
-                        </Typography>
-                      </ListItemButton>
-                      {/* Custom time picker */}
-                      {showCustomTimePicker && (
-                        <Box 
-                          sx={{ 
-                            mt: 1, 
-                            p: 2, 
-                            border: 2, 
-                            borderColor: 'primary.main', 
-                            borderRadius: 2, 
-                            bgcolor: 'background.paper',
-                            boxShadow: 2
-                          }}
-                        >
-                          <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-                            {t('admin.dashboard.enterTime')}
-                          </Typography>
-                          <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 1, mb: 2 }}>
-                            {/* Hours */}
-                            <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-                              <IconButton 
-                                size="small" 
-                                onClick={() => handleHourChange(true)}
-                                sx={{ mb: 0.5 }}
-                              >
-                                <ArrowUpwardIcon fontSize="small" />
-                              </IconButton>
-                              <TextField
-                                value={hourInput}
-                                onChange={(e) => handleHourInputChange(e.target.value)}
-                                onFocus={(e) => e.target.select()}
-                                onBlur={handleHourInputBlur}
-                                inputProps={{
-                                  style: {
-                                    textAlign: 'center',
-                                    fontSize: '2rem',
-                                    fontWeight: 'bold',
-                                    padding: '16px',
-                                  },
-                                  maxLength: 2,
-                                }}
-                                autoComplete="off"
-                                sx={{
-                                  width: 80,
-                                  '& .MuiOutlinedInput-root': {
-                                    border: 1,
-                                    borderColor: 'divider',
-                                    borderRadius: 1,
-                                    bgcolor: 'grey.100',
-                                    '&:hover': {
-                                      borderColor: 'primary.main',
-                                    },
-                                    '&.Mui-focused': {
-                                      borderColor: 'primary.main',
-                                      bgcolor: 'grey.100',
-                                    },
-                                    '& fieldset': {
-                                      border: 'none',
-                                    },
-                                  },
-                                }}
-                              />
-                              <IconButton 
-                                size="small" 
-                                onClick={() => handleHourChange(false)}
-                                sx={{ mt: 0.5 }}
-                              >
-                                <ArrowDownwardIcon fontSize="small" />
-                              </IconButton>
-                            </Box>
-                            
-                            <Typography variant="h4" sx={{ mx: 1 }}>
-                              :
-                            </Typography>
-                            
-                            {/* Minutes */}
-                            <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-                              <IconButton 
-                                size="small" 
-                                onClick={() => handleMinuteChange(true)}
-                                sx={{ mb: 0.5 }}
-                              >
-                                <ArrowUpwardIcon fontSize="small" />
-                              </IconButton>
-                              <TextField
-                                value={minuteInput}
-                                onChange={(e) => handleMinuteInputChange(e.target.value)}
-                                onFocus={(e) => e.target.select()}
-                                onBlur={handleMinuteInputBlur}
-                                inputProps={{
-                                  style: {
-                                    textAlign: 'center',
-                                    fontSize: '2rem',
-                                    fontWeight: 'bold',
-                                    padding: '16px',
-                                  },
-                                  maxLength: 2,
-                                }}
-                                autoComplete="off"
-                                sx={{
-                                  width: 80,
-                                  '& .MuiOutlinedInput-root': {
-                                    border: 1,
-                                    borderColor: 'divider',
-                                    borderRadius: 1,
-                                    bgcolor: 'grey.100',
-                                    '&:hover': {
-                                      borderColor: 'primary.main',
-                                    },
-                                    '&.Mui-focused': {
-                                      borderColor: 'primary.main',
-                                      bgcolor: 'grey.100',
-                                    },
-                                    '& fieldset': {
-                                      border: 'none',
-                                    },
-                                  },
-                                }}
-                              />
-                              <IconButton 
-                                size="small" 
-                                onClick={() => handleMinuteChange(false)}
-                                sx={{ mt: 0.5 }}
-                              >
-                                <ArrowDownwardIcon fontSize="small" />
-                              </IconButton>
-                            </Box>
-                          </Box>
-                          
-                          {/* Now and Clear buttons */}
-                          <Box sx={{ display: 'flex', justifyContent: 'space-between', gap: 1 }}>
-                            <Button
-                              size="small"
-                              onClick={handleSetNow}
-                              sx={{ color: 'primary.main', textTransform: 'none' }}
-                            >
-                              {t('admin.dashboard.now')}
-                            </Button>
-                            <Button
-                              size="small"
-                              onClick={handleClearTime}
-                              sx={{ color: 'primary.main', textTransform: 'none' }}
-                            >
-                              {t('admin.dashboard.clear')}
-                            </Button>
-                          </Box>
-                        </Box>
-                      )}
-                    </>
-                  )}
-                </>
-              )}
-            </Grid>
+                        )}
+                      </>
+                    )}
+                  </>
+                )}
+              </Grid>
 
-            {/* Client Message */}
-            <Grid item xs={12}>
-              <TextField
-                fullWidth
-                multiline
-                rows={4}
-                label={t('admin.dashboard.messageOptional')}
-                placeholder={t('admin.dashboard.messagePlaceholder')}
-                value={bookingClientMessage}
-                onChange={(e) => {
-                  const value = e.target.value;
-                  if (value.length <= 2000) {
-                    setBookingClientMessage(value);
-                  }
-                }}
-                disabled={submittingBooking}
-                error={bookingClientMessage.length > 2000}
-                helperText={
-                  bookingClientMessage.length > 2000
-                    ? t('admin.dashboard.messageMaxLength')
-                    : `${bookingClientMessage.length}/2000 ${t('common.characters')}`
-                }
-              />
-            </Grid>
-          </Grid>
-        </DialogContent>
-        <DialogActions>
-          <Button
-            onClick={handleNewBookingClose}
-            sx={{ textTransform: 'none' }}
-            disabled={submittingBooking}
-          >
-            {t('admin.dashboard.cancel')}
-          </Button>
-          <Button
-            onClick={handleSubmitBooking}
-            variant="contained"
-            sx={{ textTransform: 'none' }}
-            disabled={
-              submittingBooking ||
-              !selectedSessionTypeId ||
-              !selectedClientId ||
-              (!selectedBookingSlot && !(customStartTime && bookingSelectedDate)) ||
-              !!bookingError
-            }
-          >
-            {submittingBooking ? (
-              <>
-                <CircularProgress size={16} sx={{ mr: 1 }} />
-                {t('admin.dashboard.creating')}
-              </>
-            ) : (
-              t('admin.dashboard.createBooking')
-            )}
-          </Button>
-        </DialogActions>
-      </Dialog>
-
-      {/* Create New Client Dialog */}
-      <Dialog open={createClientOpen} onClose={handleCreateClientClose} maxWidth="sm" fullWidth>
-        <DialogTitle>{t('admin.dashboard.createNewClient')}</DialogTitle>
-        <DialogContent>
-          {createClientError && (
-            <Alert severity="error" sx={{ mb: 2 }} onClose={() => setCreateClientError(null)}>
-              {createClientError}
-            </Alert>
-          )}
-
-          <Grid container spacing={2} sx={{ mt: 1 }}>
-            <Grid item xs={12}>
-              <TextField
-                autoFocus
-                fullWidth
-                label={t('admin.dashboard.emailLabel')}
-                type="email"
-                value={newClientData.email}
-                onChange={(e) => {
-                  setNewClientData((prev) => ({ ...prev, email: e.target.value }));
-                  setCreateClientError(null);
-                }}
-                required
-                disabled={creatingClient}
-                error={!!createClientError && createClientError.includes('email')}
-              />
-            </Grid>
-
-            <Grid item xs={12}>
-              <TextField
-                fullWidth
-                label={t('admin.dashboard.firstNameLabel')}
-                value={newClientData.firstName}
-                onChange={(e) => {
-                  setNewClientData((prev) => ({ ...prev, firstName: e.target.value }));
-                }}
-                disabled={creatingClient}
-                inputProps={{ maxLength: 100 }}
-              />
-            </Grid>
-
-            <Grid item xs={12}>
-              <TextField
-                fullWidth
-                label={t('admin.dashboard.lastNameLabel')}
-                value={newClientData.lastName}
-                onChange={(e) => {
-                  setNewClientData((prev) => ({ ...prev, lastName: e.target.value }));
-                }}
-                disabled={creatingClient}
-                inputProps={{ maxLength: 100 }}
-              />
-            </Grid>
-
-            <Grid item xs={12}>
-              <FormControl fullWidth>
-                <InputLabel>{t('admin.dashboard.timezoneLabel')}</InputLabel>
-                <Select
-                  value={newClientData.timezone}
+              {/* Client Message */}
+              <Grid item xs={12}>
+                <TextField
+                  fullWidth
+                  multiline
+                  rows={4}
+                  label={t('admin.dashboard.messageOptional')}
+                  placeholder={t('admin.dashboard.messagePlaceholder')}
+                  value={bookingClientMessage}
                   onChange={(e) => {
-                    setNewClientData((prev) => ({ ...prev, timezone: e.target.value }));
+                    const value = e.target.value;
+                    if (value.length <= 2000) {
+                      setBookingClientMessage(value);
+                    }
                   }}
-                  label={t('admin.dashboard.timezoneLabel')}
-                  disabled={creatingClient}
-                >
-                  {getUniqueTimezoneOffsets().map((tz) => (
-                    <MenuItem key={tz.value} value={tz.value}>
-                      {tz.label} ({tz.offset})
-                    </MenuItem>
-                  ))}
-                </Select>
-              </FormControl>
+                  disabled={submittingBooking}
+                  error={bookingClientMessage.length > 2000}
+                  helperText={
+                    bookingClientMessage.length > 2000
+                      ? t('admin.dashboard.messageMaxLength')
+                      : `${bookingClientMessage.length}/2000 ${t('common.characters')}`
+                  }
+                />
+              </Grid>
             </Grid>
+          </DialogContent>
+          <DialogActions>
+            <Button
+              onClick={handleNewBookingClose}
+              sx={{ textTransform: 'none' }}
+              disabled={submittingBooking}
+            >
+              {t('admin.dashboard.cancel')}
+            </Button>
+            <Button
+              onClick={handleSubmitBooking}
+              variant="contained"
+              sx={{ textTransform: 'none' }}
+              disabled={
+                submittingBooking ||
+                !selectedSessionTypeId ||
+                !selectedClientId ||
+                (!selectedBookingSlot && !(customStartTime && bookingSelectedDate)) ||
+                !!bookingError
+              }
+            >
+              {submittingBooking ? (
+                <>
+                  <CircularProgress size={16} sx={{ mr: 1 }} />
+                  {t('admin.dashboard.creating')}
+                </>
+              ) : (
+                t('admin.dashboard.createBooking')
+              )}
+            </Button>
+          </DialogActions>
+        </Dialog>
 
-            <Grid item xs={12}>
-              <FormControlLabel
-                control={
-                  <Switch
-                    checked={newClientData.emailNotificationEnabled}
-                    onChange={(e) => {
-                      setNewClientData((prev) => ({ ...prev, emailNotificationEnabled: e.target.checked }));
-                    }}
-                    disabled={creatingClient}
-                  />
-                }
-                label={t('pages.profile.emailNotifications')}
-              />
-            </Grid>
-          </Grid>
-        </DialogContent>
-        <DialogActions>
-          <Button
-            onClick={handleCreateClientClose}
-            sx={{ textTransform: 'none' }}
-            disabled={creatingClient}
-          >
-            Cancel
-          </Button>
-          <Button
-            onClick={handleCreateClientSubmit}
-            variant="contained"
-            sx={{ textTransform: 'none' }}
-            disabled={creatingClient || !newClientData.email.trim()}
-          >
-            {creatingClient ? (
-              <>
-                <CircularProgress size={16} sx={{ mr: 1 }} />
-                {t('admin.dashboard.creatingClient')}
-              </>
-            ) : (
-              t('admin.dashboard.createClient')
+        {/* Create New Client Dialog */}
+        <Dialog open={createClientOpen} onClose={handleCreateClientClose} maxWidth="sm" fullWidth>
+          <DialogTitle>{t('admin.dashboard.createNewClient')}</DialogTitle>
+          <DialogContent>
+            {createClientError && (
+              <Alert severity="error" sx={{ mb: 2 }} onClose={() => setCreateClientError(null)}>
+                {createClientError}
+              </Alert>
             )}
-          </Button>
-        </DialogActions>
-      </Dialog>
+
+            <Grid container spacing={2} sx={{ mt: 1 }}>
+              <Grid item xs={12}>
+                <TextField
+                  autoFocus
+                  fullWidth
+                  label={t('admin.dashboard.emailLabel')}
+                  type="email"
+                  value={newClientData.email}
+                  onChange={(e) => {
+                    setNewClientData((prev) => ({ ...prev, email: e.target.value }));
+                    setCreateClientError(null);
+                  }}
+                  required
+                  disabled={creatingClient}
+                  error={!!createClientError && createClientError.includes('email')}
+                />
+              </Grid>
+
+              <Grid item xs={12}>
+                <TextField
+                  fullWidth
+                  label={t('admin.dashboard.firstNameLabel')}
+                  value={newClientData.firstName}
+                  onChange={(e) => {
+                    setNewClientData((prev) => ({ ...prev, firstName: e.target.value }));
+                  }}
+                  disabled={creatingClient}
+                  inputProps={{ maxLength: 100 }}
+                />
+              </Grid>
+
+              <Grid item xs={12}>
+                <TextField
+                  fullWidth
+                  label={t('admin.dashboard.lastNameLabel')}
+                  value={newClientData.lastName}
+                  onChange={(e) => {
+                    setNewClientData((prev) => ({ ...prev, lastName: e.target.value }));
+                  }}
+                  disabled={creatingClient}
+                  inputProps={{ maxLength: 100 }}
+                />
+              </Grid>
+
+              <Grid item xs={12}>
+                <FormControl fullWidth>
+                  <InputLabel>{t('admin.dashboard.timezoneLabel')}</InputLabel>
+                  <Select
+                    value={newClientData.timezone}
+                    onChange={(e) => {
+                      setNewClientData((prev) => ({ ...prev, timezone: e.target.value }));
+                    }}
+                    label={t('admin.dashboard.timezoneLabel')}
+                    disabled={creatingClient}
+                  >
+                    {getUniqueTimezoneOffsets().map((tz) => (
+                      <MenuItem key={tz.value} value={tz.value}>
+                        {tz.label} ({tz.offset})
+                      </MenuItem>
+                    ))}
+                  </Select>
+                </FormControl>
+              </Grid>
+
+              <Grid item xs={12}>
+                <FormControlLabel
+                  control={
+                    <Switch
+                      checked={newClientData.emailNotificationEnabled}
+                      onChange={(e) => {
+                        setNewClientData((prev) => ({ ...prev, emailNotificationEnabled: e.target.checked }));
+                      }}
+                      disabled={creatingClient}
+                    />
+                  }
+                  label={t('pages.profile.emailNotifications')}
+                />
+              </Grid>
+            </Grid>
+          </DialogContent>
+          <DialogActions>
+            <Button
+              onClick={handleCreateClientClose}
+              sx={{ textTransform: 'none' }}
+              disabled={creatingClient}
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={handleCreateClientSubmit}
+              variant="contained"
+              sx={{ textTransform: 'none' }}
+              disabled={creatingClient || !newClientData.email.trim()}
+            >
+              {creatingClient ? (
+                <>
+                  <CircularProgress size={16} sx={{ mr: 1 }} />
+                  {t('admin.dashboard.creatingClient')}
+                </>
+              ) : (
+                t('admin.dashboard.createClient')
+              )}
+            </Button>
+          </DialogActions>
+        </Dialog>
         {/* Success Snackbar */}
         <Snackbar
           open={!!successMessage}
@@ -2670,7 +2682,7 @@ const AdminDashboard = () => {
             {successMessage}
           </Alert>
         </Snackbar>
-    </Box>
+      </Box>
     </LocalizationProvider>
   );
 };

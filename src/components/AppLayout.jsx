@@ -62,6 +62,8 @@ const AppLayout = ({ children }) => {
   const isUserPage = ['/profile', '/booking'].includes(location.pathname);
   // Check if we're on the blog page where navigation buttons should be hidden
   const isBlogPage = location.pathname.startsWith('/blog');
+  // Check if we're on an agreement page where navigation buttons should be hidden
+  const isAgreementPage = location.pathname.startsWith('/agreement');
 
   // Handle scroll to change header background
   useEffect(() => {
@@ -97,7 +99,7 @@ const AppLayout = ({ children }) => {
     try {
       const data = await fetchUserProfile();
       if (!isFetchingRef.current) return; // Component unmounted or another fetch started
-      
+
       setUserProfile(data);
       lastFetchedTokenRef.current = token;
       // Dispatch event so other components can reuse this data
@@ -181,14 +183,14 @@ const AppLayout = ({ children }) => {
     const checkToken = () => {
       const token = getToken();
       const tokenExists = !!token;
-      
+
       // Check if token is expired
       if (tokenExists && isTokenExpired(token)) {
         // Token expired, log out user
         handleLogout();
         return;
       }
-      
+
       setHasToken(tokenExists);
       if (tokenExists) {
         loadUserProfile();
@@ -409,11 +411,11 @@ const AppLayout = ({ children }) => {
 
   return (
     <Box sx={{ display: 'flex', flexDirection: 'column', minHeight: '100vh' }}>
-      <AppBar 
+      <AppBar
         position="fixed"
-        sx={{ 
-          top: 0, 
-          zIndex: 1100, 
+        sx={{
+          top: 0,
+          zIndex: 1100,
           bgcolor: isLandingPage && !scrolled ? 'transparent' : '#2C5F5F',
           boxShadow: isLandingPage && !scrolled ? 'none' : 2,
           transition: 'all 0.3s ease-in-out',
@@ -428,7 +430,7 @@ const AppLayout = ({ children }) => {
                 color="inherit"
                 size="medium"
                 aria-label="home"
-                sx={{ 
+                sx={{
                   mr: { xs: 1, sm: 2 },
                   transition: 'all 0.2s ease-in-out',
                   '&:hover': {
@@ -444,275 +446,271 @@ const AppLayout = ({ children }) => {
 
           {/* Navigation Links */}
           <Box sx={{ flexGrow: 1, display: 'flex', justifyContent: 'center' }}>
-            <Stack 
-              direction="row" 
+            <Stack
+              direction="row"
               spacing={{ xs: 1, sm: 2, md: 3 }}
               alignItems="center"
-              sx={
-                isAdminRoute
-                  ? {
-                      position: 'absolute',
-                      left: '50%',
-                      top: '50%',
-                      transform: 'translate(-50%, -50%)',
-                    }
-                  : {}
-              }
+              sx={{
+                position: 'absolute',
+                left: '50%',
+                top: '50%',
+                transform: 'translate(-50%, -50%)',
+              }}
             >
-            {/* Admin Navigation Links */}
-            {isAdminRoute && (
-              <>
-                <Button
-                  component={Link}
-                  to="/admin/dashboard"
-                  color="inherit"
-                  sx={{ 
-                    textTransform: 'none',
-                    fontWeight: 500,
-                    fontSize: { xs: '0.875rem', sm: '0.9375rem', md: '1rem' },
-                    px: { xs: 1, sm: 1.5 },
-                    py: 1,
-                    borderRadius: 1,
-                    transition: 'all 0.2s ease-in-out',
-                    '&:hover': {
-                      bgcolor: 'rgba(255, 255, 255, 0.1)',
-                      transform: 'translateY(-1px)',
-                    },
-                  }}
-                >
-                  {t('navigation.dashboard')}
-                </Button>
-                <Button
-                  component={Link}
-                  to="/admin/home"
-                  color="inherit"
-                  sx={{ 
-                    textTransform: 'none',
-                    fontWeight: 500,
-                    fontSize: { xs: '0.875rem', sm: '0.9375rem', md: '1rem' },
-                    px: { xs: 1, sm: 1.5 },
-                    py: 1,
-                    borderRadius: 1,
-                    transition: 'all 0.2s ease-in-out',
-                    '&:hover': {
-                      bgcolor: 'rgba(255, 255, 255, 0.1)',
-                      transform: 'translateY(-1px)',
-                    },
-                  }}
-                >
-                  {t('navigation.homePage')}
-                </Button>
-                <Button
-                  component={Link}
-                  to="/admin/blog"
-                  color="inherit"
-                  sx={{ 
-                    textTransform: 'none',
-                    fontWeight: 500,
-                    fontSize: { xs: '0.875rem', sm: '0.9375rem', md: '1rem' },
-                    px: { xs: 1, sm: 1.5 },
-                    py: 1,
-                    borderRadius: 1,
-                    transition: 'all 0.2s ease-in-out',
-                    '&:hover': {
-                      bgcolor: 'rgba(255, 255, 255, 0.1)',
-                      transform: 'translateY(-1px)',
-                    },
-                  }}
-                >
-                  {t('navigation.blog')}
-                </Button>
-                <Button
-                  component={Link}
-                  to="/admin/session/configuration"
-                  color="inherit"
-                  sx={{ 
-                    textTransform: 'none',
-                    fontWeight: 500,
-                    fontSize: { xs: '0.875rem', sm: '0.9375rem', md: '1rem' },
-                    px: { xs: 1, sm: 1.5 },
-                    py: 1,
-                    borderRadius: 1,
-                    transition: 'all 0.2s ease-in-out',
-                    '&:hover': {
-                      bgcolor: 'rgba(255, 255, 255, 0.1)',
-                      transform: 'translateY(-1px)',
-                    },
-                  }}
-                >
-                  {t('navigation.sessions')}
-                </Button>
-                <Button
-                  component={Link}
-                  to="/admin/gallery"
-                  color="inherit"
-                  sx={{ 
-                    textTransform: 'none',
-                    fontWeight: 500,
-                    fontSize: { xs: '0.875rem', sm: '0.9375rem', md: '1rem' },
-                    px: { xs: 1, sm: 1.5 },
-                    py: 1,
-                    borderRadius: 1,
-                    transition: 'all 0.2s ease-in-out',
-                    '&:hover': {
-                      bgcolor: 'rgba(255, 255, 255, 0.1)',
-                      transform: 'translateY(-1px)',
-                    },
-                  }}
-                >
-                  {t('navigation.gallery')}
-                </Button>
-              </>
-            )}
+              {/* Admin Navigation Links */}
+              {isAdminRoute && (
+                <>
+                  <Button
+                    component={Link}
+                    to="/admin/dashboard"
+                    color="inherit"
+                    sx={{
+                      textTransform: 'none',
+                      fontWeight: 500,
+                      fontSize: { xs: '0.875rem', sm: '0.9375rem', md: '1rem' },
+                      px: { xs: 1, sm: 1.5 },
+                      py: 1,
+                      borderRadius: 1,
+                      transition: 'all 0.2s ease-in-out',
+                      '&:hover': {
+                        bgcolor: 'rgba(255, 255, 255, 0.1)',
+                        transform: 'translateY(-1px)',
+                      },
+                    }}
+                  >
+                    {t('navigation.dashboard')}
+                  </Button>
+                  <Button
+                    component={Link}
+                    to="/admin/home"
+                    color="inherit"
+                    sx={{
+                      textTransform: 'none',
+                      fontWeight: 500,
+                      fontSize: { xs: '0.875rem', sm: '0.9375rem', md: '1rem' },
+                      px: { xs: 1, sm: 1.5 },
+                      py: 1,
+                      borderRadius: 1,
+                      transition: 'all 0.2s ease-in-out',
+                      '&:hover': {
+                        bgcolor: 'rgba(255, 255, 255, 0.1)',
+                        transform: 'translateY(-1px)',
+                      },
+                    }}
+                  >
+                    {t('navigation.homePage')}
+                  </Button>
+                  <Button
+                    component={Link}
+                    to="/admin/blog"
+                    color="inherit"
+                    sx={{
+                      textTransform: 'none',
+                      fontWeight: 500,
+                      fontSize: { xs: '0.875rem', sm: '0.9375rem', md: '1rem' },
+                      px: { xs: 1, sm: 1.5 },
+                      py: 1,
+                      borderRadius: 1,
+                      transition: 'all 0.2s ease-in-out',
+                      '&:hover': {
+                        bgcolor: 'rgba(255, 255, 255, 0.1)',
+                        transform: 'translateY(-1px)',
+                      },
+                    }}
+                  >
+                    {t('navigation.blog')}
+                  </Button>
+                  <Button
+                    component={Link}
+                    to="/admin/session/configuration"
+                    color="inherit"
+                    sx={{
+                      textTransform: 'none',
+                      fontWeight: 500,
+                      fontSize: { xs: '0.875rem', sm: '0.9375rem', md: '1rem' },
+                      px: { xs: 1, sm: 1.5 },
+                      py: 1,
+                      borderRadius: 1,
+                      transition: 'all 0.2s ease-in-out',
+                      '&:hover': {
+                        bgcolor: 'rgba(255, 255, 255, 0.1)',
+                        transform: 'translateY(-1px)',
+                      },
+                    }}
+                  >
+                    {t('navigation.sessions')}
+                  </Button>
+                  <Button
+                    component={Link}
+                    to="/admin/gallery"
+                    color="inherit"
+                    sx={{
+                      textTransform: 'none',
+                      fontWeight: 500,
+                      fontSize: { xs: '0.875rem', sm: '0.9375rem', md: '1rem' },
+                      px: { xs: 1, sm: 1.5 },
+                      py: 1,
+                      borderRadius: 1,
+                      transition: 'all 0.2s ease-in-out',
+                      '&:hover': {
+                        bgcolor: 'rgba(255, 255, 255, 0.1)',
+                        transform: 'translateY(-1px)',
+                      },
+                    }}
+                  >
+                    {t('navigation.gallery')}
+                  </Button>
+                </>
+              )}
 
-            {/* Public Navigation Links */}
-            {!isAdminRoute && !isUserPage && !isBlogPage && (
-              <>
-                {/* Public Links - Scroll to section on landing page, navigate otherwise */}
-                {isLandingPage ? (
-                  <>
-                    <Button
-                      onClick={() => scrollToSection('about')}
-                      color="inherit"
-                      sx={{ 
-                        textTransform: 'none',
-                        fontWeight: 500,
-                        fontSize: { xs: '0.875rem', sm: '0.9375rem', md: '1rem' },
-                        px: { xs: 1, sm: 1.5 },
-                        py: 1,
-                        borderRadius: 1,
-                        transition: 'all 0.2s ease-in-out',
-                        '&:hover': {
-                          bgcolor: 'rgba(255, 255, 255, 0.1)',
-                          transform: 'translateY(-1px)',
-                        },
-                      }}
-                    >
-                      {t('navigation.about')}
-                    </Button>
-                    <Button
-                      onClick={() => scrollToSection('services')}
-                      color="inherit"
-                      sx={{ 
-                        textTransform: 'none',
-                        fontWeight: 500,
-                        fontSize: { xs: '0.875rem', sm: '0.9375rem', md: '1rem' },
-                        px: { xs: 1, sm: 1.5 },
-                        py: 1,
-                        borderRadius: 1,
-                        transition: 'all 0.2s ease-in-out',
-                        '&:hover': {
-                          bgcolor: 'rgba(255, 255, 255, 0.1)',
-                          transform: 'translateY(-1px)',
-                        },
-                      }}
-                    >
-                      {t('navigation.services')}
-                    </Button>
-                    <Button
-                      onClick={() => scrollToSection('blog')}
-                      color="inherit"
-                      sx={{ 
-                        textTransform: 'none',
-                        fontWeight: 500,
-                        fontSize: { xs: '0.875rem', sm: '0.9375rem', md: '1rem' },
-                        px: { xs: 1, sm: 1.5 },
-                        py: 1,
-                        borderRadius: 1,
-                        transition: 'all 0.2s ease-in-out',
-                        '&:hover': {
-                          bgcolor: 'rgba(255, 255, 255, 0.1)',
-                          transform: 'translateY(-1px)',
-                        },
-                      }}
-                    >
-                      {t('navigation.blog')}
-                    </Button>
-                    <Button
-                      onClick={() => scrollToSection('testimonials')}
-                      color="inherit"
-                      sx={{ 
-                        textTransform: 'none',
-                        fontWeight: 500,
-                        fontSize: { xs: '0.875rem', sm: '0.9375rem', md: '1rem' },
-                        px: { xs: 1, sm: 1.5 },
-                        py: 1,
-                        borderRadius: 1,
-                        transition: 'all 0.2s ease-in-out',
-                        '&:hover': {
-                          bgcolor: 'rgba(255, 255, 255, 0.1)',
-                          transform: 'translateY(-1px)',
-                        },
-                      }}
-                    >
-                      {t('navigation.testimonials')}
-                    </Button>
-                    <Button
-                      onClick={() => scrollToSection('contact')}
-                      color="inherit"
-                      sx={{ 
-                        textTransform: 'none',
-                        fontWeight: 500,
-                        fontSize: { xs: '0.875rem', sm: '0.9375rem', md: '1rem' },
-                        px: { xs: 1, sm: 1.5 },
-                        py: 1,
-                        borderRadius: 1,
-                        transition: 'all 0.2s ease-in-out',
-                        '&:hover': {
-                          bgcolor: 'rgba(255, 255, 255, 0.1)',
-                          transform: 'translateY(-1px)',
-                        },
-                      }}
-                    >
-                      {t('navigation.contact')}
-                    </Button>
-                  </>
-                ) : (
-                  <>
-                <Button
-                  component={Link}
-                  to="/"
-                  color="inherit"
-                      sx={{ 
-                        textTransform: 'none',
-                        fontWeight: 500,
-                        fontSize: { xs: '0.875rem', sm: '0.9375rem', md: '1rem' },
-                        px: { xs: 1, sm: 1.5 },
-                        py: 1,
-                        borderRadius: 1,
-                        transition: 'all 0.2s ease-in-out',
-                        '&:hover': {
-                          bgcolor: 'rgba(255, 255, 255, 0.1)',
-                          transform: 'translateY(-1px)',
-                        },
-                      }}
-                >
-                  {t('navigation.home')}
-                </Button>
-                <Button
-                  onClick={handleAboutMeOpen}
-                  color="inherit"
-                      sx={{ 
-                        textTransform: 'none',
-                        fontWeight: 500,
-                        fontSize: { xs: '0.875rem', sm: '0.9375rem', md: '1rem' },
-                        px: { xs: 1, sm: 1.5 },
-                        py: 1,
-                        borderRadius: 1,
-                        transition: 'all 0.2s ease-in-out',
-                        '&:hover': {
-                          bgcolor: 'rgba(255, 255, 255, 0.1)',
-                          transform: 'translateY(-1px)',
-                        },
-                      }}
-                >
-                  {t('navigation.about')}
-                </Button>
-                  </>
-                )}
+              {/* Public Navigation Links */}
+              {!isAdminRoute && !isUserPage && !isBlogPage && !isAgreementPage && (
+                <>
+                  {/* Public Links - Scroll to section on landing page, navigate otherwise */}
+                  {isLandingPage ? (
+                    <>
+                      <Button
+                        onClick={() => scrollToSection('about')}
+                        color="inherit"
+                        sx={{
+                          textTransform: 'none',
+                          fontWeight: 500,
+                          fontSize: { xs: '0.875rem', sm: '0.9375rem', md: '1rem' },
+                          px: { xs: 1, sm: 1.5 },
+                          py: 1,
+                          borderRadius: 1,
+                          transition: 'all 0.2s ease-in-out',
+                          '&:hover': {
+                            bgcolor: 'rgba(255, 255, 255, 0.1)',
+                            transform: 'translateY(-1px)',
+                          },
+                        }}
+                      >
+                        {t('navigation.about')}
+                      </Button>
+                      <Button
+                        onClick={() => scrollToSection('services')}
+                        color="inherit"
+                        sx={{
+                          textTransform: 'none',
+                          fontWeight: 500,
+                          fontSize: { xs: '0.875rem', sm: '0.9375rem', md: '1rem' },
+                          px: { xs: 1, sm: 1.5 },
+                          py: 1,
+                          borderRadius: 1,
+                          transition: 'all 0.2s ease-in-out',
+                          '&:hover': {
+                            bgcolor: 'rgba(255, 255, 255, 0.1)',
+                            transform: 'translateY(-1px)',
+                          },
+                        }}
+                      >
+                        {t('navigation.services')}
+                      </Button>
+                      <Button
+                        onClick={() => scrollToSection('blog')}
+                        color="inherit"
+                        sx={{
+                          textTransform: 'none',
+                          fontWeight: 500,
+                          fontSize: { xs: '0.875rem', sm: '0.9375rem', md: '1rem' },
+                          px: { xs: 1, sm: 1.5 },
+                          py: 1,
+                          borderRadius: 1,
+                          transition: 'all 0.2s ease-in-out',
+                          '&:hover': {
+                            bgcolor: 'rgba(255, 255, 255, 0.1)',
+                            transform: 'translateY(-1px)',
+                          },
+                        }}
+                      >
+                        {t('navigation.blog')}
+                      </Button>
+                      <Button
+                        onClick={() => scrollToSection('testimonials')}
+                        color="inherit"
+                        sx={{
+                          textTransform: 'none',
+                          fontWeight: 500,
+                          fontSize: { xs: '0.875rem', sm: '0.9375rem', md: '1rem' },
+                          px: { xs: 1, sm: 1.5 },
+                          py: 1,
+                          borderRadius: 1,
+                          transition: 'all 0.2s ease-in-out',
+                          '&:hover': {
+                            bgcolor: 'rgba(255, 255, 255, 0.1)',
+                            transform: 'translateY(-1px)',
+                          },
+                        }}
+                      >
+                        {t('navigation.testimonials')}
+                      </Button>
+                      <Button
+                        onClick={() => scrollToSection('contact')}
+                        color="inherit"
+                        sx={{
+                          textTransform: 'none',
+                          fontWeight: 500,
+                          fontSize: { xs: '0.875rem', sm: '0.9375rem', md: '1rem' },
+                          px: { xs: 1, sm: 1.5 },
+                          py: 1,
+                          borderRadius: 1,
+                          transition: 'all 0.2s ease-in-out',
+                          '&:hover': {
+                            bgcolor: 'rgba(255, 255, 255, 0.1)',
+                            transform: 'translateY(-1px)',
+                          },
+                        }}
+                      >
+                        {t('navigation.contact')}
+                      </Button>
+                    </>
+                  ) : (
+                    <>
+                      <Button
+                        component={Link}
+                        to="/"
+                        color="inherit"
+                        sx={{
+                          textTransform: 'none',
+                          fontWeight: 500,
+                          fontSize: { xs: '0.875rem', sm: '0.9375rem', md: '1rem' },
+                          px: { xs: 1, sm: 1.5 },
+                          py: 1,
+                          borderRadius: 1,
+                          transition: 'all 0.2s ease-in-out',
+                          '&:hover': {
+                            bgcolor: 'rgba(255, 255, 255, 0.1)',
+                            transform: 'translateY(-1px)',
+                          },
+                        }}
+                      >
+                        {t('navigation.home')}
+                      </Button>
+                      <Button
+                        onClick={handleAboutMeOpen}
+                        color="inherit"
+                        sx={{
+                          textTransform: 'none',
+                          fontWeight: 500,
+                          fontSize: { xs: '0.875rem', sm: '0.9375rem', md: '1rem' },
+                          px: { xs: 1, sm: 1.5 },
+                          py: 1,
+                          borderRadius: 1,
+                          transition: 'all 0.2s ease-in-out',
+                          '&:hover': {
+                            bgcolor: 'rgba(255, 255, 255, 0.1)',
+                            transform: 'translateY(-1px)',
+                          },
+                        }}
+                      >
+                        {t('navigation.about')}
+                      </Button>
+                    </>
+                  )}
 
-              </>
-            )}
+                </>
+              )}
             </Stack>
           </Box>
 
@@ -725,7 +723,7 @@ const AppLayout = ({ children }) => {
                 color="inherit"
                 size="medium"
                 aria-label="language selector"
-                sx={{ 
+                sx={{
                   transition: 'all 0.2s ease-in-out',
                   '&:hover': {
                     bgcolor: 'rgba(255, 255, 255, 0.1)',
@@ -750,13 +748,13 @@ const AppLayout = ({ children }) => {
                 horizontal: 'right',
               }}
             >
-              <MenuItem 
+              <MenuItem
                 onClick={() => handleLanguageChange('ru')}
                 selected={i18n.language === 'ru'}
               >
                 <ListItemText>Русский</ListItemText>
               </MenuItem>
-              <MenuItem 
+              <MenuItem
                 onClick={() => handleLanguageChange('en')}
                 selected={i18n.language === 'en'}
               >
@@ -994,7 +992,7 @@ const AppLayout = ({ children }) => {
                   color="inherit"
                   size="medium"
                   aria-label="login"
-                  sx={{ 
+                  sx={{
                     transition: 'all 0.2s ease-in-out',
                     '&:hover': {
                       bgcolor: 'rgba(255, 255, 255, 0.1)',
