@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { setToken } from '../utils/api';
@@ -16,44 +16,127 @@ import {
   Checkbox,
   FormControlLabel,
   Typography,
+  IconButton,
+  Tooltip,
 } from '@mui/material';
+import ErrorOutlineIcon from '@mui/icons-material/ErrorOutline';
 
 const SignUpModal = ({ open, onClose, onSwitchToLogin }) => {
   const { t } = useTranslation();
   const navigate = useNavigate();
+  const [agreements, setAgreements] = useState({});
+  const [agreementsLoading, setAgreementsLoading] = useState(false);
+  const [agreementsError, setAgreementsError] = useState('');
   const [formData, setFormData] = useState({
+    firstName: '',
+    lastName: '',
+    phoneNumber: '',
     email: '',
     password: '',
     confirmPassword: '',
-    firstName: '',
-    lastName: '',
-    agreedPersonal: false,
-    agreedPsy: false,
   });
   const [errors, setErrors] = useState({
+    firstName: '',
+    lastName: '',
+    phoneNumber: '',
     email: '',
     password: '',
     confirmPassword: '',
-    firstName: '',
-    lastName: '',
-    agreedPersonal: '',
-    agreedPsy: '',
   });
   const [loading, setLoading] = useState(false);
   const [submitError, setSubmitError] = useState('');
   const [success, setSuccess] = useState(false);
+
+  // Fetch agreements when modal opens
+  useEffect(() => {
+    const fetchAgreements = async () => {
+      if (!open) return;
+
+      try {
+        setAgreementsLoading(true);
+        setAgreementsError('');
+
+        const response = await fetch('/api/v1/public/agreements/dictionary');
+
+        if (!response.ok) {
+          throw new Error('Failed to load agreements');
+        }
+
+        const data = await response.json();
+        // data is now a List<AgreementDictionaryItem> with { id: UUID, name: string, slug: string }
+        setAgreements(data);
+
+        // Initialize form data with agreement checkboxes
+        const agreementFields = {};
+        data.forEach(agreement => {
+          agreementFields[`agreed_${agreement.id}`] = false;
+        });
+        setFormData(prev => ({ ...prev, ...agreementFields }));
+
+        // Initialize errors for agreement fields
+        const agreementErrors = {};
+        data.forEach(agreement => {
+          agreementErrors[`agreed_${agreement.id}`] = '';
+        });
+        setErrors(prev => ({ ...prev, ...agreementErrors }));
+      } catch (err) {
+        console.error('Error fetching agreements:', err);
+        setAgreementsError(err.message || 'Failed to load agreements');
+      } finally {
+        setAgreementsLoading(false);
+      }
+    };
+
+    fetchAgreements();
+  }, [open]);
 
   const validateEmail = (email) => {
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     return emailRegex.test(email);
   };
 
+  const validatePhoneNumber = (phoneNumber) => {
+    // International format: starts with + followed by digits only
+    const phoneRegex = /^\+?[0-9]+$/;
+    return phoneRegex.test(phoneNumber) && phoneNumber.replace(/[^0-9]/g, '').length >= 10;
+  };
+
+  // Check if all mandatory fields are filled
+  const isFormValid = () => {
+    const hasFirstName = formData.firstName.trim().length > 0;
+    const hasLastName = formData.lastName.trim().length > 0;
+    const hasPhoneNumber = formData.phoneNumber.trim().length > 0;
+    const hasEmail = formData.email.trim().length > 0;
+    const hasPassword = formData.password.trim().length > 0;
+    const hasConfirmPassword = formData.confirmPassword.trim().length > 0;
+
+    // Check if all agreements are checked
+    const allAgreementsChecked = Array.isArray(agreements) && agreements.every(agreement => {
+      const fieldName = `agreed_${agreement.id}`;
+      return formData[fieldName] === true;
+    });
+
+    return hasFirstName && hasLastName && hasPhoneNumber && hasEmail &&
+      hasPassword && hasConfirmPassword && allAgreementsChecked;
+  };
+
   const handleChange = (e) => {
     const { name, value } = e.target;
-    setFormData((prev) => ({
-      ...prev,
-      [name]: value,
-    }));
+
+    // For phone number, allow only digits and + symbol
+    if (name === 'phoneNumber') {
+      const sanitizedValue = value.replace(/[^0-9+]/g, '');
+      setFormData((prev) => ({
+        ...prev,
+        [name]: sanitizedValue,
+      }));
+    } else {
+      setFormData((prev) => ({
+        ...prev,
+        [name]: value,
+      }));
+    }
+
     // Clear error when user starts typing
     if (errors[name]) {
       setErrors((prev) => ({
@@ -82,16 +165,43 @@ const SignUpModal = ({ open, onClose, onSwitchToLogin }) => {
 
   const validateForm = () => {
     const newErrors = {
+      firstName: '',
+      lastName: '',
+      phoneNumber: '',
       email: '',
       password: '',
       confirmPassword: '',
-      firstName: '',
-      lastName: '',
-      agreedPersonal: '',
-      agreedPsy: '',
     };
     let isValid = true;
 
+    // Validate firstName (required)
+    if (!formData.firstName.trim()) {
+      newErrors.firstName = t('auth.firstNameRequired');
+      isValid = false;
+    } else if (formData.firstName.length > 100) {
+      newErrors.firstName = t('auth.firstNameMaxLength');
+      isValid = false;
+    }
+
+    // Validate lastName (required)
+    if (!formData.lastName.trim()) {
+      newErrors.lastName = t('auth.lastNameRequired');
+      isValid = false;
+    } else if (formData.lastName.length > 100) {
+      newErrors.lastName = t('auth.lastNameMaxLength');
+      isValid = false;
+    }
+
+    // Validate phoneNumber (required)
+    if (!formData.phoneNumber.trim()) {
+      newErrors.phoneNumber = t('auth.phoneNumberRequired');
+      isValid = false;
+    } else if (!validatePhoneNumber(formData.phoneNumber)) {
+      newErrors.phoneNumber = t('auth.phoneNumberInvalid');
+      isValid = false;
+    }
+
+    // Validate email
     if (!formData.email.trim()) {
       newErrors.email = t('auth.emailRequired');
       isValid = false;
@@ -100,6 +210,7 @@ const SignUpModal = ({ open, onClose, onSwitchToLogin }) => {
       isValid = false;
     }
 
+    // Validate password
     if (!formData.password.trim()) {
       newErrors.password = t('auth.passwordRequired');
       isValid = false;
@@ -108,6 +219,7 @@ const SignUpModal = ({ open, onClose, onSwitchToLogin }) => {
       isValid = false;
     }
 
+    // Validate confirmPassword
     if (!formData.confirmPassword.trim()) {
       newErrors.confirmPassword = t('auth.confirmPasswordRequired');
       isValid = false;
@@ -116,29 +228,16 @@ const SignUpModal = ({ open, onClose, onSwitchToLogin }) => {
       isValid = false;
     }
 
-    if (formData.firstName && formData.firstName.length > 100) {
-      newErrors.firstName = t('auth.firstNameMaxLength');
-      isValid = false;
+    // Validate dynamic agreements
+    if (Array.isArray(agreements)) {
+      agreements.forEach(agreement => {
+        const fieldName = `agreed_${agreement.id}`;
+        if (!formData[fieldName]) {
+          newErrors[fieldName] = t('auth.agreementRequired', `You must agree to ${agreement.name}`);
+          isValid = false;
+        }
+      });
     }
-
-    if (formData.lastName && formData.lastName.length > 100) {
-      newErrors.lastName = t('auth.lastNameMaxLength');
-      isValid = false;
-    }
-
-    if (!formData.agreedPersonal) {
-      newErrors.agreedPersonal = t('auth.agreePersonalRequired', 'You must agree to the processing of personal data');
-      isValid = false;
-    }
-
-    if (!formData.agreedPsy) {
-      newErrors.agreedPsy = t('auth.agreePsyRequired', 'You must agree to the informed voluntary consent');
-      isValid = false;
-    }
-
-
-
-
 
     setErrors(newErrors);
     return isValid;
@@ -156,16 +255,27 @@ const SignUpModal = ({ open, onClose, onSwitchToLogin }) => {
     setLoading(true);
 
     try {
+      // Build signedAgreements map: Map<UUID, Boolean>
+      const signedAgreements = {};
+      if (Array.isArray(agreements)) {
+        agreements.forEach(agreement => {
+          const fieldName = `agreed_${agreement.id}`;
+          signedAgreements[agreement.id] = formData[fieldName] || false;
+        });
+      }
+
       const response = await fetch('/api/v1/auth/registry', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
+          firstName: formData.firstName.trim(),
+          lastName: formData.lastName.trim(),
+          phoneNumber: formData.phoneNumber.trim(),
           email: formData.email.trim(),
           password: formData.password,
-          firstName: formData.firstName.trim() || null,
-          lastName: formData.lastName.trim() || null,
+          signedAgreements: signedAgreements,
         }),
       });
 
@@ -190,9 +300,9 @@ const SignUpModal = ({ open, onClose, onSwitchToLogin }) => {
 
       // After successful signup, detect timezone and send user settings
       try {
-        // Detect browser timezone
-        const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
-        const language = 'english';
+        // Hardcoded timezone and language for all signups
+        const timezone = 'Europe/Moscow';
+        const language = 'ru';
 
         // Prepare settings request
         const settingsOptions = {
@@ -224,6 +334,35 @@ const SignUpModal = ({ open, onClose, onSwitchToLogin }) => {
       setSuccess(true);
       // Close modal after 2 seconds
       setTimeout(() => {
+        // Reset form data before closing to prevent autocomplete issues
+        const resetData = {
+          firstName: '',
+          lastName: '',
+          phoneNumber: '',
+          email: '',
+          password: '',
+          confirmPassword: '',
+        };
+
+        // Reset agreement fields
+        if (Array.isArray(agreements)) {
+          agreements.forEach(agreement => {
+            resetData[`agreed_${agreement.id}`] = false;
+          });
+        }
+
+        setFormData(resetData);
+        setErrors({
+          firstName: '',
+          lastName: '',
+          phoneNumber: '',
+          email: '',
+          password: '',
+          confirmPassword: '',
+        });
+        setSubmitError('');
+        setSuccess(false);
+
         onClose();
         // If token is available, user is logged in, redirect to booking
         if (signupToken) {
@@ -244,20 +383,43 @@ const SignUpModal = ({ open, onClose, onSwitchToLogin }) => {
 
   const handleClose = () => {
     if (!loading && !success) {
-      setFormData({
+      // Reset basic form data
+      const resetData = {
+        firstName: '',
+        lastName: '',
+        phoneNumber: '',
         email: '',
         password: '',
         confirmPassword: '',
+      };
+
+      // Reset agreement fields
+      if (Array.isArray(agreements)) {
+        agreements.forEach(agreement => {
+          resetData[`agreed_${agreement.id}`] = false;
+        });
+      }
+
+      setFormData(resetData);
+
+      // Reset basic errors
+      const resetErrors = {
         firstName: '',
         lastName: '',
-      });
-      setErrors({
+        phoneNumber: '',
         email: '',
         password: '',
         confirmPassword: '',
-        firstName: '',
-        lastName: '',
-      });
+      };
+
+      // Reset agreement errors
+      if (Array.isArray(agreements)) {
+        agreements.forEach(agreement => {
+          resetErrors[`agreed_${agreement.id}`] = '';
+        });
+      }
+
+      setErrors(resetErrors);
       setSubmitError('');
       setSuccess(false);
       onClose();
@@ -268,10 +430,6 @@ const SignUpModal = ({ open, onClose, onSwitchToLogin }) => {
     <Dialog open={open} onClose={handleClose} maxWidth="sm" fullWidth>
       <DialogTitle>{t('auth.signUpTitle')}</DialogTitle>
       <DialogContent>
-        <DialogContentText sx={{ mb: 2 }}>
-          {t('auth.signUpDescription')}
-        </DialogContentText>
-
         {success && (
           <Alert severity="success" sx={{ mb: 2 }}>
             {t('auth.accountCreatedSuccess')}
@@ -287,54 +445,6 @@ const SignUpModal = ({ open, onClose, onSwitchToLogin }) => {
         <Box component="form" onSubmit={handleSubmit} noValidate>
           <TextField
             fullWidth
-            id="email"
-            name="email"
-            label={t('auth.email')}
-            type="email"
-            value={formData.email}
-            onChange={handleChange}
-            error={!!errors.email}
-            helperText={errors.email}
-            margin="normal"
-            required
-            autoComplete="email"
-            disabled={loading || success}
-          />
-
-          <TextField
-            fullWidth
-            id="password"
-            name="password"
-            label={t('auth.password')}
-            type="password"
-            value={formData.password}
-            onChange={handleChange}
-            error={!!errors.password}
-            helperText={errors.password}
-            margin="normal"
-            required
-            autoComplete="new-password"
-            disabled={loading || success}
-          />
-
-          <TextField
-            fullWidth
-            id="confirmPassword"
-            name="confirmPassword"
-            label={t('auth.confirmPassword')}
-            type="password"
-            value={formData.confirmPassword}
-            onChange={handleChange}
-            error={!!errors.confirmPassword}
-            helperText={errors.confirmPassword}
-            margin="normal"
-            required
-            autoComplete="new-password"
-            disabled={loading || success}
-          />
-
-          <TextField
-            fullWidth
             id="firstName"
             name="firstName"
             label={t('auth.firstName')}
@@ -342,11 +452,21 @@ const SignUpModal = ({ open, onClose, onSwitchToLogin }) => {
             value={formData.firstName}
             onChange={handleChange}
             error={!!errors.firstName}
-            helperText={errors.firstName || t('common.optional')}
             margin="normal"
+            required
             autoComplete="given-name"
             disabled={loading || success}
+            variant="outlined"
             inputProps={{ maxLength: 100 }}
+            InputProps={{
+              endAdornment: errors.firstName && (
+                <Tooltip title={errors.firstName} arrow placement="top">
+                  <IconButton size="small" edge="end" color="error">
+                    <ErrorOutlineIcon />
+                  </IconButton>
+                </Tooltip>
+              ),
+            }}
           />
 
           <TextField
@@ -358,57 +478,180 @@ const SignUpModal = ({ open, onClose, onSwitchToLogin }) => {
             value={formData.lastName}
             onChange={handleChange}
             error={!!errors.lastName}
-            helperText={errors.lastName || t('common.optional')}
             margin="normal"
+            required
             autoComplete="family-name"
             disabled={loading || success}
+            variant="outlined"
             inputProps={{ maxLength: 100 }}
+            InputProps={{
+              endAdornment: errors.lastName && (
+                <Tooltip title={errors.lastName} arrow placement="top">
+                  <IconButton size="small" edge="end" color="error">
+                    <ErrorOutlineIcon />
+                  </IconButton>
+                </Tooltip>
+              ),
+            }}
+          />
+
+          <TextField
+            fullWidth
+            id="phoneNumber"
+            name="phoneNumber"
+            label={t('auth.phoneNumber')}
+            type="tel"
+            value={formData.phoneNumber}
+            onChange={handleChange}
+            error={!!errors.phoneNumber}
+            margin="normal"
+            required
+            autoComplete="tel"
+            disabled={loading || success}
+            variant="outlined"
+            placeholder="+1234567890"
+            InputProps={{
+              endAdornment: errors.phoneNumber && (
+                <Tooltip title={errors.phoneNumber} arrow placement="top">
+                  <IconButton size="small" edge="end" color="error">
+                    <ErrorOutlineIcon />
+                  </IconButton>
+                </Tooltip>
+              ),
+            }}
+          />
+
+          <TextField
+            fullWidth
+            id="email"
+            name="email"
+            label={t('auth.email')}
+            type="email"
+            value={formData.email}
+            onChange={handleChange}
+            error={!!errors.email}
+            margin="normal"
+            required
+            autoComplete="email"
+            disabled={loading || success}
+            variant="outlined"
+            InputProps={{
+              endAdornment: errors.email && (
+                <Tooltip title={errors.email} arrow placement="top">
+                  <IconButton size="small" edge="end" color="error">
+                    <ErrorOutlineIcon />
+                  </IconButton>
+                </Tooltip>
+              ),
+            }}
+          />
+
+          <TextField
+            fullWidth
+            id="password"
+            name="password"
+            label={t('auth.password')}
+            type="password"
+            value={formData.password}
+            onChange={handleChange}
+            error={!!errors.password}
+            margin="normal"
+            required
+            autoComplete="new-password"
+            disabled={loading || success}
+            variant="outlined"
+            InputProps={{
+              endAdornment: errors.password && (
+                <Tooltip title={errors.password} arrow placement="top">
+                  <IconButton size="small" edge="end" color="error">
+                    <ErrorOutlineIcon />
+                  </IconButton>
+                </Tooltip>
+              ),
+            }}
+          />
+
+          <TextField
+            fullWidth
+            id="confirmPassword"
+            name="confirmPassword"
+            label={t('auth.confirmPassword')}
+            type="password"
+            value={formData.confirmPassword}
+            onChange={handleChange}
+            error={!!errors.confirmPassword}
+            margin="normal"
+            required
+            autoComplete="new-password"
+            disabled={loading || success}
+            variant="outlined"
+            InputProps={{
+              endAdornment: errors.confirmPassword && (
+                <Tooltip title={errors.confirmPassword} arrow placement="top">
+                  <IconButton size="small" edge="end" color="error">
+                    <ErrorOutlineIcon />
+                  </IconButton>
+                </Tooltip>
+              ),
+            }}
           />
 
           <Box sx={{ mt: 2 }}>
-            <FormControlLabel
-              control={
-                <Checkbox
-                  checked={formData.agreedPersonal}
-                  onChange={handleCheckboxChange}
-                  name="agreedPersonal"
-                  color="primary"
-                  disabled={loading || success}
-                />
-              }
-              label={
-                <Typography variant="body2">
-                  {t('auth.agreePersonalData', 'I agree to the')} <MuiLink component={Link} to="/agreement/personal" target="_blank">{t('auth.agreementPersonalData', 'Agreement on Personal Data Processing')}</MuiLink>
-                </Typography>
-              }
-            />
-            {errors.agreedPersonal && (
-              <Typography variant="caption" color="error" display="block">
-                {errors.agreedPersonal}
-              </Typography>
+            {agreementsLoading && (
+              <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
+                <CircularProgress size={20} sx={{ mr: 1 }} />
+                <Typography variant="body2">{t('auth.loadingAgreements', 'Loading agreements...')}</Typography>
+              </Box>
             )}
 
-            <FormControlLabel
-              control={
-                <Checkbox
-                  checked={formData.agreedPsy}
-                  onChange={handleCheckboxChange}
-                  name="agreedPsy"
-                  color="primary"
-                  disabled={loading || success}
-                />
-              }
-              label={
-                <Typography variant="body2">
-                  {t('auth.agreeInformedConsent', 'I agree to the')} <MuiLink component={Link} to="/agreement/psy" target="_blank">{t('auth.informedConsent', 'Informed Voluntary Consent to Psychological Help')}</MuiLink>
-                </Typography>
-              }
-            />
-            {errors.agreedPsy && (
-              <Typography variant="caption" color="error" display="block">
-                {errors.agreedPsy}
-              </Typography>
+            {agreementsError && (
+              <Alert severity="error" sx={{ mb: 2 }}>
+                {agreementsError}
+              </Alert>
             )}
+
+            {!agreementsLoading && Array.isArray(agreements) && agreements.length === 0 && !agreementsError && (
+              <Alert severity="warning" sx={{ mb: 2 }}>
+                {t('auth.noAgreementsAvailable', 'No agreements available')}
+              </Alert>
+            )}
+
+            {Array.isArray(agreements) && agreements.map((agreement) => {
+              const fieldName = `agreed_${agreement.id}`;
+              return (
+                <Box key={agreement.id}>
+                  <FormControlLabel
+                    control={
+                      <Checkbox
+                        checked={formData[fieldName] || false}
+                        onChange={handleCheckboxChange}
+                        name={fieldName}
+                        color="primary"
+                        disabled={loading || success || agreementsLoading}
+                      />
+                    }
+                    label={
+                      <Typography variant="body2">
+                        {t('auth.agreeToThe', 'I agree to the')}{' '}
+                        <MuiLink
+                          href={`/agreement/${agreement.slug}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          onClick={(e) => e.stopPropagation()}
+                        >
+                          {agreement.name}
+                        </MuiLink>
+                      </Typography>
+                    }
+                  />
+                  {errors[fieldName] && (
+                    <Typography variant="caption" color="error" display="block">
+                      {errors[fieldName]}
+                    </Typography>
+                  )}
+                </Box>
+              );
+            })}
           </Box>
 
           <Button
@@ -417,7 +660,7 @@ const SignUpModal = ({ open, onClose, onSwitchToLogin }) => {
             variant="contained"
             color="primary"
             sx={{ mt: 3, mb: 2 }}
-            disabled={loading || success}
+            disabled={loading || success || !isFormValid()}
           >
             {loading ? (
               <>

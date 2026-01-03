@@ -52,6 +52,7 @@
     "confirmPassword": "Confirm Password",
     "firstName": "First Name",
     "lastName": "Last Name",
+    "phoneNumber": "Phone Number",
     "forgotPassword": "Forgot password?",
     "forgotPasswordTitle": "Forgot Password",
     "forgotPasswordDescription": "Enter your email address and we'll send you a link to reset your password.",
@@ -67,7 +68,11 @@
     "confirmPasswordRequired": "Please confirm your password",
     "passwordsDoNotMatch": "Passwords do not match",
     "firstNameMaxLength": "First name must be at most 100 characters",
+    "firstNameRequired": "First name is required",
     "lastNameMaxLength": "Last name must be at most 100 characters",
+    "lastNameRequired": "Last name is required",
+    "phoneNumberRequired": "Phone number is required",
+    "phoneNumberInvalid": "Phone number must be in international format (e.g., +1234567890)",
     "loginFailed": "Failed to login. Please try again.",
     "signUpFailed": "Failed to sign up. Please try again.",
     "sending": "Sending...",
@@ -77,7 +82,11 @@
     "signUpDescription": "Create a new account to get started",
     "accountCreatedSuccess": "Account created successfully!",
     "creatingAccount": "Creating Account...",
-    "signIn": "Sign in"
+    "signIn": "Sign in",
+    "agreeToThe": "I agree to the",
+    "loadingAgreements": "Loading agreements...",
+    "noAgreementsAvailable": "No agreements available",
+    "agreementRequired": "You must agree to this agreement"
   },
   "userMenu": {
     "myProfile": "My Profile",
@@ -122,6 +131,7 @@
       "sessionTypeNotFound": "Session type is no longer available for booking.",
       "failedToLoadSessionTypes": "Failed to load session types.",
       "failedToLoadSessionTypesRetry": "Failed to load session types. Please try again.",
+      "slotsTimezone": "Slots are shown in {{timezone}}",
       "message": "Message:",
       "created": "Created:",
       "past": "Past",
@@ -165,6 +175,9 @@
       "firstName": "First name",
       "lastName": "Last name",
       "email": "Email",
+      "phoneNumber": "Phone number",
+      "phoneNumberRequired": "Phone number is required",
+      "phoneNumberInvalid": "Phone number must be in international format (e.g., +1234567890)",
       "timezone": "Timezone",
       "timezoneDescription": "Your timezone preference for viewing and booking sessions.",
       "timezoneRequired": "Timezone is required",
@@ -175,6 +188,37 @@
       "currency": "Currency",
       "currencyRequired": "Currency is required",
       "currencyInvalid": "Currency must be one of: RUB, TENGE, USD",
+      "currencies": {
+        "RUB": "Rubles",
+        "TENGE": "Tenge",
+        "USD": "USD"
+      },
+      "timezones": {
+        "UTC": "UTC",
+        "Europe/London": "Europe/London",
+        "Europe/Paris": "Europe/Paris",
+        "Europe/Berlin": "Europe/Berlin",
+        "Europe/Athens": "Europe/Athens",
+        "Europe/Moscow": "Europe/Moscow",
+        "Asia/Dubai": "Asia/Dubai",
+        "Asia/Tashkent": "Asia/Tashkent",
+        "Asia/Kolkata": "Asia/Kolkata",
+        "Asia/Dhaka": "Asia/Dhaka",
+        "Asia/Bangkok": "Asia/Bangkok",
+        "Asia/Singapore": "Asia/Singapore",
+        "Asia/Shanghai": "Asia/Shanghai",
+        "Asia/Tokyo": "Asia/Tokyo",
+        "Australia/Sydney": "Australia/Sydney",
+        "Pacific/Auckland": "Pacific/Auckland",
+        "America/Honolulu": "America/Honolulu",
+        "America/Anchorage": "America/Anchorage",
+        "America/Los_Angeles": "America/Los Angeles",
+        "America/Denver": "America/Denver",
+        "America/Chicago": "America/Chicago",
+        "America/New_York": "America/New York",
+        "America/Caracas": "America/Caracas",
+        "America/Sao_Paulo": "America/São Paulo"
+      },
       "emailNotifications": "Email notifications",
       "emailNotificationDescription": "Receive email notifications about your bookings and account updates.",
       "save": "Save",
@@ -301,7 +345,11 @@
       "timezoneMaxLength": "Timezone must be at most 50 characters",
       "firstNameMaxLength": "First name must be at most 100 characters",
       "lastNameMaxLength": "Last name must be at most 100 characters",
-      "failedToCreateClient": "Failed to create client. Please try again."
+      "failedToCreateClient": "Failed to create client. Please try again.",
+      "startTime": "Start Time",
+      "endTime": "End Time",
+      "createdAt": "Created At",
+      "pageSize": "Items per page"
     },
     "bookingsManagement": {
       "title": "Bookings Management",
@@ -561,6 +609,22 @@
         "hours": "hours",
         "hour": "hour"
       },
+      "userAgreements": {
+        "title": "User Agreements",
+        "addAgreement": "Add Agreement",
+        "editAgreement": "Edit Agreement",
+        "newAgreement": "New Agreement",
+        "name": "Name",
+        "slug": "Slug",
+        "slugValidationError": "Slug can only contain letters, numbers, and hyphens",
+        "content": "Content",
+        "failedToSave": "Failed to save agreement",
+        "failedToDelete": "Failed to delete agreement",
+        "confirmDelete": "Are you sure you want to delete this agreement?",
+        "noAgreementsFound": "No agreements found.",
+        "lastUpdated": "Last updated: {{date}}",
+        "version": "Version: {{version}}"
+      },
       "availabilityRules": {
         "title": "Availability Rules",
         "addRule": "Add Rule",
@@ -766,4 +830,3 @@
     }
   }
 }
-

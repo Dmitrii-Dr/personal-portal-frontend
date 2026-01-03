@@ -82,7 +82,7 @@ const LandingPage = () => {
   const [welcomeData, setWelcomeData] = useState(null);
   const [welcomeLoading, setWelcomeLoading] = useState(true);
   const [welcomeError, setWelcomeError] = useState(null);
-  
+
   // Image URLs state
   const [welcomeImageUrl, setWelcomeImageUrl] = useState(null);
   const [aboutImageUrl, setAboutImageUrl] = useState(null);
@@ -91,7 +91,7 @@ const LandingPage = () => {
   const [reviewCarouselIndex, setReviewCarouselIndex] = useState(0);
   const [sessionTypesCarouselIndex, setSessionTypesCarouselIndex] = useState(0);
   const educationRef = useRef(null);
-  
+
   // Session types state
   const [sessionTypes, setSessionTypes] = useState([]);
   const [loadingSessionTypes, setLoadingSessionTypes] = useState(true);
@@ -129,10 +129,10 @@ const LandingPage = () => {
   // Load image from mediaId with caching
   const loadImage = async (mediaId, type) => {
     if (!mediaId) return;
-    
+
     try {
       const objectUrl = await loadImageWithCache(mediaId);
-      
+
       if (type === 'welcome') {
         setWelcomeImageUrl(objectUrl);
       } else if (type === 'about') {
@@ -154,22 +154,22 @@ const LandingPage = () => {
       try {
         setWelcomeLoading(true);
         setWelcomeError(null);
-        
+
         const response = await apiClient.get('/api/v1/public/welcome', {
           signal: controller.signal,
           timeout: 10000,
         });
-        
+
         if (!isMounted) return;
-        
+
         const data = response.data;
-        
+
         setWelcomeData(data);
         // Set about-me data from welcome response for backward compatibility
         if (data.aboutMessage) {
           setAboutMeData(data.aboutMessage);
         }
-        
+
         // Load images if mediaIds exist
         if (data.welcomeMediaId) {
           loadImage(data.welcomeMediaId, 'welcome').catch(err => {
@@ -186,11 +186,11 @@ const LandingPage = () => {
             console.error('Error loading education image:', err);
           });
         }
-        
+
         // Load review images if reviewMediaIds exist
         if (data.reviewMediaIds && Array.isArray(data.reviewMediaIds) && data.reviewMediaIds.length > 0) {
           const loadReviewImages = async () => {
-            const imagePromises = data.reviewMediaIds.map(mediaId => 
+            const imagePromises = data.reviewMediaIds.map(mediaId =>
               loadImageWithCache(mediaId).catch(err => {
                 console.error(`Error loading review image ${mediaId}:`, err);
                 return null;
@@ -203,7 +203,7 @@ const LandingPage = () => {
           };
           loadReviewImages();
         }
-        
+
         // Load contact links if available
         if (data.contact && Array.isArray(data.contact)) {
           setContactLinks(data.contact);
@@ -235,16 +235,16 @@ const LandingPage = () => {
       } catch (error) {
         // Don't set error if request was aborted
         if (
-          error.name === 'AbortError' || 
-          error.name === 'CanceledError' || 
+          error.name === 'AbortError' ||
+          error.name === 'CanceledError' ||
           error.code === 'ERR_CANCELED' ||
           (error.message && error.message.includes('canceled'))
         ) {
           return;
         }
-        
+
         if (!isMounted) return;
-        
+
         console.error('Error fetching welcome data:', error);
         let errorMessage = 'Failed to load welcome information';
         if (error.response?.data?.message) {
@@ -259,7 +259,7 @@ const LandingPage = () => {
         }
       }
     };
-    
+
     fetchWelcomeData();
 
     return () => {
@@ -277,14 +277,14 @@ const LandingPage = () => {
       try {
         setLoadingSessionTypes(true);
         setSessionTypesError(null);
-        
+
         const response = await apiClient.get('/api/v1/public/session/type', {
           signal: controller.signal,
           timeout: 10000,
         });
-        
+
         if (!isMounted) return;
-        
+
         if (response.data && Array.isArray(response.data)) {
           setSessionTypes(response.data);
           // Set first session type as default if available
@@ -297,16 +297,16 @@ const LandingPage = () => {
       } catch (error) {
         // Don't set error if request was aborted
         if (
-          error.name === 'AbortError' || 
-          error.name === 'CanceledError' || 
+          error.name === 'AbortError' ||
+          error.name === 'CanceledError' ||
           error.code === 'ERR_CANCELED' ||
           (error.message && error.message.includes('canceled'))
         ) {
           return;
         }
-        
+
         if (!isMounted) return;
-        
+
         console.error('Error fetching session types:', error);
         let errorMessage = 'Failed to load session types';
         if (error.response?.data?.message) {
@@ -322,7 +322,7 @@ const LandingPage = () => {
         }
       }
     };
-    
+
     fetchSessionTypes();
 
     return () => {
@@ -352,7 +352,7 @@ const LandingPage = () => {
         const response = await apiClient.get(`/api/v1/public/articles?id=${articleIds}`, {
           timeout: 10000,
         });
-        
+
         if (response.data && Array.isArray(response.data)) {
           setBlogArticles(response.data);
         } else {
@@ -427,7 +427,7 @@ const LandingPage = () => {
             background: 'linear-gradient(135deg, rgba(44, 95, 95, 0.3) 0%, rgba(31, 69, 69, 0.4) 100%)',
             zIndex: 0,
           } : {},
-          background: welcomeImageUrl 
+          background: welcomeImageUrl
             ? 'transparent'
             : 'linear-gradient(135deg, #2C5F5F 0%, #1F4545 100%)',
         }}
@@ -485,13 +485,13 @@ const LandingPage = () => {
               <Box sx={{ maxWidth: '600px' }}>
                 {/* Header with line above */}
                 <Box sx={{ mb: 3 }}>
-                  <Divider 
-                    sx={{ 
-                      width: '60px', 
-                      height: '2px', 
+                  <Divider
+                    sx={{
+                      width: '60px',
+                      height: '2px',
                       bgcolor: 'black',
                       mb: 2,
-                    }} 
+                    }}
                   />
                   <Typography
                     variant="h2"
@@ -715,13 +715,13 @@ const LandingPage = () => {
               <Box sx={{ maxWidth: '600px', mx: { xs: 'auto', md: 0 } }}>
                 {/* Header with line above */}
                 <Box sx={{ mb: 3 }}>
-                  <Divider 
-                    sx={{ 
-                      width: '60px', 
-                      height: '2px', 
+                  <Divider
+                    sx={{
+                      width: '60px',
+                      height: '2px',
                       bgcolor: 'black',
                       mb: 2,
-                    }} 
+                    }}
                   />
                   <Typography
                     variant="h2"
@@ -942,9 +942,9 @@ const LandingPage = () => {
                     {Array.from({ length: Math.min(3, sessionTypes.length) }).map((_, frameIndex) => {
                       const sessionTypeIndex = sessionTypesCarouselIndex + frameIndex;
                       const sessionType = sessionTypes[sessionTypeIndex];
-                      
+
                       if (!sessionType) return null;
-                      
+
                       return (
                         <Grid item xs={12} md={4} key={sessionType.id || sessionType.sessionTypeId} sx={{ display: 'flex' }}>
                           <Card
@@ -983,7 +983,7 @@ const LandingPage = () => {
                                 <Typography
                                   variant="body2"
                                   color="text.secondary"
-                                  sx={{ 
+                                  sx={{
                                     mb: 1.5,
                                     flexGrow: 1,
                                     display: '-webkit-box',
@@ -1097,12 +1097,12 @@ const LandingPage = () => {
           {/* Header with line above */}
           <Box sx={{ mb: 4, textAlign: 'center' }}>
             <Box sx={{ display: 'flex', justifyContent: 'center', mb: 2 }}>
-              <Divider 
-                sx={{ 
-                  width: '60px', 
-                  height: '2px', 
+              <Divider
+                sx={{
+                  width: '60px',
+                  height: '2px',
                   bgcolor: 'black',
-                }} 
+                }}
               />
             </Box>
             <Typography
@@ -1142,10 +1142,10 @@ const LandingPage = () => {
                         // Remove HTML tags using regex
                         return html.replace(/<[^>]*>/g, '').replace(/\s+/g, ' ').trim();
                       };
-                      
+
                       const plainContent = stripHtml(article.content || '');
-                      const contentPreview = plainContent.length > 300 
-                        ? plainContent.substring(0, 300) + '...' 
+                      const contentPreview = plainContent.length > 300
+                        ? plainContent.substring(0, 300) + '...'
                         : plainContent;
 
                       return (
@@ -1265,12 +1265,12 @@ const LandingPage = () => {
             {/* Header with line above */}
             <Box sx={{ mb: 4, textAlign: 'center' }}>
               <Box sx={{ display: 'flex', justifyContent: 'center', mb: 2 }}>
-                <Divider 
-                  sx={{ 
-                    width: '60px', 
-                    height: '2px', 
+                <Divider
+                  sx={{
+                    width: '60px',
+                    height: '2px',
                     bgcolor: 'black',
-                  }} 
+                  }}
                 />
               </Box>
               <Typography
@@ -1361,7 +1361,7 @@ const LandingPage = () => {
                     {Array.from({ length: 3 }).map((_, frameIndex) => {
                       const imageIndex = reviewCarouselIndex + frameIndex;
                       const imageUrl = reviewImageUrls[imageIndex] || null;
-                      
+
                       return (
                         <Box
                           key={frameIndex}
@@ -1486,11 +1486,11 @@ const LandingPage = () => {
             zIndex: 1,
           }}
         >
-          <Typography 
-            variant="h5" 
-            component="h2" 
-            sx={{ 
-              fontWeight: 600, 
+          <Typography
+            variant="h5"
+            component="h2"
+            sx={{
+              fontWeight: 600,
               fontSize: { xs: '1.25rem', sm: '1.5rem' },
               textAlign: 'center',
               flex: 1,
@@ -1506,7 +1506,7 @@ const LandingPage = () => {
                 setSelectedSessionTypeId(null);
               }, 300);
             }}
-            sx={{ 
+            sx={{
               color: 'white',
               position: 'absolute',
               right: 8,
@@ -1519,14 +1519,15 @@ const LandingPage = () => {
             <CloseIcon />
           </IconButton>
         </DialogTitle>
-        <DialogContent 
-          dividers 
-          sx={{ 
+        <DialogContent
+          dividers
+          sx={{
             p: 0,
             overflow: 'auto',
             flex: 1,
             display: 'flex',
             flexDirection: 'column',
+            minHeight: '620px',
           }}
         >
           {/* Session Type Info Card */}
@@ -1540,11 +1541,11 @@ const LandingPage = () => {
               }}
             >
               <Box sx={{ mb: 2 }}>
-                <Typography 
-                  variant="h6" 
-                  component="h3" 
-                  gutterBottom 
-                  sx={{ 
+                <Typography
+                  variant="h6"
+                  component="h3"
+                  gutterBottom
+                  sx={{
                     fontWeight: 600,
                     color: 'text.primary',
                     mb: 1,
@@ -1553,9 +1554,9 @@ const LandingPage = () => {
                   {selectedSessionType.name}
                 </Typography>
                 {selectedSessionType.description && (
-                  <Typography 
-                    variant="body2" 
-                    sx={{ 
+                  <Typography
+                    variant="body2"
+                    sx={{
                       color: 'text.secondary',
                       lineHeight: 1.6,
                     }}
@@ -1627,8 +1628,8 @@ const LandingPage = () => {
             </Box>
           )}
           {/* Booking Form */}
-          <Box 
-            sx={{ 
+          <Box
+            sx={{
               pt: { xs: 1, sm: 1.5 },
               px: { xs: 2, sm: 3 },
               pb: { xs: 2, sm: 3 },
@@ -1677,7 +1678,7 @@ const LandingPage = () => {
           >
             {t('landing.contact.followDescription')}
           </Typography>
-          
+
           {/* Social Links */}
           <Box
             sx={{

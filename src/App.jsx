@@ -16,8 +16,7 @@ import AdminGalleryPage from './pages/AdminGalleryPage';
 import AboutMePage from './pages/AboutMePage';
 import SessionsConfigurationPage from './pages/SessionsConfigurationPage';
 import ResetPasswordPage from './pages/ResetPasswordPage';
-import AgreementPersonalPage from './pages/AgreementPersonalPage';
-import AgreementPsyPage from './pages/AgreementPsyPage';
+import AgreementPage from './pages/AgreementPage';
 import AdminRoute from './components/AdminRoute';
 import AdminRedirect from './components/AdminRedirect';
 import ErrorBoundary from './components/ErrorBoundary';
@@ -668,8 +667,7 @@ function App() {
                 <Route path="/booking" element={<BookingPage />} />
                 <Route path="/login" element={<LoginPage />} />
                 <Route path="/signup" element={<SignUpPage />} />
-                <Route path="/agreement/personal" element={<AgreementPersonalPage />} />
-                <Route path="/agreement/psy" element={<AgreementPsyPage />} />
+                <Route path="/agreement/:slug" element={<AgreementPage />} />
                 <Route path="/reset-password" element={<ResetPasswordPage />} />
                 <Route path="/profile" element={<ProfilePage />} />
                 <Route path="/about-me" element={<AboutMePage />} />

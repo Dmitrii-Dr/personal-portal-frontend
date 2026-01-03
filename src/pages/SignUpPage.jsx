@@ -181,9 +181,9 @@ const SignUpPage = () => {
 
       // After successful signup, detect timezone and send user settings
       try {
-        // Detect browser timezone
-        const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
-        const language = 'english';
+        // Hardcoded timezone and language for all signups
+        const timezone = 'Europe/Moscow';
+        const language = 'ru';
 
         // Prepare settings request
         const settingsOptions = {
