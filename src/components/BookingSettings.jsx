@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { fetchWithAuth } from '../utils/api';
+import { fetchTimezones, sortTimezonesByOffset, extractTimezoneOffset, findTimezoneIdByOffset } from '../utils/timezoneService';
 import {
   Box,
   Typography,
@@ -21,65 +22,6 @@ import EditIcon from '@mui/icons-material/Edit';
 import SaveIcon from '@mui/icons-material/Save';
 import CancelIcon from '@mui/icons-material/Cancel';
 
-// Common timezones with unique UTC offsets (one representative per offset)
-// Format: { value: timezone, offset: UTC offset, label: display name }
-const COMMON_TIMEZONES = [
-  { value: 'UTC', offset: '+00:00', label: 'UTC' },
-  { value: 'Europe/London', offset: '+00:00', label: 'Europe/London' },
-  { value: 'Europe/Paris', offset: '+01:00', label: 'Europe/Paris' },
-  { value: 'Europe/Berlin', offset: '+01:00', label: 'Europe/Berlin' },
-  { value: 'Europe/Athens', offset: '+02:00', label: 'Europe/Athens' },
-  { value: 'Europe/Moscow', offset: '+03:00', label: 'Europe/Moscow' },
-  { value: 'Asia/Dubai', offset: '+04:00', label: 'Asia/Dubai' },
-  { value: 'Asia/Tashkent', offset: '+05:00', label: 'Asia/Tashkent' },
-  { value: 'Asia/Kolkata', offset: '+05:30', label: 'Asia/Kolkata' },
-  { value: 'Asia/Dhaka', offset: '+06:00', label: 'Asia/Dhaka' },
-  { value: 'Asia/Bangkok', offset: '+07:00', label: 'Asia/Bangkok' },
-  { value: 'Asia/Singapore', offset: '+08:00', label: 'Asia/Singapore' },
-  { value: 'Asia/Shanghai', offset: '+08:00', label: 'Asia/Shanghai' },
-  { value: 'Asia/Tokyo', offset: '+09:00', label: 'Asia/Tokyo' },
-  { value: 'Australia/Sydney', offset: '+10:00', label: 'Australia/Sydney' },
-  { value: 'Pacific/Auckland', offset: '+12:00', label: 'Pacific/Auckland' },
-  { value: 'America/Honolulu', offset: '-10:00', label: 'America/Honolulu' },
-  { value: 'America/Anchorage', offset: '-09:00', label: 'America/Anchorage' },
-  { value: 'America/Los_Angeles', offset: '-08:00', label: 'America/Los_Angeles' },
-  { value: 'America/Denver', offset: '-07:00', label: 'America/Denver' },
-  { value: 'America/Chicago', offset: '-06:00', label: 'America/Chicago' },
-  { value: 'America/New_York', offset: '-05:00', label: 'America/New_York' },
-  { value: 'America/Caracas', offset: '-04:00', label: 'America/Caracas' },
-  { value: 'America/Sao_Paulo', offset: '-03:00', label: 'America/Sao_Paulo' },
-];
-
-// Group timezones by unique offset and keep only one representative per offset
-const getUniqueTimezoneOffsets = () => {
-  const offsetMap = new Map();
-  
-  COMMON_TIMEZONES.forEach((tz) => {
-    if (!offsetMap.has(tz.offset)) {
-      offsetMap.set(tz.offset, tz);
-    }
-  });
-  
-  return Array.from(offsetMap.values()).sort((a, b) => {
-    // Sort: UTC first, then positive offsets (highest first), then negative offsets (least negative first)
-    if (a.offset === '+00:00') return -1;
-    if (b.offset === '+00:00') return 1;
-    
-    const offsetA = a.offset;
-    const offsetB = b.offset;
-    
-    // Both positive or both negative
-    if ((offsetA.startsWith('+') && offsetB.startsWith('+')) || 
-        (offsetA.startsWith('-') && offsetB.startsWith('-'))) {
-      return offsetB.localeCompare(offsetA);
-    }
-    
-    // One positive, one negative
-    if (offsetA.startsWith('+')) return -1;
-    return 1;
-  });
-};
-
 const BookingSettings = () => {
   const { t } = useTranslation();
   const [settings, setSettings] = useState(null);
@@ -98,6 +40,10 @@ const BookingSettings = () => {
   });
   const [formErrors, setFormErrors] = useState({});
   const hasFetchedRef = useRef(false);
+
+  // Timezones state
+  const [timezones, setTimezones] = useState([]);
+  const [timezonesLoading, setTimezonesLoading] = useState(true);
 
   // Fetch booking settings
   const fetchSettings = async () => {
@@ -120,7 +66,7 @@ const BookingSettings = () => {
         bookingFirstSlotInterval: data.bookingFirstSlotInterval || 10,
         bookingCancelationInterval: data.bookingCancelationInterval || 0,
         bookingUpdatingInterval: data.bookingUpdatingInterval || 0,
-        defaultTimezone: data.defaultTimezone || 'UTC',
+        defaultTimezone: extractTimezoneOffset(data.defaultTimezone) || '+00:00',
       });
     } catch (err) {
       console.error('Error fetching booking settings:', err);
@@ -139,6 +85,38 @@ const BookingSettings = () => {
     fetchSettings();
   }, []);
 
+  // Fetch timezones from API
+  useEffect(() => {
+    let isMounted = true;
+
+    const loadTimezones = async () => {
+      setTimezonesLoading(true);
+
+      try {
+        const data = await fetchTimezones();
+        if (!isMounted) return;
+
+        if (data && Array.isArray(data)) {
+          const sortedTimezones = sortTimezonesByOffset(data);
+          setTimezones(sortedTimezones);
+        }
+      } catch (err) {
+        if (!isMounted) return;
+        console.error('Error fetching timezones:', err);
+      } finally {
+        if (isMounted) {
+          setTimezonesLoading(false);
+        }
+      }
+    };
+
+    loadTimezones();
+
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
   // Format minutes to readable format (hours and minutes)
   const formatMinutes = (minutes) => {
     if (minutes === 0) return `0 ${t('admin.sessionConfiguration.bookingSettings.minutes')}`;
@@ -146,10 +124,10 @@ const BookingSettings = () => {
       const minuteKey = minutes === 1 ? 'minute' : 'minutes';
       return `${minutes} ${t(`admin.sessionConfiguration.bookingSettings.${minuteKey}`)}`;
     }
-    
+
     const hours = Math.floor(minutes / 60);
     const remainingMinutes = minutes % 60;
-    
+
     const hourKey = hours === 1 ? 'hour' : 'hours';
     let result = `${hours} ${t(`admin.sessionConfiguration.bookingSettings.${hourKey}`)}`;
     if (remainingMinutes > 0) {
@@ -178,7 +156,7 @@ const BookingSettings = () => {
         bookingFirstSlotInterval: settings.bookingFirstSlotInterval || 10,
         bookingCancelationInterval: settings.bookingCancelationInterval || 0,
         bookingUpdatingInterval: settings.bookingUpdatingInterval || 0,
-        defaultTimezone: settings.defaultTimezone || 'UTC',
+        defaultTimezone: extractTimezoneOffset(settings.defaultTimezone) || '+00:00',
       });
     }
   };
@@ -231,7 +209,7 @@ const BookingSettings = () => {
           bookingFirstSlotInterval: formData.bookingFirstSlotInterval,
           bookingCancelationInterval: formData.bookingCancelationInterval,
           bookingUpdatingInterval: formData.bookingUpdatingInterval,
-          defaultTimezone: formData.defaultTimezone,
+          defaultTimezoneId: findTimezoneIdByOffset(formData.defaultTimezone, timezones),
         }),
       });
 
@@ -315,7 +293,7 @@ const BookingSettings = () => {
       )}
 
       {timezoneChanged && isEditing && (
-          <Alert severity="warning" sx={{ mb: 2 }}>
+        <Alert severity="warning" sx={{ mb: 2 }}>
           {t('admin.sessionConfiguration.bookingSettings.timezoneChangedWarning')}
         </Alert>
       )}
@@ -360,9 +338,7 @@ const BookingSettings = () => {
               {t('admin.sessionConfiguration.bookingSettings.defaultTimezone')}
             </Typography>
             <Typography variant="body1" gutterBottom>
-              {settings?.defaultTimezone && settings?.defaultUtcOffset
-                ? `${settings.defaultTimezone} (${settings.defaultUtcOffset})`
-                : settings?.defaultTimezone || 'N/A'}
+              {extractTimezoneOffset(settings?.defaultTimezone) || 'N/A'}
             </Typography>
           </Grid>
         </Grid>
@@ -440,12 +416,20 @@ const BookingSettings = () => {
                 value={formData.defaultTimezone}
                 onChange={handleChange('defaultTimezone')}
                 label={t('admin.sessionConfiguration.bookingSettings.defaultTimezone')}
+                disabled={timezonesLoading}
               >
-                {getUniqueTimezoneOffsets().map((tz) => (
-                  <MenuItem key={tz.value} value={tz.value}>
-                    {tz.label} ({tz.offset})
+                {timezonesLoading ? (
+                  <MenuItem disabled>
+                    <CircularProgress size={20} sx={{ mr: 1 }} />
+                    Loading timezones...
                   </MenuItem>
-                ))}
+                ) : (
+                  timezones.map((tz) => (
+                    <MenuItem key={tz.offset} value={tz.offset}>
+                      {t(`pages.profile.timezones.${tz.id}`, { defaultValue: tz.displayName })} ({tz.offset})
+                    </MenuItem>
+                  ))
+                )}
               </Select>
               {formErrors.defaultTimezone && (
                 <Typography variant="caption" color="error" sx={{ mt: 0.5, display: 'block' }}>

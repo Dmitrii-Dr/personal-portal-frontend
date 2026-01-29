@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { fetchWithAuth } from '../utils/api';
 import apiClient from '../utils/api';
 import { getCachedSlots, setCachedSlots } from '../utils/bookingSlotCache';
+import { fetchTimezones, sortTimezonesByOffset, getOffsetFromTimezone, extractTimezoneOffset, findTimezoneIdByOffset } from '../utils/timezoneService';
 import AvailabilityRuleComponent from '../components/AvailabilityRuleComponent';
 import AvailabilityOverrideComponent from '../components/AvailabilityOverrideComponent';
 import BookingSettings from '../components/BookingSettings';
@@ -51,71 +52,6 @@ dayjs.extend(updateLocale);
 dayjs.extend(localeData);
 dayjs.locale('en-gb'); // Use en-gb locale which starts week on Monday
 
-// Common timezones with UTC offsets
-// Format: { value: timezone, offset: UTC offset, label: display name }
-const COMMON_TIMEZONES = [
-  { value: 'UTC', offset: '+00:00', label: 'UTC' },
-  { value: 'Europe/London', offset: '+00:00', label: 'Europe/London' },
-  { value: 'Europe/Paris', offset: '+01:00', label: 'Europe/Paris' },
-  { value: 'Europe/Berlin', offset: '+01:00', label: 'Europe/Berlin' },
-  { value: 'Europe/Athens', offset: '+02:00', label: 'Europe/Athens' },
-  { value: 'Europe/Moscow', offset: '+03:00', label: 'Europe/Moscow' },
-  { value: 'Asia/Dubai', offset: '+04:00', label: 'Asia/Dubai' },
-  { value: 'Asia/Tashkent', offset: '+05:00', label: 'Asia/Tashkent' },
-  { value: 'Asia/Kolkata', offset: '+05:30', label: 'Asia/Kolkata' },
-  { value: 'Asia/Dhaka', offset: '+06:00', label: 'Asia/Dhaka' },
-  { value: 'Asia/Bangkok', offset: '+07:00', label: 'Asia/Bangkok' },
-  { value: 'Asia/Singapore', offset: '+08:00', label: 'Asia/Singapore' },
-  { value: 'Asia/Shanghai', offset: '+08:00', label: 'Asia/Shanghai' },
-  { value: 'Asia/Almaty', offset: '+06:00', label: 'Asia/Almaty' },
-  { value: 'Asia/Tokyo', offset: '+09:00', label: 'Asia/Tokyo' },
-  { value: 'Asia/Seoul', offset: '+09:00', label: 'Asia/Seoul' },
-  { value: 'Australia/Sydney', offset: '+10:00', label: 'Australia/Sydney' },
-  { value: 'Australia/Melbourne', offset: '+10:00', label: 'Australia/Melbourne' },
-  { value: 'Pacific/Auckland', offset: '+12:00', label: 'Pacific/Auckland' },
-  { value: 'America/Honolulu', offset: '-10:00', label: 'America/Honolulu' },
-  { value: 'America/Anchorage', offset: '-09:00', label: 'America/Anchorage' },
-  { value: 'America/Los_Angeles', offset: '-08:00', label: 'America/Los_Angeles' },
-  { value: 'America/Phoenix', offset: '-07:00', label: 'America/Phoenix' },
-  { value: 'America/Denver', offset: '-07:00', label: 'America/Denver' },
-  { value: 'America/Chicago', offset: '-06:00', label: 'America/Chicago' },
-  { value: 'America/New_York', offset: '-05:00', label: 'America/New_York' },
-  { value: 'America/Caracas', offset: '-04:00', label: 'America/Caracas' },
-  { value: 'America/Sao_Paulo', offset: '-03:00', label: 'America/Sao_Paulo' },
-];
-
-// Helper function to get UTC offset for a timezone
-const getTimezoneOffset = (timezone) => {
-  try {
-    const now = new Date();
-    const utcDate = new Date(now.toLocaleString('en-US', { timeZone: 'UTC' }));
-    const tzDate = new Date(now.toLocaleString('en-US', { timeZone: timezone }));
-    const offsetMs = tzDate - utcDate;
-    const offsetHours = Math.floor(offsetMs / (1000 * 60 * 60));
-    const offsetMinutes = Math.floor((offsetMs % (1000 * 60 * 60)) / (1000 * 60));
-    const sign = offsetHours >= 0 ? '+' : '-';
-    const absHours = Math.abs(offsetHours);
-    const absMinutes = Math.abs(offsetMinutes);
-    return `${sign}${absHours.toString().padStart(2, '0')}:${absMinutes.toString().padStart(2, '0')}`;
-  } catch {
-    return '+00:00';
-  }
-};
-
-// Get timezone with offset for display
-const getTimezoneWithOffset = (timezone) => {
-  const found = COMMON_TIMEZONES.find(tz => tz.value === timezone);
-  if (found) {
-    return found;
-  }
-  // If not in common list, calculate offset dynamically
-  return {
-    value: timezone,
-    offset: getTimezoneOffset(timezone),
-    label: timezone,
-  };
-};
-
 const SessionsConfigurationPage = () => {
   const { t } = useTranslation();
 
@@ -131,9 +67,9 @@ const SessionsConfigurationPage = () => {
     bufferMinutes: 0,
     active: true,
     prices: {
-      Rubles: 0,
-      Tenge: 0,
-      USD: 0,
+      Rubles: '',
+      Tenge: '',
+      USD: '',
     },
   });
   const [error, setError] = useState(null);
@@ -147,6 +83,10 @@ const SessionsConfigurationPage = () => {
   const [selectedTimezone, setSelectedTimezone] = useState(null);
   const [userTimezone, setUserTimezone] = useState(null);
   const hasFetchedSessionTypesRef = useRef(false);
+
+  // Timezones state
+  const [timezones, setTimezones] = useState([]);
+  const [timezonesLoading, setTimezonesLoading] = useState(true);
 
   // Fetch session types (admin endpoint returns all session types, active and inactive)
   useEffect(() => {
@@ -184,6 +124,38 @@ const SessionsConfigurationPage = () => {
     fetchSessionTypes();
   }, []);
 
+  // Fetch timezones from API
+  useEffect(() => {
+    let isMounted = true;
+
+    const loadTimezones = async () => {
+      setTimezonesLoading(true);
+
+      try {
+        const data = await fetchTimezones();
+        if (!isMounted) return;
+
+        if (data && Array.isArray(data)) {
+          const sortedTimezones = sortTimezonesByOffset(data);
+          setTimezones(sortedTimezones);
+        }
+      } catch (err) {
+        if (!isMounted) return;
+        console.error('Error fetching timezones:', err);
+      } finally {
+        if (isMounted) {
+          setTimezonesLoading(false);
+        }
+      }
+    };
+
+    loadTimezones();
+
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
   // Fetch user settings to get default timezone
   useEffect(() => {
     let isMounted = true;
@@ -196,17 +168,16 @@ const SessionsConfigurationPage = () => {
         if (response.ok) {
           const data = await response.json();
           if (data.timezone) {
-            setUserTimezone(data.timezone);
-            setSelectedTimezone(data.timezone);
+            const normalizedTimezone = extractTimezoneOffset(data.timezone);
+            setUserTimezone(normalizedTimezone);
+            setSelectedTimezone(normalizedTimezone);
           } else {
-            // Fallback to browser timezone if no timezone in settings
-            const browserTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC';
-            setSelectedTimezone(browserTimezone);
+            // Fallback to UTC offset if no timezone in settings
+            setSelectedTimezone('+00:00');
           }
         } else {
-          // Fallback to browser timezone if request fails
-          const browserTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC';
-          setSelectedTimezone(browserTimezone);
+          // Fallback to UTC offset if request fails
+          setSelectedTimezone('+00:00');
         }
       } catch (err) {
         if (err.name === 'AbortError' || err.name === 'CanceledError' || err.code === 'ERR_CANCELED') {
@@ -214,9 +185,8 @@ const SessionsConfigurationPage = () => {
         }
         if (!isMounted) return;
         console.warn('Error fetching user settings:', err);
-        // Fallback to browser timezone
-        const browserTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC';
-        setSelectedTimezone(browserTimezone);
+        // Fallback to UTC offset
+        setSelectedTimezone('+00:00');
       }
     };
 
@@ -258,11 +228,20 @@ const SessionsConfigurationPage = () => {
         return;
       }
 
+
+      const timezoneId = findTimezoneIdByOffset(selectedTimezone, timezones);
+      if (!timezoneId) {
+        console.error('Could not find timezone ID for offset:', selectedTimezone);
+        setSlotsError('Invalid timezone selected. Please try again.');
+        setLoadingSlots(false);
+        return;
+      }
+
       const response = await apiClient.get('/api/v1/public/booking/available/slot', {
         params: {
           sessionTypeId: selectedSessionTypeId,
           suggestedDate: dateString,
-          timezone: selectedTimezone,
+          timezoneId: timezoneId,
         },
         timeout: 10000,
       });
@@ -289,11 +268,11 @@ const SessionsConfigurationPage = () => {
   const handleOpenSessionTypeDialog = (sessionType = null) => {
     if (sessionType) {
       setEditingSessionType(sessionType);
-      // Normalize prices - ensure all currencies have values, default to 0
+      // Normalize prices - show actual values or empty string if 0
       const normalizedPrices = {
-        Rubles: sessionType.prices?.Rubles ?? 0,
-        Tenge: sessionType.prices?.Tenge ?? 0,
-        USD: sessionType.prices?.USD ?? 0,
+        Rubles: sessionType.prices?.Rubles || '',
+        Tenge: sessionType.prices?.Tenge || '',
+        USD: sessionType.prices?.USD || '',
       };
 
       setSessionTypeForm({
@@ -313,9 +292,9 @@ const SessionsConfigurationPage = () => {
         bufferMinutes: 0,
         active: true,
         prices: {
-          Rubles: 0,
-          Tenge: 0,
-          USD: 0,
+          Rubles: '',
+          Tenge: '',
+          USD: '',
         },
       });
     }
@@ -625,19 +604,18 @@ const SessionsConfigurationPage = () => {
                         onChange={(e) => setSelectedTimezone(e.target.value)}
                         label={t('admin.sessionConfiguration.timezone')}
                       >
-                        {(() => {
-                          // Get all timezones, including user's timezone if not in the list
-                          const allTimezones = [...COMMON_TIMEZONES];
-                          if (selectedTimezone && !COMMON_TIMEZONES.find(tz => tz.value === selectedTimezone)) {
-                            const tzWithOffset = getTimezoneWithOffset(selectedTimezone);
-                            allTimezones.unshift(tzWithOffset);
-                          }
-                          return allTimezones.map((tz) => (
-                            <MenuItem key={tz.value} value={tz.value}>
-                              {tz.label} ({tz.offset})
+                        {timezonesLoading ? (
+                          <MenuItem disabled>
+                            <CircularProgress size={20} sx={{ mr: 1 }} />
+                            Loading timezones...
+                          </MenuItem>
+                        ) : (
+                          timezones.map((tz) => (
+                            <MenuItem key={tz.offset} value={tz.offset}>
+                              {t(`pages.profile.timezones.${tz.id}`, { defaultValue: tz.displayName })} ({tz.offset})
                             </MenuItem>
-                          ));
-                        })()}
+                          ))
+                        )}
                       </Select>
                     </FormControl>
                   </Box>
@@ -771,14 +749,13 @@ const SessionsConfigurationPage = () => {
             fullWidth
             label={t('admin.sessionConfiguration.priceRubles')}
             type="number"
-            value={sessionTypeForm.prices?.Rubles ?? 0}
+            value={sessionTypeForm.prices?.Rubles ?? ''}
             onChange={(e) => {
-              const value = e.target.value === '' ? 0 : e.target.value;
               setSessionTypeForm({
                 ...sessionTypeForm,
                 prices: {
                   ...sessionTypeForm.prices,
-                  Rubles: value,
+                  Rubles: e.target.value,
                 },
               });
             }}
@@ -790,14 +767,13 @@ const SessionsConfigurationPage = () => {
             fullWidth
             label={t('admin.sessionConfiguration.priceTenge')}
             type="number"
-            value={sessionTypeForm.prices?.Tenge ?? 0}
+            value={sessionTypeForm.prices?.Tenge ?? ''}
             onChange={(e) => {
-              const value = e.target.value === '' ? 0 : e.target.value;
               setSessionTypeForm({
                 ...sessionTypeForm,
                 prices: {
                   ...sessionTypeForm.prices,
-                  Tenge: value,
+                  Tenge: e.target.value,
                 },
               });
             }}
@@ -809,14 +785,13 @@ const SessionsConfigurationPage = () => {
             fullWidth
             label={t('admin.sessionConfiguration.priceUSD')}
             type="number"
-            value={sessionTypeForm.prices?.USD ?? 0}
+            value={sessionTypeForm.prices?.USD ?? ''}
             onChange={(e) => {
-              const value = e.target.value === '' ? 0 : e.target.value;
               setSessionTypeForm({
                 ...sessionTypeForm,
                 prices: {
                   ...sessionTypeForm.prices,
-                  USD: value,
+                  USD: e.target.value,
                 },
               });
             }}

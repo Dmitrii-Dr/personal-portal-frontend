@@ -300,8 +300,21 @@ const SignUpModal = ({ open, onClose, onSwitchToLogin }) => {
 
       // After successful signup, detect timezone and send user settings
       try {
-        // Hardcoded timezone and language for all signups
-        const timezone = 'Europe/Moscow';
+        let timezoneId = 16; // Default timezone ID
+
+        // Check if there's a pending booking with a selected timezone
+        const pendingBookingStr = sessionStorage.getItem('pending_booking');
+        if (pendingBookingStr) {
+          try {
+            const pendingBooking = JSON.parse(pendingBookingStr);
+            if (pendingBooking.timezoneId) {
+              timezoneId = pendingBooking.timezoneId;
+            }
+          } catch (e) {
+            console.warn('Failed to parse pending booking:', e);
+          }
+        }
+
         const language = 'ru';
 
         // Prepare settings request
@@ -311,8 +324,8 @@ const SignUpModal = ({ open, onClose, onSwitchToLogin }) => {
             'Content-Type': 'application/json',
           },
           body: JSON.stringify({
-            timezone: timezone.substring(0, 50),
-            language: language.substring(0, 10),
+            timezoneId: timezoneId,
+            language: language.substring(0, 10), // Ensure max 10 characters
           }),
         };
 

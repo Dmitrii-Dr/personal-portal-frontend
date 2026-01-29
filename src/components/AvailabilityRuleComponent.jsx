@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import apiClient from '../utils/api';
+import { extractTimezoneOffset } from '../utils/timezoneService';
 import {
   Box,
   Typography,
@@ -46,7 +47,7 @@ import dayjs from 'dayjs';
 
 const AvailabilityRuleComponent = () => {
   const { t } = useTranslation();
-  
+
   const DAYS_OF_WEEK = [
     { value: 'MONDAY', label: t('admin.sessionConfiguration.availabilityRules.monday') },
     { value: 'TUESDAY', label: t('admin.sessionConfiguration.availabilityRules.tuesday') },
@@ -62,7 +63,7 @@ const AvailabilityRuleComponent = () => {
     { value: 'INACTIVE', label: t('admin.sessionConfiguration.availabilityRules.inactive') },
     { value: 'ARCHIVED', label: t('admin.sessionConfiguration.availabilityRules.archived') },
   ];
-  
+
   const [rules, setRules] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
@@ -97,7 +98,16 @@ const AvailabilityRuleComponent = () => {
         signal,
         timeout: 10000,
       });
-      setRules(Array.isArray(response.data) ? response.data : []);
+
+      // Normalize UTC offset from "Z" to "+00:00" for consistency
+      const normalizedRules = Array.isArray(response.data)
+        ? response.data.map(rule => ({
+          ...rule,
+          utcOffset: rule.utcOffset === 'Z' ? '+00:00' : rule.utcOffset
+        }))
+        : [];
+
+      setRules(normalizedRules);
     } catch (err) {
       // Don't set error if request was aborted
       if (err.name === 'AbortError' || err.name === 'CanceledError' || err.code === 'ERR_CANCELED') {
@@ -203,7 +213,7 @@ const AvailabilityRuleComponent = () => {
           return '';
         }
       };
-      
+
       setFormData({
         daysOfWeek: Array.isArray(rule.daysOfWeek) ? [...rule.daysOfWeek] : [],
         availableStartTime: formatTimeForInput(rule.availableStartTime),
@@ -523,7 +533,7 @@ const AvailabilityRuleComponent = () => {
                       size="small"
                     />
                   </TableCell>
-                  <TableCell>{rule.timezone || 'N/A'}</TableCell>
+                  <TableCell>{extractTimezoneOffset(rule.timezone) || 'N/A'}</TableCell>
                   <TableCell align="right">
                     <IconButton
                       size="small"
@@ -565,207 +575,207 @@ const AvailabilityRuleComponent = () => {
             </Alert>
           )}
 
-          <LocalizationProvider dateAdapter={AdapterDayjs}>
+          <LocalizationProvider dateAdapter={AdapterDayjs} adapterLocale="en-gb">
             <Grid container spacing={2} sx={{ mt: 1 }}>
               {/* Row 1: Rule Start Date and Rule End Date */}
               <Grid item xs={12} sm={6}>
                 <Box sx={{ display: 'flex', gap: 1, alignItems: 'flex-end' }}>
-                    <Box sx={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 0 }}>
-                      <MuiInputLabel htmlFor="date-from" sx={{ px: 0.5, fontSize: '0.875rem', mb: 0.5, lineHeight: 1.2 }}>
-                        {t('admin.sessionConfiguration.availabilityRules.ruleStartDate')}
-                      </MuiInputLabel>
-                      <Box>
-                        <Button
-                          variant="outlined"
-                          id="date-from"
-                          fullWidth
-                          onClick={(e) => {
-                            setDateFromAnchorEl(e.currentTarget);
-                            setDateFromPopoverOpen(true);
-                          }}
-                          endIcon={<KeyboardArrowDownIcon />}
-                          sx={{
-                            justifyContent: 'space-between',
-                            textTransform: 'none',
-                            fontWeight: 'normal',
-                            height: '56px',
-                            ...(formErrors.ruleStartDate && {
-                              borderColor: 'error.main',
-                            }),
-                          }}
-                        >
-                          {formData.ruleStartDate
-                            ? formData.ruleStartDate.format('MMM D, YYYY')
-                            : t('admin.sessionConfiguration.availabilityRules.pickADate')}
-                        </Button>
-                        <Popover
-                          open={dateFromPopoverOpen}
-                          anchorEl={dateFromAnchorEl}
-                          onClose={() => {
-                            setDateFromPopoverOpen(false);
-                            setDateFromAnchorEl(null);
-                          }}
-                          anchorOrigin={{
-                            vertical: 'bottom',
-                            horizontal: 'left',
-                          }}
-                          transformOrigin={{
-                            vertical: 'top',
-                            horizontal: 'left',
-                          }}
-                        >
-                          <Box sx={{ p: 0 }}>
-                            <DateCalendar
-                              value={formData.ruleStartDate}
-                              onChange={(date) => {
-                                handleDateChange('ruleStartDate')(date);
-                                setDateFromPopoverOpen(false);
-                                setDateFromAnchorEl(null);
-                              }}
-                              minDate={dayjs()}
-                            />
-                          </Box>
-                        </Popover>
-                      </Box>
-                      {formErrors.ruleStartDate && (
-                        <Typography variant="caption" color="error" sx={{ mt: 0.5, display: 'block' }}>
-                          {formErrors.ruleStartDate}
-                        </Typography>
-                      )}
-                    </Box>
-                    <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0, width: 120, flexShrink: 0 }}>
-                      <MuiInputLabel
-                        htmlFor="time-from"
-                        sx={{ px: 0.5, fontSize: '0.875rem', mb: 0.5, visibility: 'hidden', height: '20px', lineHeight: 1.2 }}
-                      >
-                        {t('admin.sessionConfiguration.availabilityRules.startTime')}
-                      </MuiInputLabel>
-                      <TextField
-                        type="time"
-                        id="time-from"
-                        value={formData.availableStartTime}
-                        onChange={handleTimeChange('availableStartTime')}
-                        error={!!formErrors.availableStartTime}
-                        helperText={formErrors.availableStartTime}
-                        disabled={!formData.ruleStartDate}
-                        inputProps={{
-                          step: 1,
-                          style: {
-                            WebkitAppearance: 'none',
-                            MozAppearance: 'textfield',
-                          },
+                  <Box sx={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 0 }}>
+                    <MuiInputLabel htmlFor="date-from" sx={{ px: 0.5, fontSize: '0.875rem', mb: 0.5, lineHeight: 1.2 }}>
+                      {t('admin.sessionConfiguration.availabilityRules.ruleStartDate')}
+                    </MuiInputLabel>
+                    <Box>
+                      <Button
+                        variant="outlined"
+                        id="date-from"
+                        fullWidth
+                        onClick={(e) => {
+                          setDateFromAnchorEl(e.currentTarget);
+                          setDateFromPopoverOpen(true);
                         }}
+                        endIcon={<KeyboardArrowDownIcon />}
                         sx={{
-                          '& input[type="time"]::-webkit-calendar-picker-indicator': {
-                            display: 'none',
-                          },
-                          '& .MuiFormHelperText-root': {
-                            marginTop: 0.5,
-                            marginBottom: 0,
-                          },
+                          justifyContent: 'space-between',
+                          textTransform: 'none',
+                          fontWeight: 'normal',
+                          height: '56px',
+                          ...(formErrors.ruleStartDate && {
+                            borderColor: 'error.main',
+                          }),
                         }}
-                      />
+                      >
+                        {formData.ruleStartDate
+                          ? formData.ruleStartDate.format('MMM D, YYYY')
+                          : t('admin.sessionConfiguration.availabilityRules.pickADate')}
+                      </Button>
+                      <Popover
+                        open={dateFromPopoverOpen}
+                        anchorEl={dateFromAnchorEl}
+                        onClose={() => {
+                          setDateFromPopoverOpen(false);
+                          setDateFromAnchorEl(null);
+                        }}
+                        anchorOrigin={{
+                          vertical: 'bottom',
+                          horizontal: 'left',
+                        }}
+                        transformOrigin={{
+                          vertical: 'top',
+                          horizontal: 'left',
+                        }}
+                      >
+                        <Box sx={{ p: 0 }}>
+                          <DateCalendar
+                            value={formData.ruleStartDate}
+                            onChange={(date) => {
+                              handleDateChange('ruleStartDate')(date);
+                              setDateFromPopoverOpen(false);
+                              setDateFromAnchorEl(null);
+                            }}
+                            minDate={dayjs()}
+                          />
+                        </Box>
+                      </Popover>
                     </Box>
+                    {formErrors.ruleStartDate && (
+                      <Typography variant="caption" color="error" sx={{ mt: 0.5, display: 'block' }}>
+                        {formErrors.ruleStartDate}
+                      </Typography>
+                    )}
                   </Box>
+                  <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0, width: 120, flexShrink: 0 }}>
+                    <MuiInputLabel
+                      htmlFor="time-from"
+                      sx={{ px: 0.5, fontSize: '0.875rem', mb: 0.5, visibility: 'hidden', height: '20px', lineHeight: 1.2 }}
+                    >
+                      {t('admin.sessionConfiguration.availabilityRules.startTime')}
+                    </MuiInputLabel>
+                    <TextField
+                      type="time"
+                      id="time-from"
+                      value={formData.availableStartTime}
+                      onChange={handleTimeChange('availableStartTime')}
+                      error={!!formErrors.availableStartTime}
+                      helperText={formErrors.availableStartTime}
+                      disabled={!formData.ruleStartDate}
+                      inputProps={{
+                        step: 1,
+                        style: {
+                          WebkitAppearance: 'none',
+                          MozAppearance: 'textfield',
+                        },
+                      }}
+                      sx={{
+                        '& input[type="time"]::-webkit-calendar-picker-indicator': {
+                          display: 'none',
+                        },
+                        '& .MuiFormHelperText-root': {
+                          marginTop: 0.5,
+                          marginBottom: 0,
+                        },
+                      }}
+                    />
+                  </Box>
+                </Box>
               </Grid>
 
               <Grid item xs={12} sm={6}>
                 <Box sx={{ display: 'flex', gap: 1, alignItems: 'flex-end' }}>
-                    <Box sx={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 0 }}>
-                      <MuiInputLabel htmlFor="date-to" sx={{ px: 0.5, fontSize: '0.875rem', mb: 0.5, lineHeight: 1.2 }}>
-                        {t('admin.sessionConfiguration.availabilityRules.ruleEndDate')}
-                      </MuiInputLabel>
-                      <Box>
-                        <Button
-                          variant="outlined"
-                          id="date-to"
-                          fullWidth
-                          onClick={(e) => {
-                            setDateToAnchorEl(e.currentTarget);
-                            setDateToPopoverOpen(true);
-                          }}
-                          endIcon={<KeyboardArrowDownIcon />}
-                          sx={{
-                            justifyContent: 'space-between',
-                            textTransform: 'none',
-                            fontWeight: 'normal',
-                            height: '56px',
-                            ...(formErrors.ruleEndDate && {
-                              borderColor: 'error.main',
-                            }),
-                          }}
-                        >
-                          {formData.ruleEndDate
-                            ? formData.ruleEndDate.format('MMM D, YYYY')
-                            : t('admin.sessionConfiguration.availabilityRules.pickADate')}
-                        </Button>
-                        <Popover
-                          open={dateToPopoverOpen}
-                          anchorEl={dateToAnchorEl}
-                          onClose={() => {
-                            setDateToPopoverOpen(false);
-                            setDateToAnchorEl(null);
-                          }}
-                          anchorOrigin={{
-                            vertical: 'bottom',
-                            horizontal: 'left',
-                          }}
-                          transformOrigin={{
-                            vertical: 'top',
-                            horizontal: 'left',
-                          }}
-                        >
-                          <Box sx={{ p: 0 }}>
-                            <DateCalendar
-                              value={formData.ruleEndDate}
-                              onChange={(date) => {
-                                handleDateChange('ruleEndDate')(date);
-                                setDateToPopoverOpen(false);
-                                setDateToAnchorEl(null);
-                              }}
-                              minDate={formData.ruleStartDate || dayjs()}
-                            />
-                          </Box>
-                        </Popover>
-                      </Box>
-                      {formErrors.ruleEndDate && (
-                        <Typography variant="caption" color="error" sx={{ mt: 0.5, display: 'block' }}>
-                          {formErrors.ruleEndDate}
-                        </Typography>
-                      )}
-                    </Box>
-                    <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0, width: 120, flexShrink: 0 }}>
-                      <MuiInputLabel
-                        htmlFor="time-to"
-                        sx={{ px: 0.5, fontSize: '0.875rem', mb: 0.5, visibility: 'hidden', height: '20px', lineHeight: 1.2 }}
-                      >
-                        {t('admin.sessionConfiguration.availabilityRules.endTime')}
-                      </MuiInputLabel>
-                      <TextField
-                        type="time"
-                        id="time-to"
-                        value={formData.availableEndTime}
-                        onChange={handleTimeChange('availableEndTime')}
-                        error={!!formErrors.availableEndTime}
-                        helperText={formErrors.availableEndTime}
-                        disabled={!formData.ruleEndDate}
-                        inputProps={{
-                          step: 1,
-                          style: {
-                            WebkitAppearance: 'none',
-                            MozAppearance: 'textfield',
-                          },
+                  <Box sx={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 0 }}>
+                    <MuiInputLabel htmlFor="date-to" sx={{ px: 0.5, fontSize: '0.875rem', mb: 0.5, lineHeight: 1.2 }}>
+                      {t('admin.sessionConfiguration.availabilityRules.ruleEndDate')}
+                    </MuiInputLabel>
+                    <Box>
+                      <Button
+                        variant="outlined"
+                        id="date-to"
+                        fullWidth
+                        onClick={(e) => {
+                          setDateToAnchorEl(e.currentTarget);
+                          setDateToPopoverOpen(true);
                         }}
+                        endIcon={<KeyboardArrowDownIcon />}
                         sx={{
-                          '& input[type="time"]::-webkit-calendar-picker-indicator': {
-                            display: 'none',
-                          },
-                          '& .MuiFormHelperText-root': {
-                            marginTop: 0.5,
-                            marginBottom: 0,
-                          },
+                          justifyContent: 'space-between',
+                          textTransform: 'none',
+                          fontWeight: 'normal',
+                          height: '56px',
+                          ...(formErrors.ruleEndDate && {
+                            borderColor: 'error.main',
+                          }),
                         }}
-                      />
+                      >
+                        {formData.ruleEndDate
+                          ? formData.ruleEndDate.format('MMM D, YYYY')
+                          : t('admin.sessionConfiguration.availabilityRules.pickADate')}
+                      </Button>
+                      <Popover
+                        open={dateToPopoverOpen}
+                        anchorEl={dateToAnchorEl}
+                        onClose={() => {
+                          setDateToPopoverOpen(false);
+                          setDateToAnchorEl(null);
+                        }}
+                        anchorOrigin={{
+                          vertical: 'bottom',
+                          horizontal: 'left',
+                        }}
+                        transformOrigin={{
+                          vertical: 'top',
+                          horizontal: 'left',
+                        }}
+                      >
+                        <Box sx={{ p: 0 }}>
+                          <DateCalendar
+                            value={formData.ruleEndDate}
+                            onChange={(date) => {
+                              handleDateChange('ruleEndDate')(date);
+                              setDateToPopoverOpen(false);
+                              setDateToAnchorEl(null);
+                            }}
+                            minDate={formData.ruleStartDate || dayjs()}
+                          />
+                        </Box>
+                      </Popover>
+                    </Box>
+                    {formErrors.ruleEndDate && (
+                      <Typography variant="caption" color="error" sx={{ mt: 0.5, display: 'block' }}>
+                        {formErrors.ruleEndDate}
+                      </Typography>
+                    )}
+                  </Box>
+                  <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0, width: 120, flexShrink: 0 }}>
+                    <MuiInputLabel
+                      htmlFor="time-to"
+                      sx={{ px: 0.5, fontSize: '0.875rem', mb: 0.5, visibility: 'hidden', height: '20px', lineHeight: 1.2 }}
+                    >
+                      {t('admin.sessionConfiguration.availabilityRules.endTime')}
+                    </MuiInputLabel>
+                    <TextField
+                      type="time"
+                      id="time-to"
+                      value={formData.availableEndTime}
+                      onChange={handleTimeChange('availableEndTime')}
+                      error={!!formErrors.availableEndTime}
+                      helperText={formErrors.availableEndTime}
+                      disabled={!formData.ruleEndDate}
+                      inputProps={{
+                        step: 1,
+                        style: {
+                          WebkitAppearance: 'none',
+                          MozAppearance: 'textfield',
+                        },
+                      }}
+                      sx={{
+                        '& input[type="time"]::-webkit-calendar-picker-indicator': {
+                          display: 'none',
+                        },
+                        '& .MuiFormHelperText-root': {
+                          marginTop: 0.5,
+                          marginBottom: 0,
+                        },
+                      }}
+                    />
                   </Box>
                 </Box>
               </Grid>

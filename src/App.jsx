@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { BrowserRouter as Router, Routes, Route, useNavigate, useLocation } from 'react-router-dom';
 import AppLayout from './components/AppLayout';
 import LandingPage from './pages/LandingPage';
@@ -41,6 +41,7 @@ import {
 } from '@mui/material';
 import { Link } from 'react-router-dom';
 import { setToken, fetchWithAuth, hasAdminRole, getRolesFromToken } from './utils/api';
+import { fetchTimezones } from './utils/timezoneService';
 import axios from 'axios';
 import dayjs from 'dayjs';
 
@@ -653,6 +654,13 @@ const AccountPage = () => (
 );
 
 function App() {
+  // Preload timezones when app starts to ensure they're available globally
+  useEffect(() => {
+    fetchTimezones().catch(err => {
+      console.error('Failed to preload timezones:', err);
+    });
+  }, []);
+
   return (
     <ThemeProvider theme={theme}>
       <CssBaseline />

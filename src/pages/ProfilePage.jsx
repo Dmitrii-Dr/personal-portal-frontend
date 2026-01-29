@@ -1,6 +1,7 @@
 import React, { useEffect, useState, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { fetchWithAuth, fetchUserProfile, clearUserProfileCache, fetchUserSettings, clearUserSettingsCache, getToken } from '../utils/api';
+import { fetchTimezones, sortTimezonesByOffset, getOffsetFromTimezone, extractTimezoneOffset, findTimezoneIdByOffset } from '../utils/timezoneService';
 import {
   Box,
   Card,
@@ -23,65 +24,6 @@ import {
   CardHeader,
 } from '@mui/material';
 import EditIcon from '@mui/icons-material/Edit';
-
-// Common timezones with unique UTC offsets (one representative per offset)
-// Format: { value: timezone, offset: UTC offset, labelKey: translation key }
-const COMMON_TIMEZONES = [
-  { value: 'UTC', offset: '+00:00', labelKey: 'UTC' },
-  { value: 'Europe/London', offset: '+00:00', labelKey: 'Europe/London' },
-  { value: 'Europe/Paris', offset: '+01:00', labelKey: 'Europe/Paris' },
-  { value: 'Europe/Berlin', offset: '+01:00', labelKey: 'Europe/Berlin' },
-  { value: 'Europe/Athens', offset: '+02:00', labelKey: 'Europe/Athens' },
-  { value: 'Europe/Moscow', offset: '+03:00', labelKey: 'Europe/Moscow' },
-  { value: 'Asia/Dubai', offset: '+04:00', labelKey: 'Asia/Dubai' },
-  { value: 'Asia/Tashkent', offset: '+05:00', labelKey: 'Asia/Tashkent' },
-  { value: 'Asia/Kolkata', offset: '+05:30', labelKey: 'Asia/Kolkata' },
-  { value: 'Asia/Dhaka', offset: '+06:00', labelKey: 'Asia/Dhaka' },
-  { value: 'Asia/Bangkok', offset: '+07:00', labelKey: 'Asia/Bangkok' },
-  { value: 'Asia/Singapore', offset: '+08:00', labelKey: 'Asia/Singapore' },
-  { value: 'Asia/Shanghai', offset: '+08:00', labelKey: 'Asia/Shanghai' },
-  { value: 'Asia/Tokyo', offset: '+09:00', labelKey: 'Asia/Tokyo' },
-  { value: 'Australia/Sydney', offset: '+10:00', labelKey: 'Australia/Sydney' },
-  { value: 'Pacific/Auckland', offset: '+12:00', labelKey: 'Pacific/Auckland' },
-  { value: 'America/Honolulu', offset: '-10:00', labelKey: 'America/Honolulu' },
-  { value: 'America/Anchorage', offset: '-09:00', labelKey: 'America/Anchorage' },
-  { value: 'America/Los_Angeles', offset: '-08:00', labelKey: 'America/Los_Angeles' },
-  { value: 'America/Denver', offset: '-07:00', labelKey: 'America/Denver' },
-  { value: 'America/Chicago', offset: '-06:00', labelKey: 'America/Chicago' },
-  { value: 'America/New_York', offset: '-05:00', labelKey: 'America/New_York' },
-  { value: 'America/Caracas', offset: '-04:00', labelKey: 'America/Caracas' },
-  { value: 'America/Sao_Paulo', offset: '-03:00', labelKey: 'America/Sao_Paulo' },
-];
-
-// Group timezones by unique offset and keep only one representative per offset
-const getUniqueTimezoneOffsets = () => {
-  const offsetMap = new Map();
-
-  COMMON_TIMEZONES.forEach((tz) => {
-    if (!offsetMap.has(tz.offset)) {
-      offsetMap.set(tz.offset, tz);
-    }
-  });
-
-  return Array.from(offsetMap.values()).sort((a, b) => {
-    // Sort: UTC first, then positive offsets (highest first), then negative offsets (least negative first)
-    if (a.offset === '+00:00') return -1;
-    if (b.offset === '+00:00') return 1;
-
-    const offsetA = a.offset;
-    const offsetB = b.offset;
-
-    // Both positive or both negative
-    if ((offsetA.startsWith('+') && offsetB.startsWith('+')) ||
-      (offsetA.startsWith('-') && offsetB.startsWith('-'))) {
-      return offsetB.localeCompare(offsetA);
-    }
-
-    // One positive, one negative
-    if (offsetA.startsWith('+')) return -1;
-    return 1;
-  });
-};
 
 const ProfilePage = () => {
   const { t } = useTranslation();
@@ -118,7 +60,10 @@ const ProfilePage = () => {
   });
   const [savingSettings, setSavingSettings] = useState(false);
 
-  const timezones = getUniqueTimezoneOffsets();
+  // Timezones state
+  const [timezones, setTimezones] = useState([]);
+  const [timezonesLoading, setTimezonesLoading] = useState(true);
+  const [timezonesError, setTimezonesError] = useState(null);
   const languages = ['english', 'spanish', 'french', 'german', 'italian', 'portuguese', 'russian', 'chinese', 'japanese'];
   const currencies = [
     { value: 'Rubles', symbol: '₽', displayName: t('pages.profile.currencies.RUB') },
@@ -191,6 +136,44 @@ const ProfilePage = () => {
     return '';
   };
 
+  // Fetch timezones from API
+  useEffect(() => {
+    let isMounted = true;
+
+    const loadTimezones = async () => {
+      setTimezonesLoading(true);
+      setTimezonesError(null);
+
+      try {
+        const data = await fetchTimezones();
+        if (!isMounted) return;
+
+        if (data && Array.isArray(data)) {
+          // Sort timezones by offset
+          const sortedTimezones = sortTimezonesByOffset(data);
+          setTimezones(sortedTimezones);
+        } else {
+          setTimezonesError(t('pages.profile.failedToLoadTimezones'));
+        }
+      } catch (err) {
+        if (!isMounted) return;
+
+        console.error('Error fetching timezones:', err);
+        setTimezonesError(err.message || t('pages.profile.failedToLoadTimezones'));
+      } finally {
+        if (isMounted) {
+          setTimezonesLoading(false);
+        }
+      }
+    };
+
+    loadTimezones();
+
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
   useEffect(() => {
     let isMounted = true;
 
@@ -260,8 +243,9 @@ const ProfilePage = () => {
 
         if (data) {
           setSettings(data);
+          const normalizedTimezone = extractTimezoneOffset(data.timezone);
           setSettingsFormData({
-            timezone: data.timezone || '',
+            timezone: normalizedTimezone || '',
             language: data.language || 'english',
             currency: normalizeCurrencyValue(data.currency),
             emailNotificationEnabled: data.emailNotificationEnabled !== undefined ? data.emailNotificationEnabled : true,
@@ -408,13 +392,14 @@ const ProfilePage = () => {
     // Save settings if changed
     if (settingsChanged) {
       try {
+        const timezoneId = findTimezoneIdByOffset(settingsFormData.timezone.trim(), timezones);
         const response = await fetchWithAuth('/api/v1/user/setting', {
           method: 'PUT',
           headers: {
             'Content-Type': 'application/json',
           },
           body: JSON.stringify({
-            timezone: settingsFormData.timezone.trim(),
+            timezoneId: timezoneId,
             language: settingsFormData.language.trim(),
             currency: settingsFormData.currency.trim(),
             emailNotificationEnabled: settingsFormData.emailNotificationEnabled,
@@ -703,13 +688,24 @@ const ProfilePage = () => {
                           label={t('pages.profile.timezone')}
                           onChange={(e) => handleSettingsFieldChange('timezone', e.target.value)}
                           error={!!settingsErrors.timezone}
-                          disabled={saving || savingSettings}
+                          disabled={saving || savingSettings || timezonesLoading}
                         >
-                          {timezones.map((tz) => (
-                            <MenuItem key={tz.value} value={tz.value}>
-                              {t(`pages.profile.timezones.${tz.labelKey}`)} ({tz.offset})
+                          {timezonesLoading ? (
+                            <MenuItem disabled>
+                              <CircularProgress size={20} sx={{ mr: 1 }} />
+                              {t('pages.profile.loadingTimezones')}
                             </MenuItem>
-                          ))}
+                          ) : timezonesError ? (
+                            <MenuItem disabled>
+                              {t('pages.profile.failedToLoadTimezones')}
+                            </MenuItem>
+                          ) : (
+                            timezones.map((tz) => (
+                              <MenuItem key={tz.offset} value={tz.offset}>
+                                {t(`pages.profile.timezones.${tz.id}`, { defaultValue: tz.displayName })} ({tz.offset})
+                              </MenuItem>
+                            ))
+                          )}
                         </Select>
                         {settingsErrors.timezone && (
                           <Typography variant="caption" color="error" sx={{ mt: 0.5, ml: 1.75 }}>

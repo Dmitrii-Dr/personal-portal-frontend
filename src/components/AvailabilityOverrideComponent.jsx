@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import apiClient from '../utils/api';
+import { extractTimezoneOffset } from '../utils/timezoneService';
 import {
   Box,
   Typography,
@@ -109,18 +110,18 @@ const AvailabilityOverrideComponent = () => {
           signal: controller.signal,
           timeout: 10000,
         });
-        
+
         if (!isMounted) return;
-        
+
         setOverrides(Array.isArray(response.data) ? response.data : []);
       } catch (err) {
         // Don't set error if request was aborted
         if (err.name === 'AbortError' || err.name === 'CanceledError' || err.code === 'ERR_CANCELED') {
           return;
         }
-        
+
         if (!isMounted) return;
-        
+
         console.error('Error fetching availability overrides:', err);
         let errorMessage = 'Failed to load availability overrides.';
         if (err.response?.status === 401) {
@@ -224,7 +225,7 @@ const AvailabilityOverrideComponent = () => {
 
       const startTime = formatTimeForInput(override.startTime);
       const endTime = formatTimeForInput(override.endTime);
-      
+
       // Parse and set hour/minute inputs
       if (startTime) {
         const [startHour, startMin] = startTime.split(':');
@@ -234,7 +235,7 @@ const AvailabilityOverrideComponent = () => {
         setStartHourInput('00');
         setStartMinuteInput('00');
       }
-      
+
       if (endTime) {
         const [endHour, endMin] = endTime.split(':');
         setEndHourInput(endHour || '00');
@@ -298,8 +299,8 @@ const AvailabilityOverrideComponent = () => {
   // Time picker handlers for start time
   const handleStartHourChange = (increment) => {
     const currentHour = parseInt(startHourInput, 10) || 0;
-    const newHour = increment 
-      ? (currentHour + 1) % 24 
+    const newHour = increment
+      ? (currentHour + 1) % 24
       : (currentHour - 1 + 24) % 24;
     const newHourStr = String(newHour).padStart(2, '0');
     setStartHourInput(newHourStr);
@@ -312,8 +313,8 @@ const AvailabilityOverrideComponent = () => {
 
   const handleStartMinuteChange = (increment) => {
     const currentMinute = parseInt(startMinuteInput, 10) || 0;
-    const newMinute = increment 
-      ? (currentMinute + 5) % 60 
+    const newMinute = increment
+      ? (currentMinute + 5) % 60
       : (currentMinute - 5 + 60) % 60;
     const newMinuteStr = String(newMinute).padStart(2, '0');
     setStartMinuteInput(newMinuteStr);
@@ -369,8 +370,8 @@ const AvailabilityOverrideComponent = () => {
   // Time picker handlers for end time
   const handleEndHourChange = (increment) => {
     const currentHour = parseInt(endHourInput, 10) || 0;
-    const newHour = increment 
-      ? (currentHour + 1) % 24 
+    const newHour = increment
+      ? (currentHour + 1) % 24
       : (currentHour - 1 + 24) % 24;
     const newHourStr = String(newHour).padStart(2, '0');
     setEndHourInput(newHourStr);
@@ -383,8 +384,8 @@ const AvailabilityOverrideComponent = () => {
 
   const handleEndMinuteChange = (increment) => {
     const currentMinute = parseInt(endMinuteInput, 10) || 0;
-    const newMinute = increment 
-      ? (currentMinute + 5) % 60 
+    const newMinute = increment
+      ? (currentMinute + 5) % 60
       : (currentMinute - 5 + 60) % 60;
     const newMinuteStr = String(newMinute).padStart(2, '0');
     setEndMinuteInput(newMinuteStr);
@@ -672,7 +673,7 @@ const AvailabilityOverrideComponent = () => {
                       size="small"
                     />
                   </TableCell>
-                  <TableCell>{override.timezone || 'N/A'}</TableCell>
+                  <TableCell>{extractTimezoneOffset(override.timezone) || 'N/A'}</TableCell>
                   <TableCell align="right">
                     <IconButton
                       size="small"
@@ -793,8 +794,8 @@ const AvailabilityOverrideComponent = () => {
                   <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 1 }}>
                     {/* Hours */}
                     <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-                      <IconButton 
-                        size="small" 
+                      <IconButton
+                        size="small"
                         onClick={() => handleStartHourChange(true)}
                         disabled={!formData.overrideDate}
                         sx={{ mb: 0.5 }}
@@ -838,8 +839,8 @@ const AvailabilityOverrideComponent = () => {
                           },
                         }}
                       />
-                      <IconButton 
-                        size="small" 
+                      <IconButton
+                        size="small"
                         onClick={() => handleStartHourChange(false)}
                         disabled={!formData.overrideDate}
                         sx={{ mt: 0.5 }}
@@ -847,15 +848,15 @@ const AvailabilityOverrideComponent = () => {
                         <ArrowDownwardIcon fontSize="small" />
                       </IconButton>
                     </Box>
-                    
+
                     <Typography variant="h5" sx={{ mx: 1 }}>
                       :
                     </Typography>
-                    
+
                     {/* Minutes */}
                     <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-                      <IconButton 
-                        size="small" 
+                      <IconButton
+                        size="small"
                         onClick={() => handleStartMinuteChange(true)}
                         disabled={!formData.overrideDate}
                         sx={{ mb: 0.5 }}
@@ -899,8 +900,8 @@ const AvailabilityOverrideComponent = () => {
                           },
                         }}
                       />
-                      <IconButton 
-                        size="small" 
+                      <IconButton
+                        size="small"
                         onClick={() => handleStartMinuteChange(false)}
                         disabled={!formData.overrideDate}
                         sx={{ mt: 0.5 }}
@@ -927,8 +928,8 @@ const AvailabilityOverrideComponent = () => {
                   <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 1 }}>
                     {/* Hours */}
                     <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-                      <IconButton 
-                        size="small" 
+                      <IconButton
+                        size="small"
                         onClick={() => handleEndHourChange(true)}
                         disabled={!formData.overrideDate}
                         sx={{ mb: 0.5 }}
@@ -972,8 +973,8 @@ const AvailabilityOverrideComponent = () => {
                           },
                         }}
                       />
-                      <IconButton 
-                        size="small" 
+                      <IconButton
+                        size="small"
                         onClick={() => handleEndHourChange(false)}
                         disabled={!formData.overrideDate}
                         sx={{ mt: 0.5 }}
@@ -981,15 +982,15 @@ const AvailabilityOverrideComponent = () => {
                         <ArrowDownwardIcon fontSize="small" />
                       </IconButton>
                     </Box>
-                    
+
                     <Typography variant="h5" sx={{ mx: 1 }}>
                       :
                     </Typography>
-                    
+
                     {/* Minutes */}
                     <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-                      <IconButton 
-                        size="small" 
+                      <IconButton
+                        size="small"
                         onClick={() => handleEndMinuteChange(true)}
                         disabled={!formData.overrideDate}
                         sx={{ mb: 0.5 }}
@@ -1033,8 +1034,8 @@ const AvailabilityOverrideComponent = () => {
                           },
                         }}
                       />
-                      <IconButton 
-                        size="small" 
+                      <IconButton
+                        size="small"
                         onClick={() => handleEndMinuteChange(false)}
                         disabled={!formData.overrideDate}
                         sx={{ mt: 0.5 }}

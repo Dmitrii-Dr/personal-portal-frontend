@@ -12,6 +12,7 @@ import 'dayjs/locale/en-gb';
 import 'dayjs/locale/ru';
 import apiClient, { fetchWithAuth, getToken, fetchUserSettings as fetchUserSettingsCached } from '../utils/api';
 import { getCachedSlots, setCachedSlots, invalidateCache, clearAllCache } from '../utils/bookingSlotCache';
+import { fetchTimezones, sortTimezonesByOffset, getOffsetFromTimezone, extractTimezoneOffset, findTimezoneIdByOffset } from '../utils/timezoneService';
 
 // Configure dayjs to start week on Monday
 dayjs.extend(utc);
@@ -103,6 +104,10 @@ const BookingPage = ({ sessionTypeId: propSessionTypeId, hideMyBookings = false 
   const slotsScrollRef = useRef(null);
   const navigate = useNavigate();
 
+  // Timezones state
+  const [timezones, setTimezones] = useState([]);
+  const [timezonesLoading, setTimezonesLoading] = useState(true);
+
   const PENDING_BOOKING_KEY = 'pending_booking';
 
   // Format date to YYYY-MM-DD for API
@@ -121,7 +126,8 @@ const BookingPage = ({ sessionTypeId: propSessionTypeId, hideMyBookings = false 
       const data = await fetchUserSettingsCached();
       if (data) {
         if (data.timezone) {
-          setUserTimezone(data.timezone);
+          const normalizedTimezone = extractTimezoneOffset(data.timezone);
+          setUserTimezone(normalizedTimezone);
         } else {
           // Clear timezone if not in settings
           setUserTimezone(null);
@@ -147,7 +153,6 @@ const BookingPage = ({ sessionTypeId: propSessionTypeId, hideMyBookings = false 
       'Rubles': '₽',
       'Tenge': '₸',
       'USD': '$',
-      'USD': '$', // Fallback for typo
     };
     return currencyMap[currency] || '';
   };
@@ -197,75 +202,42 @@ const BookingPage = ({ sessionTypeId: propSessionTypeId, hideMyBookings = false 
     return `${price}${symbol}`;
   };
 
-  // Helper function to get UTC offset for a timezone
-  const getTimezoneOffset = (timezone) => {
-    try {
-      const now = new Date();
-      const utcDate = new Date(now.toLocaleString('en-US', { timeZone: 'UTC' }));
-      const tzDate = new Date(now.toLocaleString('en-US', { timeZone: timezone }));
-      const offsetMs = tzDate - utcDate;
-      const offsetHours = Math.floor(offsetMs / (1000 * 60 * 60));
-      const offsetMinutes = Math.floor((offsetMs % (1000 * 60 * 60)) / (1000 * 60));
-      const sign = offsetHours >= 0 ? '+' : '-';
-      const absHours = Math.abs(offsetHours);
-      const absMinutes = Math.abs(offsetMinutes);
-      return `${sign}${absHours.toString().padStart(2, '0')}:${absMinutes.toString().padStart(2, '0')}`;
-    } catch {
-      return '+00:00';
-    }
-  };
+  // Fetch timezones from API
+  useEffect(() => {
+    let isMounted = true;
 
-  // Get list of common timezones with their display names and offsets
-  const getTimezoneOptions = () => {
-    // Simplified list with one representative timezone per major offset
-    const timezones = [
-      'Pacific/Honolulu',      // UTC-10
-      'America/Anchorage',     // UTC-09
-      'America/Los_Angeles',   // UTC-08
-      'America/Denver',        // UTC-07
-      'America/Chicago',       // UTC-06
-      'America/New_York',      // UTC-05
-      'America/Caracas',       // UTC-04
-      'America/Sao_Paulo',     // UTC-03
-      'Atlantic/South_Georgia', // UTC-02
-      'Atlantic/Azores',       // UTC-01
-      'UTC',                   // UTC+00
-      'Europe/London',         // UTC+00/+01
-      'Europe/Paris',          // UTC+01/+02
-      'Europe/Athens',         // UTC+02/+03
-      'Europe/Moscow',         // UTC+03
-      'Asia/Dubai',            // UTC+04
-      'Asia/Karachi',          // UTC+05
-      'Asia/Kolkata',          // UTC+05:30
-      'Asia/Dhaka',            // UTC+06
-      'Asia/Bangkok',          // UTC+07
-      'Asia/Shanghai',         // UTC+08
-      'Asia/Tokyo',            // UTC+09
-      'Australia/Sydney',      // UTC+10/+11
-      'Pacific/Auckland',      // UTC+12/+13
-    ];
+    const loadTimezones = async () => {
+      setTimezonesLoading(true);
 
-    return timezones.map(tz => {
-      const offset = getTimezoneOffset(tz);
-      // Format timezone name for display (e.g., "America/New_York" -> "New York")
-      const displayName = tz.split('/').pop().replace(/_/g, ' ');
-      return {
-        value: tz,
-        label: `${displayName} (UTC${offset})`,
-        offset: offset
-      };
-    }).sort((a, b) => {
-      // Sort by offset (UTC-12 to UTC+14)
-      const offsetA = parseInt(a.offset.replace(':', '').replace('+', ''));
-      const offsetB = parseInt(b.offset.replace(':', '').replace('+', ''));
-      return offsetA - offsetB;
-    });
-  };
+      try {
+        const data = await fetchTimezones();
+        if (!isMounted) return;
 
-  // Initialize selected timezone for anonymous users - default to Moscow
+        if (data && Array.isArray(data)) {
+          const sortedTimezones = sortTimezonesByOffset(data);
+          setTimezones(sortedTimezones);
+        }
+      } catch (err) {
+        if (!isMounted) return;
+        console.error('Error fetching timezones:', err);
+      } finally {
+        if (isMounted) {
+          setTimezonesLoading(false);
+        }
+      }
+    };
+
+    loadTimezones();
+
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
+  // Initialize selected timezone for anonymous users - default to Moscow (+03:00)
   useEffect(() => {
     if (!hasToken && !selectedTimezone) {
-      setSelectedTimezone('Europe/Moscow');
+      setSelectedTimezone('+03:00'); // Moscow timezone offset
     }
   }, [hasToken, selectedTimezone]);
 
@@ -277,8 +249,8 @@ const BookingPage = ({ sessionTypeId: propSessionTypeId, hideMyBookings = false 
     if (selectedTimezone) {
       return selectedTimezone;
     }
-    // Default to Moscow for anonymous users
-    return 'Europe/Moscow';
+    // Default to Moscow (+03:00) for anonymous users
+    return '+03:00';
   };
 
   // Fetch available slots for a given date
@@ -297,7 +269,7 @@ const BookingPage = ({ sessionTypeId: propSessionTypeId, hideMyBookings = false 
       const dateString = formatDateForAPI(date);
 
       // Use user timezone from settings if logged in, otherwise use selected timezone for anonymous users
-      let timezone = 'Europe/Moscow'; // Default to Moscow for anonymous users
+      let timezone = '+03:00'; // Default to Moscow (+03:00) for anonymous users
       if (userTimezone) {
         timezone = userTimezone;
       } else if (selectedTimezone) {
@@ -317,11 +289,24 @@ const BookingPage = ({ sessionTypeId: propSessionTypeId, hideMyBookings = false 
         return;
       }
 
+      const timezoneId = findTimezoneIdByOffset(timezone, timezones);
+      if (!timezoneId) {
+        console.error('Could not find timezone ID for offset:', timezone);
+        // For anonymous users who haven't selected a timezone, show a helpful message
+        if (!hasToken && !selectedTimezone) {
+          setError(t('booking.pleaseSelectTimezone') || 'Please select a timezone to view available slots.');
+        } else {
+          setError('Invalid timezone selected. Please try again.');
+        }
+        setLoading(false);
+        return;
+      }
+
       const response = await apiClient.get('/api/v1/public/booking/available/slot', {
         params: {
           sessionTypeId,
           suggestedDate: dateString,
-          timezone,
+          timezoneId: timezoneId,
         },
         timeout: 10000,
       });
@@ -708,16 +693,10 @@ const BookingPage = ({ sessionTypeId: propSessionTypeId, hideMyBookings = false 
       setUpdateSlotError(null);
       const dateString = formatDateForAPI(date);
 
-      // Use user timezone from settings if available and user is logged in, otherwise use browser timezone
-      let timezone = 'UTC';
+      // Use user timezone from settings if available and user is logged in, otherwise use UTC
+      let timezone = '+00:00'; // Default to UTC
       if (hasToken && userTimezone) {
         timezone = userTimezone;
-      } else {
-        try {
-          timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
-        } catch {
-          timezone = 'UTC'; // Final fallback
-        }
       }
 
       // Check cache first
@@ -733,11 +712,24 @@ const BookingPage = ({ sessionTypeId: propSessionTypeId, hideMyBookings = false 
         return;
       }
 
+      const timezoneId = findTimezoneIdByOffset(timezone, timezones);
+      if (!timezoneId) {
+        console.error('Could not find timezone ID for offset:', timezone);
+        // For anonymous users who haven't selected a timezone, show a helpful message
+        if (!hasToken && !selectedTimezone) {
+          setUpdateSlotError(t('booking.pleaseSelectTimezone') || 'Please select a timezone to view available slots.');
+        } else {
+          setUpdateSlotError('Invalid timezone selected. Please try again.');
+        }
+        setUpdateLoadingSlots(false);
+        return;
+      }
+
       const response = await apiClient.get('/api/v1/public/booking/available/slot', {
         params: {
           sessionTypeId,
           suggestedDate: dateString,
-          timezone,
+          timezoneId: timezoneId,
         },
         timeout: 10000,
       });
@@ -938,12 +930,17 @@ const BookingPage = ({ sessionTypeId: propSessionTypeId, hideMyBookings = false 
 
     // Check if user is logged in - DO NOT call API without token
     if (!hasToken || !getToken()) {
+      // Get the timezone ID for the current timezone
+      const currentTimezone = getCurrentTimezone();
+      const timezoneId = findTimezoneIdByOffset(currentTimezone, timezones);
+
       // Save booking data to sessionStorage
       const pendingBooking = {
         sessionTypeId: sessionTypeId,
         startTimeInstant: selectedSlot.startTimeInstant,
         clientMessage: clientMessage.trim() || null,
         selectedDate: formatDateForAPI(selectedDate),
+        timezoneId: timezoneId, // Include timezone ID for signup
       };
       sessionStorage.setItem(PENDING_BOOKING_KEY, JSON.stringify(pendingBooking));
 
@@ -1621,16 +1618,23 @@ const BookingPage = ({ sessionTypeId: propSessionTypeId, hideMyBookings = false 
                         }}
                         label="Timezone"
                       >
-                        {getTimezoneOptions().map((tz) => (
-                          <MenuItem key={tz.value} value={tz.value}>
-                            {tz.label}
+                        {timezonesLoading ? (
+                          <MenuItem disabled>
+                            <CircularProgress size={20} sx={{ mr: 1 }} />
+                            Loading timezones...
                           </MenuItem>
-                        ))}
+                        ) : (
+                          timezones.map((tz) => (
+                            <MenuItem key={tz.offset} value={tz.offset}>
+                              {t(`pages.profile.timezones.${tz.id}`, { defaultValue: tz.displayName })} ({tz.offset})
+                            </MenuItem>
+                          ))
+                        )}
                       </Select>
                     </FormControl>
                   ) : (
                     <Alert severity="info" sx={{ mb: 2 }}>
-                      {t('pages.booking.slotsTimezone', { timezone: `${getCurrentTimezone()} (${getTimezoneOffset(getCurrentTimezone())})` })}
+                      {t('pages.booking.slotsTimezone', { timezone: getCurrentTimezone() })}
                     </Alert>
                   )
                 )}
@@ -1839,16 +1843,33 @@ const BookingPage = ({ sessionTypeId: propSessionTypeId, hideMyBookings = false 
                           }}
                           label="Timezone"
                         >
-                          {getTimezoneOptions().map((tz) => (
-                            <MenuItem key={tz.value} value={tz.value}>
-                              {tz.label}
+                          {timezonesLoading ? (
+                            <MenuItem disabled>
+                              <CircularProgress size={20} sx={{ mr: 1 }} />
+                              Loading timezones...
                             </MenuItem>
-                          ))}
+                          ) : (
+                            timezones.map((tz) => (
+                              <MenuItem key={tz.offset} value={tz.offset}>
+                                {t(`pages.profile.timezones.${tz.id}`, { defaultValue: tz.displayName })} ({tz.offset})
+                              </MenuItem>
+                            ))
+                          )}
                         </Select>
                       </FormControl>
                     ) : (
                       <Alert severity="info" sx={{ mb: 2 }}>
-                        Slots are shown in {getCurrentTimezone()} ({getTimezoneOffset(getCurrentTimezone())})
+                        {(() => {
+                          const currentOffset = getCurrentTimezone();
+                          const found = timezones.find(tz => tz.offset === currentOffset);
+                          const displayName = found
+                            ? t(`pages.profile.timezones.${found.id}`, { defaultValue: found.displayName })
+                            : currentOffset;
+
+                          return t('pages.booking.slotsTimezone', {
+                            timezone: `${displayName} (${currentOffset})`
+                          });
+                        })()}
                       </Alert>
                     )
                   )}
