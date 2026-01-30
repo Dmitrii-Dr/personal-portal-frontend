@@ -47,7 +47,9 @@ import {
   Tab,
   Tooltip,
   Snackbar,
+  IconButton,
 } from '@mui/material';
+import CloseIcon from '@mui/icons-material/Close';
 import { DateCalendar } from '@mui/x-date-pickers/DateCalendar';
 import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
 import { AdapterDayjs } from '@mui/x-date-pickers/AdapterDayjs';
@@ -102,6 +104,7 @@ const BookingPage = ({ sessionTypeId: propSessionTypeId, hideMyBookings = false 
   const [showScrollTop, setShowScrollTop] = useState(false);
   const [showScrollBottom, setShowScrollBottom] = useState(false);
   const slotsScrollRef = useRef(null);
+  const pendingBookingAttempted = useRef(false);
   const navigate = useNavigate();
 
   // Timezones state
@@ -943,6 +946,8 @@ const BookingPage = ({ sessionTypeId: propSessionTypeId, hideMyBookings = false 
         timezoneId: timezoneId, // Include timezone ID for signup
       };
       sessionStorage.setItem(PENDING_BOOKING_KEY, JSON.stringify(pendingBooking));
+      // Reset the attempted flag for this new booking
+      pendingBookingAttempted.current = false;
 
       // Show login/signup dialog
       setLoginRequiredDialogOpen(true);
@@ -991,7 +996,14 @@ const BookingPage = ({ sessionTypeId: propSessionTypeId, hideMyBookings = false 
       console.error('Error creating booking:', err);
       let errorMessage = t('pages.booking.bookingFailed');
 
-      if (err.code === 'ECONNABORTED') {
+      // Check for 400 or 500 errors and show user-friendly message
+      if (err.response && (err.response.status === 400 || err.response.status >= 500)) {
+        errorMessage = t('pages.booking.bookingErrorRetry');
+        // Invalidate cache to refresh slots
+        const dateString = formatDateForAPI(selectedDate);
+        const currentTimezone = getCurrentTimezone();
+        invalidateCache(sessionTypeId, dateString, currentTimezone);
+      } else if (err.code === 'ECONNABORTED') {
         errorMessage = 'Request timed out. Please try again.';
       } else if (err.response) {
         errorMessage = err.response.data?.message || `Server error: ${err.response.status}`;
@@ -1020,6 +1032,14 @@ const BookingPage = ({ sessionTypeId: propSessionTypeId, hideMyBookings = false 
     if (!pendingBookingStr || !hasToken || !token) {
       return;
     }
+
+    // Prevent multiple attempts for the same booking
+    if (pendingBookingAttempted.current) {
+      return;
+    }
+
+    // Mark as attempted
+    pendingBookingAttempted.current = true;
 
     try {
       const pendingBooking = JSON.parse(pendingBookingStr);
@@ -1055,9 +1075,14 @@ const BookingPage = ({ sessionTypeId: propSessionTypeId, hideMyBookings = false 
       }
     } catch (err) {
       console.error('Error completing pending booking:', err);
-      // Don't show error to user, just log it
+      // Remove pending booking to prevent infinite retries
+      sessionStorage.removeItem(PENDING_BOOKING_KEY);
+      // Show error to user for 400/500 errors
+      if (err.response && (err.response.status === 400 || err.response.status >= 500)) {
+        setBookingError(t('pages.booking.bookingErrorRetry'));
+      }
     }
-  }, [hasToken]);
+  }, [hasToken, t, fetchBookings, fetchAvailableSlots]);
 
   // Check for pending booking when user logs in
   useEffect(() => {
@@ -1105,7 +1130,12 @@ const BookingPage = ({ sessionTypeId: propSessionTypeId, hideMyBookings = false 
   // Format date for display
   const formatDateForDisplay = (date) => {
     const locale = i18nInstance.language === 'ru' ? 'ru' : 'en-gb';
-    return dayjs(date).locale(locale).format('MMMM D, YYYY');
+    const formatted = dayjs(date).locale(locale).format('MMMM D, YYYY');
+    // Capitalize first letter of month name for Russian
+    if (locale === 'ru') {
+      return formatted.charAt(0).toUpperCase() + formatted.slice(1);
+    }
+    return formatted;
   };
 
   // Format instant for display (24-hour format) using user's timezone
@@ -1960,16 +1990,10 @@ const BookingPage = ({ sessionTypeId: propSessionTypeId, hideMyBookings = false 
                       - <strong>{formatTime(dialogSlot.endTime)}</strong>{' '}
                     </>
                   )}
-                  on <strong>{formatDateForDisplay(selectedDate)}</strong>?
+                  {t('pages.booking.on')} <strong>{formatDateForDisplay(selectedDate)}</strong>?
                 </>
               )}
             </DialogContentText>
-
-            {bookingError && (
-              <Alert severity="error" sx={{ mb: 2 }}>
-                {bookingError}
-              </Alert>
-            )}
 
             <TextField
               fullWidth
@@ -2023,8 +2047,22 @@ const BookingPage = ({ sessionTypeId: propSessionTypeId, hideMyBookings = false 
         </Dialog>
 
         {/* Login Required Dialog */}
-        <Dialog open={loginRequiredDialogOpen} onClose={() => setLoginRequiredDialogOpen(false)}>
-          <DialogTitle>{t('auth.loginRequired')}</DialogTitle>
+        <Dialog open={loginRequiredDialogOpen} onClose={() => setLoginRequiredDialogOpen(false)} maxWidth="sm" fullWidth>
+          <DialogTitle sx={{ m: 0, p: 2, pr: 6 }}>
+            {t('auth.loginRequired')}
+            <IconButton
+              aria-label="close"
+              onClick={() => setLoginRequiredDialogOpen(false)}
+              sx={{
+                position: 'absolute',
+                right: 8,
+                top: 8,
+                color: (theme) => theme.palette.grey[500],
+              }}
+            >
+              <CloseIcon />
+            </IconButton>
+          </DialogTitle>
           <DialogContent>
             <DialogContentText>
               {t('landing.booking.loginToBook')}
@@ -2039,7 +2077,7 @@ const BookingPage = ({ sessionTypeId: propSessionTypeId, hideMyBookings = false 
                     ? formatTime(dialogSlot.startTime)
                     : formatTimeFromInstant(dialogSlot.startTimeInstant)}
                   {dialogSlot.endTime && ` - ${formatTime(dialogSlot.endTime)}`}
-                  {' '}on {formatDateForDisplay(selectedDate)}
+                  {' '}{t('pages.booking.on')} {formatDateForDisplay(selectedDate)}
                 </Typography>
                 <Typography variant="caption" color="text.secondary" sx={{ mt: 1, display: 'block' }}>
                   {t('pages.booking.selectionSaved')}
@@ -2047,23 +2085,17 @@ const BookingPage = ({ sessionTypeId: propSessionTypeId, hideMyBookings = false 
               </Box>
             )}
           </DialogContent>
-          <DialogActions>
-            <Button
-              onClick={() => setLoginRequiredDialogOpen(false)}
-              color="inherit"
-              sx={{ textTransform: 'none' }}
-            >
-              {t('common.cancel')}
-            </Button>
+          <DialogActions sx={{ px: 3, pb: 2, gap: 1.5 }}>
             <Button
               onClick={() => {
                 setLoginRequiredDialogOpen(false);
                 navigate('/signup', { state: { returnTo: '/booking' } });
               }}
               variant="outlined"
-              sx={{ textTransform: 'none' }}
+              fullWidth
+              sx={{ textTransform: 'none', py: 1 }}
             >
-              Sign Up
+              {t('auth.signUp')}
             </Button>
             <Button
               onClick={() => {
@@ -2071,9 +2103,10 @@ const BookingPage = ({ sessionTypeId: propSessionTypeId, hideMyBookings = false 
                 navigate('/login', { state: { returnTo: '/booking' } });
               }}
               variant="contained"
-              sx={{ textTransform: 'none' }}
+              fullWidth
+              sx={{ textTransform: 'none', py: 1 }}
             >
-              Log In
+              {t('auth.login')}
             </Button>
           </DialogActions>
         </Dialog>
@@ -2294,10 +2327,23 @@ const BookingPage = ({ sessionTypeId: propSessionTypeId, hideMyBookings = false 
             {successMessage}
           </Alert>
         </Snackbar>
+
+        {/* Error Snackbar */}
+        <Snackbar
+          open={!!bookingError}
+          autoHideDuration={8000}
+          onClose={() => setBookingError(null)}
+          anchorOrigin={{ vertical: 'top', horizontal: 'right' }}
+          sx={{ mt: { xs: 8, sm: 9, md: 10 } }}
+        >
+          <Alert onClose={() => setBookingError(null)} severity="error" sx={{ width: '100%' }}>
+            {bookingError}
+          </Alert>
+        </Snackbar>
       </Box>
     </LocalizationProvider >
   );
 };
 
-export default BookingPage;
 
+export default BookingPage;

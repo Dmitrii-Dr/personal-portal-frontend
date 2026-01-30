@@ -86,7 +86,8 @@
     "agreeToThe": "I agree to the",
     "loadingAgreements": "Loading agreements...",
     "noAgreementsAvailable": "No agreements available",
-    "agreementRequired": "You must agree to this agreement"
+    "agreementRequired": "You must agree to this agreement",
+    "loginRequired": "One More Step to Book"
   },
   "userMenu": {
     "myProfile": "My Profile",
@@ -111,6 +112,7 @@
       "updateSessionDateTime": "Update Session Date/Time",
       "bookingSuccess": "Booking created successfully",
       "bookingFailed": "Failed to create booking",
+      "bookingErrorRetry": "Something happened. Please try again or select another slot",
       "noAvailableSlots": "No available slots",
       "loadingSlots": "Loading available slots...",
       "price": "Price",
