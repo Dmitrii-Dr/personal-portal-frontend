@@ -1175,56 +1175,31 @@ const BookingPage = ({ sessionTypeId: propSessionTypeId, hideMyBookings = false 
     }
   };
 
-  // Format time range, showing date only once if both times are on the same day
-  const formatTimeRange = (startInstant, endInstant) => {
-    if (!startInstant || !endInstant) return 'N/A';
+  // Format booking start time, showing date and start time only
+  const formatBookingStart = (startInstant) => {
+    if (!startInstant) return 'N/A';
     try {
       const locale = i18nInstance.language === 'ru' ? 'ru' : 'en-gb';
       const timezone = userTimezone || selectedTimezone || 'Europe/Moscow';
 
       const startTime = dayjs.utc(startInstant).tz(timezone);
-      const endTime = dayjs.utc(endInstant).tz(timezone);
 
-      // Check if both times are on the same day
-      const sameDay = startTime.format('YYYY-MM-DD') === endTime.format('YYYY-MM-DD');
-
-      if (sameDay) {
-        // Show date once with locale-specific format
-        let dateStr;
-        if (locale === 'ru') {
-          // Russian format with genitive case: "Сессия назначена на 31 Января, 2026"
-          const day = startTime.format('D');
-          const monthIndex = startTime.month();
-          const monthGenitive = monthsGenitive[monthIndex];
-          const year = startTime.format('YYYY');
-          dateStr = `${t('pages.booking.sessionScheduledFor')} ${day} ${monthGenitive}, ${year}`;
-        } else {
-          // English format: "Session scheduled for January 31, 2026"
-          dateStr = `${t('pages.booking.sessionScheduledFor')} ${startTime.locale(locale).format('MMMM D, YYYY')}`;
-        }
-        const startTimeStr = startTime.format('HH:mm');
-        const endTimeStr = endTime.format('HH:mm');
-        return `${dateStr}, ${startTimeStr} - ${endTimeStr}`;
+      let dateStr;
+      if (locale === 'ru') {
+        // Russian format with genitive case: "Сессия назначена на 31 Января, 2026"
+        const day = startTime.format('D');
+        const monthIndex = startTime.month();
+        const monthGenitive = monthsGenitive[monthIndex];
+        const year = startTime.format('YYYY');
+        dateStr = `${day} ${monthGenitive}, ${year}`;
       } else {
-        // Different days: show full format for both
-        if (locale === 'ru') {
-          // Russian format for both dates
-          const formatRuDate = (time) => {
-            const day = time.format('D');
-            const month = time.locale(locale).format('MMMM');
-            const year = time.format('YYYY');
-            const capitalizedMonth = month.charAt(0).toUpperCase() + month.slice(1);
-            const timeStr = time.format('HH:mm');
-            return `${day} ${capitalizedMonth}, ${year}, ${timeStr}`;
-          };
-          return `${formatRuDate(startTime)} - ${formatRuDate(endTime)}`;
-        } else {
-          return `${startTime.locale(locale).format('MMMM D, YYYY, HH:mm')} - ${endTime.locale(locale).format('MMMM D, YYYY, HH:mm')}`;
-        }
+        // English format: "January 31, 2026"
+        dateStr = `${startTime.locale(locale).format('MMMM D, YYYY')}`;
       }
+      const startTimeStr = startTime.format('HH:mm');
+      return `${dateStr}, ${startTimeStr}`;
     } catch {
-      // Fallback to showing both separately
-      return `${formatInstant(startInstant)} - ${formatInstant(endInstant)}`;
+      return formatInstant(startInstant);
     }
   };
 
@@ -1402,7 +1377,10 @@ const BookingPage = ({ sessionTypeId: propSessionTypeId, hideMyBookings = false 
                                     )}
                                   </Box>
                                   <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
-                                    {formatTimeRange(booking.startTimeInstant, booking.endTimeInstant)}
+                                    <strong>{t('pages.booking.sessionScheduledFor')} </strong>{formatBookingStart(booking.startTimeInstant)}
+                                  </Typography>
+                                  <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
+                                    <strong>{t('pages.booking.sessionDuration')}:</strong> {booking.sessionDurationMinutes} {t('common.minutes')}
                                   </Typography>
                                 </Box>
                                 <Box sx={{ display: 'flex', gap: 1, alignItems: 'center' }}>
@@ -1424,13 +1402,13 @@ const BookingPage = ({ sessionTypeId: propSessionTypeId, hideMyBookings = false 
                               </Box>
                               {booking.clientMessage && (
                                 <>
-                                  <Divider sx={{ my: 1 }} />
                                   <Typography variant="body2" color="text.secondary">
                                     <strong>{t('pages.booking.message')}:</strong> {booking.clientMessage}
                                   </Typography>
                                 </>
                               )}
-                              <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 1 }}>
+                              <Divider sx={{ my: 1, mt: 2 }} />
+                              <Typography variant="caption" color="text.secondary" sx={{ display: 'block' }}>
                                 {t('pages.booking.created')} {formatInstant(booking.createdAt)}
                               </Typography>
                               <Box sx={{ display: 'flex', justifyContent: 'flex-end', gap: 1, mt: 2 }}>
@@ -1525,7 +1503,10 @@ const BookingPage = ({ sessionTypeId: propSessionTypeId, hideMyBookings = false 
                                   )}
                                 </Box>
                                 <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
-                                  {formatTimeRange(booking.startTimeInstant, booking.endTimeInstant)}
+                                  <strong>{t('pages.booking.sessionScheduledFor')} </strong>{formatBookingStart(booking.startTimeInstant)}
+                                </Typography>
+                                <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
+                                  <strong>{t('pages.booking.sessionDuration')}:</strong> {booking.sessionDurationMinutes} {t('common.minutes')}
                                 </Typography>
                               </Box>
                               <Chip
@@ -1536,13 +1517,13 @@ const BookingPage = ({ sessionTypeId: propSessionTypeId, hideMyBookings = false 
                             </Box>
                             {booking.clientMessage && (
                               <>
-                                <Divider sx={{ my: 1 }} />
                                 <Typography variant="body2" color="text.secondary">
                                   <strong>{t('pages.booking.message')}:</strong> {booking.clientMessage}
                                 </Typography>
                               </>
                             )}
-                            <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 1 }}>
+                            <Divider sx={{ my: 1, mt: 2 }} />
+                            <Typography variant="caption" color="text.secondary" sx={{ display: 'block' }}>
                               {t('pages.booking.created')} {formatInstant(booking.createdAt)}
                             </Typography>
                           </CardContent>

@@ -18,6 +18,7 @@
     "yes": "Да",
     "no": "Нет",
     "ok": "ОК",
+    "minutes": "минут",
     "select": "Выбрать",
     "all": "Все",
     "none": "Нет",
@@ -164,6 +165,7 @@
       "updating": "Обновление...",
       "updateBooking": "Изменить запись",
       "sessionScheduledFor": "Сессия назначена на:",
+      "sessionDuration": "Продолжительность сессии",
       "selectedSlot": "Выбранный слот",
       "status": {
         "PENDING_APPROVAL": "Ожидает Подтверждения",
