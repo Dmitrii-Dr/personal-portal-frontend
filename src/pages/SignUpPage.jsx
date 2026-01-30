@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { fetchWithAuth, setToken } from '../utils/api';
 import {
   Box,
@@ -16,6 +17,7 @@ import {
 } from '@mui/material';
 
 const SignUpPage = () => {
+  const { t } = useTranslation();
   const navigate = useNavigate();
   const location = useLocation();
   const [formData, setFormData] = useState({
@@ -96,18 +98,18 @@ const SignUpPage = () => {
     }
 
     if (!formData.password.trim()) {
-      newErrors.password = 'Password is required';
+      newErrors.password = t('auth.passwordRequired');
       isValid = false;
     } else if (formData.password.length < 6) {
-      newErrors.password = 'Password must be at least 6 characters';
+      newErrors.password = t('auth.passwordMinLength');
       isValid = false;
     }
 
     if (!formData.confirmPassword.trim()) {
-      newErrors.confirmPassword = 'Please confirm your password';
+      newErrors.confirmPassword = t('auth.confirmPasswordRequired');
       isValid = false;
     } else if (formData.password !== formData.confirmPassword) {
-      newErrors.confirmPassword = 'Passwords do not match';
+      newErrors.confirmPassword = t('auth.passwordsDoNotMatch');
       isValid = false;
     }
 
@@ -299,7 +301,7 @@ const SignUpPage = () => {
               fullWidth
               id="password"
               name="password"
-              label="Password"
+              label={t('auth.password')}
               type="password"
               value={formData.password}
               onChange={handleChange}
@@ -315,7 +317,7 @@ const SignUpPage = () => {
               fullWidth
               id="confirmPassword"
               name="confirmPassword"
-              label="Confirm Password"
+              label={t('auth.confirmPassword')}
               type="password"
               value={formData.confirmPassword}
               onChange={handleChange}

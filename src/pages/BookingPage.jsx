@@ -19,6 +19,18 @@ dayjs.extend(utc);
 dayjs.extend(timezone);
 dayjs.extend(updateLocale);
 dayjs.extend(localeData);
+
+
+// Customize Russian locale to capitalize month names
+dayjs.updateLocale('ru', {
+  months: 'Январь_Февраль_Март_Апрель_Май_Июнь_Июль_Август_Сентябрь_Октябрь_Ноябрь_Декабрь'.split('_'),
+  monthsShort: 'Янв_Фев_Мар_Апр_Май_Июн_Июл_Авг_Сен_Окт_Ноя_Дек'.split('_'),
+});
+
+// Genitive case months for Russian dates (when month is part of a date)
+const monthsGenitive = 'Января_Февраля_Марта_Апреля_Мая_Июня_Июля_Августа_Сентября_Октября_Ноября_Декабря'.split('_');
+
+
 dayjs.locale('en-gb'); // Use en-gb locale which starts week on Monday
 import {
   Grid,
@@ -1180,16 +1192,15 @@ const BookingPage = ({ sessionTypeId: propSessionTypeId, hideMyBookings = false 
         // Show date once with locale-specific format
         let dateStr;
         if (locale === 'ru') {
-          // Russian format: "9 Января, 2026"
+          // Russian format with genitive case: "Сессия назначена на 31 Января, 2026"
           const day = startTime.format('D');
-          const month = startTime.locale(locale).format('MMMM');
+          const monthIndex = startTime.month();
+          const monthGenitive = monthsGenitive[monthIndex];
           const year = startTime.format('YYYY');
-          // Capitalize first letter of month
-          const capitalizedMonth = month.charAt(0).toUpperCase() + month.slice(1);
-          dateStr = `${day} ${capitalizedMonth}, ${year}`;
+          dateStr = `${t('pages.booking.sessionScheduledFor')} ${day} ${monthGenitive}, ${year}`;
         } else {
-          // English format: "January 9, 2026"
-          dateStr = startTime.locale(locale).format('MMMM D, YYYY');
+          // English format: "Session scheduled for January 31, 2026"
+          dateStr = `${t('pages.booking.sessionScheduledFor')} ${startTime.locale(locale).format('MMMM D, YYYY')}`;
         }
         const startTimeStr = startTime.format('HH:mm');
         const endTimeStr = endTime.format('HH:mm');
@@ -1313,7 +1324,7 @@ const BookingPage = ({ sessionTypeId: propSessionTypeId, hideMyBookings = false 
   }, [hasToken, activeTab]);
 
   return (
-    <LocalizationProvider dateAdapter={AdapterDayjs} adapterLocale="en-gb">
+    <LocalizationProvider dateAdapter={AdapterDayjs} adapterLocale={i18nInstance.language === 'ru' ? 'ru' : 'en-gb'}>
       <Box>
         {/* Show "My Bookings" section only if user is logged in and not in dialog/popup */}
         {hasToken && !hideMyBookings && (
@@ -1415,7 +1426,7 @@ const BookingPage = ({ sessionTypeId: propSessionTypeId, hideMyBookings = false 
                                 <>
                                   <Divider sx={{ my: 1 }} />
                                   <Typography variant="body2" color="text.secondary">
-                                    <strong>Message:</strong> {booking.clientMessage}
+                                    <strong>{t('pages.booking.message')}:</strong> {booking.clientMessage}
                                   </Typography>
                                 </>
                               )}
@@ -1527,7 +1538,7 @@ const BookingPage = ({ sessionTypeId: propSessionTypeId, hideMyBookings = false 
                               <>
                                 <Divider sx={{ my: 1 }} />
                                 <Typography variant="body2" color="text.secondary">
-                                  <strong>Message:</strong> {booking.clientMessage}
+                                  <strong>{t('pages.booking.message')}:</strong> {booking.clientMessage}
                                 </Typography>
                               </>
                             )}
@@ -1974,7 +1985,22 @@ const BookingPage = ({ sessionTypeId: propSessionTypeId, hideMyBookings = false 
 
         {/* Booking Confirmation Dialog */}
         <Dialog open={openDialog} onClose={handleDialogClose} maxWidth="sm" fullWidth>
-          <DialogTitle>{t('pages.booking.confirmBookingTitle')}</DialogTitle>
+          <DialogTitle sx={{ m: 0, p: 2, pr: 6 }}>
+            {t('pages.booking.confirmBookingTitle')}
+            <IconButton
+              aria-label="close"
+              onClick={handleDialogClose}
+              disabled={submittingBooking}
+              sx={{
+                position: 'absolute',
+                right: 8,
+                top: 8,
+                color: (theme) => theme.palette.grey[500],
+              }}
+            >
+              <CloseIcon />
+            </IconButton>
+          </DialogTitle>
           <DialogContent>
             <DialogContentText sx={{ mb: 2 }}>
               {dialogSlot && (
@@ -2018,19 +2044,14 @@ const BookingPage = ({ sessionTypeId: propSessionTypeId, hideMyBookings = false 
               sx={{ mt: 1 }}
             />
           </DialogContent>
-          <DialogActions>
-            <Button
-              onClick={handleDialogClose}
-              color="inherit"
-              disabled={submittingBooking}
-            >
-              {t('common.cancel')}
-            </Button>
+          <DialogActions sx={{ px: 3, pb: 2 }}>
             <Button
               onClick={handleConfirmBooking}
               color="primary"
               variant="contained"
+              fullWidth
               disabled={submittingBooking || !selectedSlot || !selectedSlot.startTimeInstant}
+              sx={{ py: 1 }}
             >
               {submittingBooking ? (
                 <>
@@ -2193,6 +2214,12 @@ const BookingPage = ({ sessionTypeId: propSessionTypeId, hideMyBookings = false 
                         minDate={dayjs()}
                         sx={{ width: '100%' }}
                         firstDayOfWeek={1}
+                        slotProps={{
+                          calendarHeader: {
+                            format: 'MMMM YYYY',
+                          },
+                        }}
+                        dayOfWeekFormatter={(day) => day.charAt(0).toUpperCase() + day.slice(1)}
                       />
                     </Box>
                   </Grid>
@@ -2200,7 +2227,7 @@ const BookingPage = ({ sessionTypeId: propSessionTypeId, hideMyBookings = false 
                   {/* Right Column - Available Slots */}
                   <Grid item xs={12} md={6}>
                     <Typography variant="h6" gutterBottom>
-                      Available Times on {formatDateForDisplay(updateSelectedDate)}
+                      {t('pages.booking.availableTimes')} {formatDateForDisplay(updateSelectedDate)}
                     </Typography>
 
                     {updateSlotError && (
@@ -2266,8 +2293,8 @@ const BookingPage = ({ sessionTypeId: propSessionTypeId, hideMyBookings = false 
                   fullWidth
                   multiline
                   rows={4}
-                  label="Message (Optional)"
-                  placeholder="Add any additional notes or questions..."
+                  label={t('pages.booking.messageOptional')}
+                  placeholder={t('pages.booking.messagePlaceholder')}
                   value={updateClientMessage}
                   onChange={(e) => {
                     const value = e.target.value;
@@ -2306,10 +2333,10 @@ const BookingPage = ({ sessionTypeId: propSessionTypeId, hideMyBookings = false 
               {updatingBooking ? (
                 <>
                   <CircularProgress size={16} sx={{ mr: 1 }} />
-                  Updating...
+                  {t('pages.booking.updating')}
                 </>
               ) : (
-                'Update Booking'
+                t('pages.booking.updateBooking')
               )}
             </Button>
           </DialogActions>

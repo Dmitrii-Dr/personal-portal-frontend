@@ -105,7 +105,7 @@ const LoginModal = ({ open, onClose, onSwitchToSignUp }) => {
         const errorData = await response.json().catch(() => ({}));
         throw new Error(
           errorData.message ||
-            `Login failed: ${response.status} ${response.statusText}`
+          `Login failed: ${response.status} ${response.statusText}`
         );
       }
 
@@ -191,7 +191,7 @@ const LoginModal = ({ open, onClose, onSwitchToSignUp }) => {
         const errorData = await response.json().catch(() => ({}));
         throw new Error(
           errorData.message ||
-            `Failed to send password reset email: ${response.status} ${response.statusText}`
+          `Failed to send password reset email: ${response.status} ${response.statusText}`
         );
       }
     } catch (error) {
@@ -283,9 +283,6 @@ const LoginModal = ({ open, onClose, onSwitchToSignUp }) => {
           </>
         ) : (
           <>
-            <DialogContentText sx={{ mb: 2 }}>
-              {t('auth.signIn')}
-            </DialogContentText>
 
             {submitError && (
               <Alert severity="error" sx={{ mb: 2 }}>

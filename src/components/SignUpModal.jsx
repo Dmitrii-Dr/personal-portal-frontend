@@ -623,12 +623,6 @@ const SignUpModal = ({ open, onClose, onSwitchToLogin }) => {
               </Alert>
             )}
 
-            {!agreementsLoading && Array.isArray(agreements) && agreements.length === 0 && !agreementsError && (
-              <Alert severity="warning" sx={{ mb: 2 }}>
-                {t('auth.noAgreementsAvailable', 'No agreements available')}
-              </Alert>
-            )}
-
             {Array.isArray(agreements) && agreements.map((agreement) => {
               const fieldName = `agreed_${agreement.id}`;
               return (
