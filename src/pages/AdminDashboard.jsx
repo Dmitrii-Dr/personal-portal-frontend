@@ -44,6 +44,8 @@ import AddIcon from '@mui/icons-material/Add';
 import AccessTimeIcon from '@mui/icons-material/AccessTime';
 import ArrowUpwardIcon from '@mui/icons-material/ArrowUpward';
 import ArrowDownwardIcon from '@mui/icons-material/ArrowDownward';
+import KeyboardArrowDownIcon from '@mui/icons-material/KeyboardArrowDown';
+import KeyboardArrowUpIcon from '@mui/icons-material/KeyboardArrowUp';
 import { DateCalendar } from '@mui/x-date-pickers/DateCalendar';
 import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
 import { AdapterDayjs } from '@mui/x-date-pickers/AdapterDayjs';
@@ -84,6 +86,9 @@ const PastSessions = () => {
   const mountedRef = useRef(true);
   const fetchingParamsRef = useRef(null);
   const fetchingPromiseRef = useRef(null);
+
+
+
 
   useEffect(() => {
     mountedRef.current = true;
@@ -155,6 +160,8 @@ const PastSessions = () => {
       setUserTimezone(getOffsetFromTimezone(browserTimezone));
     }
   }, []);
+
+
 
   // Apply date filter to bookings and pagination
   const applyDateFilter = (bookingsToFilter, start, end) => {
@@ -840,6 +847,11 @@ const AdminDashboard = () => {
   const [hourInput, setHourInput] = useState('00');
   const [minuteInput, setMinuteInput] = useState('00');
 
+  // New Booking Slots Scroll state
+  const bookingSlotsScrollRef = useRef(null);
+  const [showBookingScrollTop, setShowBookingScrollTop] = useState(false);
+  const [showBookingScrollBottom, setShowBookingScrollBottom] = useState(false);
+
   // Timezones state
   const [timezones, setTimezones] = useState([]);
   const [timezonesLoading, setTimezonesLoading] = useState(true);
@@ -1388,6 +1400,21 @@ const AdminDashboard = () => {
     setCustomStartTime(null);
     setSelectedBookingSlot(null);
   };
+
+  // Effect to handle scroll indicator initial state when slots are loaded for New Booking
+  useEffect(() => {
+    if (newBookingOpen && bookingAvailableSlots.length > 0) {
+      // Small timeout to allow render
+      setTimeout(() => {
+        if (bookingSlotsScrollRef.current) {
+          const element = bookingSlotsScrollRef.current;
+          const isScrollable = element.scrollHeight > element.clientHeight;
+          setShowBookingScrollBottom(isScrollable);
+        }
+      }, 100);
+    }
+  }, [newBookingOpen, bookingAvailableSlots, showCustomTimePicker]);
+
 
   const formatTime = (timeString) => {
     if (!timeString) return 'N/A';
@@ -2029,7 +2056,6 @@ const AdminDashboard = () => {
                     onChange={handleBookingDateChange}
                     minDate={dayjs()}
                     sx={{ width: '100%' }}
-                    firstDayOfWeek={1}
                     disabled={!selectedSessionTypeId || !selectedClientId}
                   />
                 </Box>
@@ -2086,217 +2112,274 @@ const AdminDashboard = () => {
                         <CircularProgress />
                       </Box>
                     ) : bookingAvailableSlots.length > 0 ? (
-                      <List>
-                        {bookingAvailableSlots.map((slot, index) => {
-                          const startTime = slot.startTime
-                            ? formatTime(slot.startTime)
-                            : (slot.startTimeInstant ? formatTimeFromInstant(slot.startTimeInstant) : 'N/A');
-                          const endTime = slot.endTime
-                            ? formatTime(slot.endTime)
-                            : 'N/A';
-                          const isSelected = selectedBookingSlot?.startTimeInstant === slot.startTimeInstant && !showCustomTimePicker;
+                      <Box sx={{ position: 'relative' }}>
+                        <Box
+                          ref={bookingSlotsScrollRef}
+                          sx={{ maxHeight: '240px', overflowY: 'auto', pr: 1 }}
+                          onScroll={(e) => {
+                            const element = e.target;
+                            const isAtTop = element.scrollTop === 0;
+                            const isAtBottom = Math.abs(element.scrollHeight - element.scrollTop - element.clientHeight) < 1;
 
-                          // Check if slot is in the past (only for today)
-                          const isToday = bookingSelectedDate.isSame(dayjs(), 'day');
-                          const isPastSlot = isToday && slot.startTimeInstant && dayjs(slot.startTimeInstant).isBefore(dayjs());
-                          const isDisabled = isPastSlot;
+                            setShowBookingScrollTop(!isAtTop);
+                            setShowBookingScrollBottom(!isAtBottom && bookingAvailableSlots.length > 4);
+                          }}
+                        >
+                          <List>
+                            {bookingAvailableSlots.map((slot, index) => {
+                              const startTime = slot.startTime
+                                ? formatTime(slot.startTime)
+                                : (slot.startTimeInstant ? formatTimeFromInstant(slot.startTimeInstant) : 'N/A');
+                              const endTime = slot.endTime
+                                ? formatTime(slot.endTime)
+                                : 'N/A';
+                              const isSelected = selectedBookingSlot?.startTimeInstant === slot.startTimeInstant && !showCustomTimePicker;
 
-                          return (
+                              // Check if slot is in the past (only for today)
+                              const isToday = bookingSelectedDate.isSame(dayjs(), 'day');
+                              const isPastSlot = isToday && slot.startTimeInstant && dayjs(slot.startTimeInstant).isBefore(dayjs());
+                              const isDisabled = isPastSlot;
+
+                              return (
+                                <ListItemButton
+                                  key={slot.startTimeInstant || `slot-${index}`}
+                                  onClick={() => !isDisabled && handleBookingSlotClick(slot)}
+                                  selected={isSelected}
+                                  disabled={isDisabled}
+                                  sx={{
+                                    border: 1,
+                                    borderColor: isSelected ? 'primary.main' : (isDisabled ? 'error.light' : 'divider'),
+                                    borderRadius: 1,
+                                    mb: 1,
+                                    bgcolor: isSelected ? 'action.selected' : (isDisabled ? 'action.disabledBackground' : 'transparent'),
+                                    opacity: isDisabled ? 0.5 : 1,
+                                    '&:hover': {
+                                      bgcolor: isDisabled ? 'action.disabledBackground' : 'action.hover',
+                                    },
+                                    '&.Mui-disabled': {
+                                      opacity: 0.5,
+                                    },
+                                  }}
+                                >
+                                  <Typography variant="body1" color={isDisabled ? 'text.disabled' : 'text.primary'}>
+                                    {startTime}{endTime !== 'N/A' ? ` - ${endTime}` : ''}
+                                    {isDisabled && ` ${t('admin.dashboard.past')}`}
+                                  </Typography>
+                                </ListItemButton>
+                              );
+                            })}
+                            {/* Create new slot option */}
                             <ListItemButton
-                              key={slot.startTimeInstant || `slot-${index}`}
-                              onClick={() => !isDisabled && handleBookingSlotClick(slot)}
-                              selected={isSelected}
-                              disabled={isDisabled}
+                              onClick={handleCreateNewSlotClick}
+                              selected={showCustomTimePicker}
                               sx={{
                                 border: 1,
-                                borderColor: isSelected ? 'primary.main' : (isDisabled ? 'error.light' : 'divider'),
+                                borderColor: showCustomTimePicker ? 'primary.main' : 'divider',
+                                borderStyle: 'dashed',
                                 borderRadius: 1,
                                 mb: 1,
-                                bgcolor: isSelected ? 'action.selected' : (isDisabled ? 'action.disabledBackground' : 'transparent'),
-                                opacity: isDisabled ? 0.5 : 1,
+                                bgcolor: showCustomTimePicker ? 'action.selected' : 'transparent',
                                 '&:hover': {
-                                  bgcolor: isDisabled ? 'action.disabledBackground' : 'action.hover',
-                                },
-                                '&.Mui-disabled': {
-                                  opacity: 0.5,
+                                  bgcolor: 'action.hover',
                                 },
                               }}
                             >
-                              <Typography variant="body1" color={isDisabled ? 'text.disabled' : 'text.primary'}>
-                                {startTime}{endTime !== 'N/A' ? ` - ${endTime}` : ''}
-                                {isDisabled && ` ${t('admin.dashboard.past')}`}
+                              <Typography variant="body1" sx={{ fontStyle: 'italic' }}>
+                                {t('admin.dashboard.createNewSlot')}
                               </Typography>
                             </ListItemButton>
-                          );
-                        })}
-                        {/* Create new slot option */}
-                        <ListItemButton
-                          onClick={handleCreateNewSlotClick}
-                          selected={showCustomTimePicker}
-                          sx={{
-                            border: 1,
-                            borderColor: showCustomTimePicker ? 'primary.main' : 'divider',
-                            borderStyle: 'dashed',
-                            borderRadius: 1,
-                            mb: 1,
-                            bgcolor: showCustomTimePicker ? 'action.selected' : 'transparent',
-                            '&:hover': {
-                              bgcolor: 'action.hover',
-                            },
-                          }}
-                        >
-                          <Typography variant="body1" sx={{ fontStyle: 'italic' }}>
-                            {t('admin.dashboard.createNewSlot')}
-                          </Typography>
-                        </ListItemButton>
-                        {/* Custom time picker */}
-                        {showCustomTimePicker && (
+                            {/* Custom time picker */}
+                            {showCustomTimePicker && (
+                              <Box
+                                sx={{
+                                  mt: 1,
+                                  p: 2,
+                                  border: 2,
+                                  borderColor: 'primary.main',
+                                  borderRadius: 2,
+                                  bgcolor: 'background.paper',
+                                  boxShadow: 2
+                                }}
+                              >
+                                <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+                                  {t('admin.dashboard.enterTime')}
+                                </Typography>
+                                <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 1, mb: 2 }}>
+                                  {/* Hours */}
+                                  <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+                                    <IconButton
+                                      size="small"
+                                      onClick={() => handleHourChange(true)}
+                                      sx={{ mb: 0.5 }}
+                                    >
+                                      <ArrowUpwardIcon fontSize="small" />
+                                    </IconButton>
+                                    <TextField
+                                      value={hourInput}
+                                      onChange={(e) => handleHourInputChange(e.target.value)}
+                                      onFocus={(e) => e.target.select()}
+                                      onBlur={handleHourInputBlur}
+                                      inputProps={{
+                                        style: {
+                                          textAlign: 'center',
+                                          fontSize: '2rem',
+                                          fontWeight: 'bold',
+                                          padding: '16px',
+                                        },
+                                        maxLength: 2,
+                                      }}
+                                      autoComplete="off"
+                                      sx={{
+                                        width: 80,
+                                        '& .MuiOutlinedInput-root': {
+                                          border: 1,
+                                          borderColor: 'divider',
+                                          borderRadius: 1,
+                                          bgcolor: 'grey.100',
+                                          '&:hover': {
+                                            borderColor: 'primary.main',
+                                          },
+                                          '&.Mui-focused': {
+                                            borderColor: 'primary.main',
+                                            bgcolor: 'grey.100',
+                                          },
+                                          '& fieldset': {
+                                            border: 'none',
+                                          },
+                                        },
+                                      }}
+                                    />
+                                    <IconButton
+                                      size="small"
+                                      onClick={() => handleHourChange(false)}
+                                      sx={{ mt: 0.5 }}
+                                    >
+                                      <ArrowDownwardIcon fontSize="small" />
+                                    </IconButton>
+                                  </Box>
+
+                                  <Typography variant="h4" sx={{ mx: 1 }}>
+                                    :
+                                  </Typography>
+
+                                  {/* Minutes */}
+                                  <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+                                    <IconButton
+                                      size="small"
+                                      onClick={() => handleMinuteChange(true)}
+                                      sx={{ mb: 0.5 }}
+                                    >
+                                      <ArrowUpwardIcon fontSize="small" />
+                                    </IconButton>
+                                    <TextField
+                                      value={minuteInput}
+                                      onChange={(e) => handleMinuteInputChange(e.target.value)}
+                                      onFocus={(e) => e.target.select()}
+                                      onBlur={handleMinuteInputBlur}
+                                      inputProps={{
+                                        style: {
+                                          textAlign: 'center',
+                                          fontSize: '2rem',
+                                          fontWeight: 'bold',
+                                          padding: '16px',
+                                        },
+                                        maxLength: 2,
+                                      }}
+                                      autoComplete="off"
+                                      sx={{
+                                        width: 80,
+                                        '& .MuiOutlinedInput-root': {
+                                          border: 1,
+                                          borderColor: 'divider',
+                                          borderRadius: 1,
+                                          bgcolor: 'grey.100',
+                                          '&:hover': {
+                                            borderColor: 'primary.main',
+                                          },
+                                          '&.Mui-focused': {
+                                            borderColor: 'primary.main',
+                                            bgcolor: 'grey.100',
+                                          },
+                                          '& fieldset': {
+                                            border: 'none',
+                                          },
+                                        },
+                                      }}
+                                    />
+                                    <IconButton
+                                      size="small"
+                                      onClick={() => handleMinuteChange(false)}
+                                      sx={{ mt: 0.5 }}
+                                    >
+                                      <ArrowDownwardIcon fontSize="small" />
+                                    </IconButton>
+                                  </Box>
+                                </Box>
+
+                                {/* Now and Clear buttons */}
+                                <Box sx={{ display: 'flex', justifyContent: 'space-between', gap: 1 }}>
+                                  <Button
+                                    size="small"
+                                    onClick={handleSetNow}
+                                    sx={{ color: 'primary.main', textTransform: 'none' }}
+                                  >
+                                    {t('admin.dashboard.now')}
+                                  </Button>
+                                  <Button
+                                    size="small"
+                                    onClick={handleClearTime}
+                                    sx={{ color: 'primary.main', textTransform: 'none' }}
+                                  >
+                                    {t('admin.dashboard.clear')}
+                                  </Button>
+                                </Box>
+                              </Box>
+                            )}
+                          </List>
+                        </Box>
+                        {/* Top scroll indicator */}
+                        {showBookingScrollTop && (
                           <Box
                             sx={{
-                              mt: 1,
-                              p: 2,
-                              border: 2,
-                              borderColor: 'primary.main',
-                              borderRadius: 2,
-                              bgcolor: 'background.paper',
-                              boxShadow: 2
+                              position: 'absolute',
+                              top: 0,
+                              left: 0,
+                              right: 0,
+                              height: '40px',
+                              background: 'linear-gradient(to top, transparent, rgba(255,255,255,0.8))',
+                              display: 'flex',
+                              justifyContent: 'center',
+                              alignItems: 'flex-start',
+                              pointerEvents: 'none',
+                              pt: 0.5,
+                              borderRadius: '4px 4px 0 0',
                             }}
                           >
-                            <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-                              {t('admin.dashboard.enterTime')}
-                            </Typography>
-                            <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 1, mb: 2 }}>
-                              {/* Hours */}
-                              <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-                                <IconButton
-                                  size="small"
-                                  onClick={() => handleHourChange(true)}
-                                  sx={{ mb: 0.5 }}
-                                >
-                                  <ArrowUpwardIcon fontSize="small" />
-                                </IconButton>
-                                <TextField
-                                  value={hourInput}
-                                  onChange={(e) => handleHourInputChange(e.target.value)}
-                                  onFocus={(e) => e.target.select()}
-                                  onBlur={handleHourInputBlur}
-                                  inputProps={{
-                                    style: {
-                                      textAlign: 'center',
-                                      fontSize: '2rem',
-                                      fontWeight: 'bold',
-                                      padding: '16px',
-                                    },
-                                    maxLength: 2,
-                                  }}
-                                  autoComplete="off"
-                                  sx={{
-                                    width: 80,
-                                    '& .MuiOutlinedInput-root': {
-                                      border: 1,
-                                      borderColor: 'divider',
-                                      borderRadius: 1,
-                                      bgcolor: 'grey.100',
-                                      '&:hover': {
-                                        borderColor: 'primary.main',
-                                      },
-                                      '&.Mui-focused': {
-                                        borderColor: 'primary.main',
-                                        bgcolor: 'grey.100',
-                                      },
-                                      '& fieldset': {
-                                        border: 'none',
-                                      },
-                                    },
-                                  }}
-                                />
-                                <IconButton
-                                  size="small"
-                                  onClick={() => handleHourChange(false)}
-                                  sx={{ mt: 0.5 }}
-                                >
-                                  <ArrowDownwardIcon fontSize="small" />
-                                </IconButton>
-                              </Box>
-
-                              <Typography variant="h4" sx={{ mx: 1 }}>
-                                :
-                              </Typography>
-
-                              {/* Minutes */}
-                              <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-                                <IconButton
-                                  size="small"
-                                  onClick={() => handleMinuteChange(true)}
-                                  sx={{ mb: 0.5 }}
-                                >
-                                  <ArrowUpwardIcon fontSize="small" />
-                                </IconButton>
-                                <TextField
-                                  value={minuteInput}
-                                  onChange={(e) => handleMinuteInputChange(e.target.value)}
-                                  onFocus={(e) => e.target.select()}
-                                  onBlur={handleMinuteInputBlur}
-                                  inputProps={{
-                                    style: {
-                                      textAlign: 'center',
-                                      fontSize: '2rem',
-                                      fontWeight: 'bold',
-                                      padding: '16px',
-                                    },
-                                    maxLength: 2,
-                                  }}
-                                  autoComplete="off"
-                                  sx={{
-                                    width: 80,
-                                    '& .MuiOutlinedInput-root': {
-                                      border: 1,
-                                      borderColor: 'divider',
-                                      borderRadius: 1,
-                                      bgcolor: 'grey.100',
-                                      '&:hover': {
-                                        borderColor: 'primary.main',
-                                      },
-                                      '&.Mui-focused': {
-                                        borderColor: 'primary.main',
-                                        bgcolor: 'grey.100',
-                                      },
-                                      '& fieldset': {
-                                        border: 'none',
-                                      },
-                                    },
-                                  }}
-                                />
-                                <IconButton
-                                  size="small"
-                                  onClick={() => handleMinuteChange(false)}
-                                  sx={{ mt: 0.5 }}
-                                >
-                                  <ArrowDownwardIcon fontSize="small" />
-                                </IconButton>
-                              </Box>
-                            </Box>
-
-                            {/* Now and Clear buttons */}
-                            <Box sx={{ display: 'flex', justifyContent: 'space-between', gap: 1 }}>
-                              <Button
-                                size="small"
-                                onClick={handleSetNow}
-                                sx={{ color: 'primary.main', textTransform: 'none' }}
-                              >
-                                {t('admin.dashboard.now')}
-                              </Button>
-                              <Button
-                                size="small"
-                                onClick={handleClearTime}
-                                sx={{ color: 'primary.main', textTransform: 'none' }}
-                              >
-                                {t('admin.dashboard.clear')}
-                              </Button>
-                            </Box>
+                            <KeyboardArrowUpIcon sx={{ color: 'text.secondary', opacity: 0.7 }} />
                           </Box>
                         )}
-                      </List>
+                        {/* Bottom scroll indicator */}
+                        {showBookingScrollBottom && (
+                          <Box
+                            sx={{
+                              position: 'absolute',
+                              bottom: 0,
+                              left: 0,
+                              right: 0,
+                              height: '40px',
+                              background: 'linear-gradient(to bottom, transparent, rgba(255,255,255,0.8))',
+                              display: 'flex',
+                              justifyContent: 'center',
+                              alignItems: 'flex-end',
+                              pointerEvents: 'none',
+                              pb: 0.5,
+                              borderRadius: '0 0 4px 4px',
+                            }}
+                          >
+                            <KeyboardArrowDownIcon sx={{ color: 'text.secondary', opacity: 0.7 }} />
+                          </Box>
+                        )}
+                      </Box>
                     ) : (
                       <>
                         <Alert severity="info" sx={{ mb: 2 }}>

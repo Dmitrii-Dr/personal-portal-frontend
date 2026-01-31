@@ -98,6 +98,17 @@ const BookingPage = ({ sessionTypeId: propSessionTypeId, hideMyBookings = false 
   const [cancelDialogOpen, setCancelDialogOpen] = useState(false);
   const [bookingToCancel, setBookingToCancel] = useState(null);
   const [cancelling, setCancelling] = useState(false);
+
+  // New Booking Scroll state
+  const newBookingSlotsScrollRef = useRef(null);
+  const [showNewBookingScrollTop, setShowNewBookingScrollTop] = useState(false);
+  const [showNewBookingScrollBottom, setShowNewBookingScrollBottom] = useState(false);
+
+  // Update Booking Scroll state
+  const updateBookingSlotsScrollRef = useRef(null);
+  const [showUpdateBookingScrollTop, setShowUpdateBookingScrollTop] = useState(false);
+  const [showUpdateBookingScrollBottom, setShowUpdateBookingScrollBottom] = useState(false);
+
   const [hasToken, setHasToken] = useState(false);
   const [loginRequiredDialogOpen, setLoginRequiredDialogOpen] = useState(false);
   const [updateDialogOpen, setUpdateDialogOpen] = useState(false);
@@ -122,6 +133,9 @@ const BookingPage = ({ sessionTypeId: propSessionTypeId, hideMyBookings = false 
   // Timezones state
   const [timezones, setTimezones] = useState([]);
   const [timezonesLoading, setTimezonesLoading] = useState(true);
+
+  // Booking settings state
+  const [bookingSettings, setBookingSettings] = useState(null);
 
   const PENDING_BOOKING_KEY = 'pending_booking';
 
@@ -242,7 +256,19 @@ const BookingPage = ({ sessionTypeId: propSessionTypeId, hideMyBookings = false 
       }
     };
 
+    const loadBookingSettings = async () => {
+      try {
+        const response = await apiClient.get('/api/v1/public/booking/setting');
+        if (isMounted && response.data) {
+          setBookingSettings(response.data);
+        }
+      } catch (err) {
+        console.error('Error fetching booking settings:', err);
+      }
+    };
+
     loadTimezones();
+    loadBookingSettings();
 
     return () => {
       isMounted = false;
@@ -783,6 +809,7 @@ const BookingPage = ({ sessionTypeId: propSessionTypeId, hideMyBookings = false 
   // Handle update date change
   const handleUpdateDateChange = (newDate) => {
     setUpdateSelectedDate(newDate);
+    setUpdateSelectedSlot(null);
     if (updateSessionTypeId) {
       fetchUpdateSlots(newDate, updateSessionTypeId);
     }
@@ -1293,11 +1320,60 @@ const BookingPage = ({ sessionTypeId: propSessionTypeId, hideMyBookings = false 
     }
   };
 
-  // Get active bookings (CONFIRMED first, then PENDING_APPROVAL)
+  // Check if booking can be updated based on settings
+  const canUpdateBooking = (booking) => {
+    if (!booking) return false;
+
+    // If settings not loaded yet, default to allowing update (or disallow? usually safer to allow then fail or wait)
+    // However, for better UX let's assume allowed if we are not sure, unless it's past
+    if (!bookingSettings) return !isPastBooking(booking);
+
+    // Also check standard "past" logic
+    if (isPastBooking(booking)) {
+      return false;
+    }
+
+    if (!booking.startTimeInstant) return false;
+
+    try {
+      const updateIntervalMinutes = bookingSettings.bookingUpdatingInterval || 0;
+      const startTime = dayjs(booking.startTimeInstant);
+      const now = dayjs();
+
+      // Calculate deadline: startTime - interval
+      const deadline = startTime.subtract(updateIntervalMinutes, 'minute');
+
+      // If deadline > now, returns true (button available)
+      return deadline.isAfter(now);
+    } catch (e) {
+      console.error("Error calculating update availability", e);
+      return false;
+    }
+  };
+
+  // Check if booking can be cancelled (if start time is in the future)
+  const canCancelBooking = (booking) => {
+    if (!booking || !booking.startTimeInstant) return false;
+
+    // Check if start time is in the future
+    const startTime = dayjs(booking.startTimeInstant);
+    const now = dayjs();
+
+    return startTime.isAfter(now);
+  };
+
+  // Get active bookings sorted by start time
   const getActiveBookings = () => {
     const confirmed = groupedBookings.CONFIRMED || [];
     const pendingApproval = groupedBookings.PENDING_APPROVAL || [];
-    return [...confirmed, ...pendingApproval];
+    const allActive = [...confirmed, ...pendingApproval];
+
+    // Sort by startTimeInstant
+    return allActive.sort((a, b) => {
+      if (!a.startTimeInstant) return 1;
+      if (!b.startTimeInstant) return -1;
+      return dayjs(a.startTimeInstant).diff(dayjs(b.startTimeInstant));
+    });
   };
 
   // Handle tab change
@@ -1340,6 +1416,33 @@ const BookingPage = ({ sessionTypeId: propSessionTypeId, hideMyBookings = false 
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [hasToken, activeTab]);
+
+  // Effect to handle scroll indicator initial state when slots are loaded
+  useEffect(() => {
+    if (newBookingDialogOpen && newBookingSlotsScrollRef.current && availableSlots.length > 0) {
+      // Small timeout to allow render
+      setTimeout(() => {
+        if (newBookingSlotsScrollRef.current) {
+          const element = newBookingSlotsScrollRef.current;
+          const isScrollable = element.scrollHeight > element.clientHeight;
+          setShowNewBookingScrollBottom(isScrollable);
+        }
+      }, 100);
+    }
+  }, [newBookingDialogOpen, availableSlots]);
+
+  useEffect(() => {
+    if (updateDialogOpen && updateBookingSlotsScrollRef.current && updateAvailableSlots.length > 0) {
+      // Small timeout to allow render
+      setTimeout(() => {
+        if (updateBookingSlotsScrollRef.current) {
+          const element = updateBookingSlotsScrollRef.current;
+          const isScrollable = element.scrollHeight > element.clientHeight;
+          setShowUpdateBookingScrollBottom(isScrollable);
+        }
+      }, 100);
+    }
+  }, [updateDialogOpen, updateAvailableSlots]);
 
   return (
     <LocalizationProvider dateAdapter={AdapterDayjs} adapterLocale={i18nInstance.language === 'ru' ? 'ru' : 'en-gb'}>
@@ -1456,43 +1559,90 @@ const BookingPage = ({ sessionTypeId: propSessionTypeId, hideMyBookings = false 
                               </Typography>
                               <Box sx={{ display: 'flex', justifyContent: 'flex-end', gap: 1, mt: 2 }}>
                                 {booking.status?.toUpperCase() === 'CONFIRMED' ? (
-                                  <Tooltip title={t('pages.booking.cancelTooltip')}>
-                                    <span>
+                                  <>
+                                    <Tooltip title={t('pages.booking.cancelTooltip')}>
+                                      <span>
+                                        <Button
+                                          variant="outlined"
+                                          color="primary"
+                                          size="small"
+                                          disabled={true}
+                                          sx={{ textTransform: 'none' }}
+                                        >
+                                          {t('pages.booking.updateSessionDateTime')}
+                                        </Button>
+                                      </span>
+                                    </Tooltip>
+                                    <Tooltip title={t('pages.booking.cancelTooltip')}>
+                                      <span>
+                                        <Button
+                                          variant="outlined"
+                                          color="error"
+                                          size="small"
+                                          disabled={true}
+                                          sx={{ textTransform: 'none' }}
+                                        >
+                                          {t('pages.booking.cancelBooking')}
+                                        </Button>
+                                      </span>
+                                    </Tooltip>
+                                  </>
+                                ) : (
+                                  <>
+                                    {(booking.status?.toUpperCase() === 'PENDING_APPROVAL' || booking.status?.toUpperCase() === 'PENDING') && (
+                                      canUpdateBooking(booking) ? (
+                                        <Button
+                                          variant="outlined"
+                                          color="primary"
+                                          size="small"
+                                          onClick={() => handleUpdateClick(booking)}
+                                          disabled={updatingBooking}
+                                          sx={{ textTransform: 'none' }}
+                                        >
+                                          {t('pages.booking.updateSessionDateTime')}
+                                        </Button>
+                                      ) : (
+                                        <Tooltip title={t('pages.booking.cancelTooltip')}>
+                                          <span>
+                                            <Button
+                                              variant="outlined"
+                                              color="primary"
+                                              size="small"
+                                              disabled={true}
+                                              sx={{ textTransform: 'none' }}
+                                            >
+                                              {t('pages.booking.updateSessionDateTime')}
+                                            </Button>
+                                          </span>
+                                        </Tooltip>
+                                      )
+                                    )}
+                                    {canCancelBooking(booking) ? (
                                       <Button
                                         variant="outlined"
                                         color="error"
                                         size="small"
-                                        disabled={true}
+                                        onClick={() => handleCancelClick(booking)}
+                                        disabled={cancelling}
                                         sx={{ textTransform: 'none' }}
                                       >
                                         {t('pages.booking.cancelBooking')}
                                       </Button>
-                                    </span>
-                                  </Tooltip>
-                                ) : (
-                                  <>
-                                    {(booking.status?.toUpperCase() === 'PENDING_APPROVAL' || booking.status?.toUpperCase() === 'PENDING') && (
-                                      <Button
-                                        variant="outlined"
-                                        color="primary"
-                                        size="small"
-                                        onClick={() => handleUpdateClick(booking)}
-                                        disabled={updatingBooking || isPast}
-                                        sx={{ textTransform: 'none' }}
-                                      >
-                                        {t('pages.booking.updateSessionDateTime')}
-                                      </Button>
+                                    ) : (
+                                      <Tooltip title={t('pages.booking.cancelTooltip')}>
+                                        <span>
+                                          <Button
+                                            variant="outlined"
+                                            color="error"
+                                            size="small"
+                                            disabled={true}
+                                            sx={{ textTransform: 'none' }}
+                                          >
+                                            {t('pages.booking.cancelBooking')}
+                                          </Button>
+                                        </span>
+                                      </Tooltip>
                                     )}
-                                    <Button
-                                      variant="outlined"
-                                      color="error"
-                                      size="small"
-                                      onClick={() => handleCancelClick(booking)}
-                                      disabled={cancelling || isPast}
-                                      sx={{ textTransform: 'none' }}
-                                    >
-                                      {t('pages.booking.cancelBooking')}
-                                    </Button>
                                   </>
                                 )}
                               </Box>
@@ -1989,36 +2139,93 @@ const BookingPage = ({ sessionTypeId: propSessionTypeId, hideMyBookings = false 
                       <CircularProgress />
                     </Box>
                   ) : availableSlots.length > 0 ? (
-                    <List>
-                      {availableSlots.map((slot, index) => {
-                        const startTime = slot.startTime
-                          ? formatTime(slot.startTime)
-                          : (slot.startTimeInstant ? formatTimeFromInstant(slot.startTimeInstant) : 'N/A');
-                        const endTime = slot.endTime
-                          ? formatTime(slot.endTime)
-                          : 'N/A';
+                    <Box sx={{ position: 'relative' }}>
+                      <Box
+                        ref={newBookingSlotsScrollRef}
+                        sx={{ maxHeight: '240px', overflowY: 'auto', pr: 1 }}
+                        onScroll={(e) => {
+                          const element = e.target;
+                          const isAtTop = element.scrollTop === 0;
+                          const isAtBottom = Math.abs(element.scrollHeight - element.scrollTop - element.clientHeight) < 1;
 
-                        return (
-                          <ListItemButton
-                            key={slot.startTimeInstant || `slot-${index}`}
-                            onClick={() => handleSlotClick(slot)}
-                            sx={{
-                              border: 1,
-                              borderColor: 'divider',
-                              borderRadius: 1,
-                              mb: 1,
-                              '&:hover': {
-                                bgcolor: 'action.hover',
-                              },
-                            }}
-                          >
-                            <Typography variant="body1">
-                              {startTime}{endTime !== 'N/A' ? ` - ${endTime}` : ''}
-                            </Typography>
-                          </ListItemButton>
-                        );
-                      })}
-                    </List>
+                          setShowNewBookingScrollTop(!isAtTop);
+                          setShowNewBookingScrollBottom(!isAtBottom && availableSlots.length > 4);
+                        }}
+                      >
+                        <List>
+                          {availableSlots.map((slot, index) => {
+                            const startTime = slot.startTime
+                              ? formatTime(slot.startTime)
+                              : (slot.startTimeInstant ? formatTimeFromInstant(slot.startTimeInstant) : 'N/A');
+                            const endTime = slot.endTime
+                              ? formatTime(slot.endTime)
+                              : 'N/A';
+
+                            return (
+                              <ListItemButton
+                                key={slot.startTimeInstant || `slot-${index}`}
+                                onClick={() => handleSlotClick(slot)}
+                                sx={{
+                                  border: 1,
+                                  borderColor: 'divider',
+                                  borderRadius: 1,
+                                  mb: 1,
+                                  '&:hover': {
+                                    bgcolor: 'action.hover',
+                                  },
+                                }}
+                              >
+                                <Typography variant="body1">
+                                  {startTime}{endTime !== 'N/A' ? ` - ${endTime}` : ''}
+                                </Typography>
+                              </ListItemButton>
+                            );
+                          })}
+                        </List>
+                      </Box>
+                      {/* Top scroll indicator */}
+                      {showNewBookingScrollTop && (
+                        <Box
+                          sx={{
+                            position: 'absolute',
+                            top: 0,
+                            left: 0,
+                            right: 0,
+                            height: '40px',
+                            background: 'linear-gradient(to top, transparent, rgba(255,255,255,0.8))',
+                            display: 'flex',
+                            justifyContent: 'center',
+                            alignItems: 'flex-start',
+                            pointerEvents: 'none',
+                            pt: 0.5,
+                            borderRadius: '4px 4px 0 0',
+                          }}
+                        >
+                          <KeyboardArrowUpIcon sx={{ color: 'text.secondary', opacity: 0.7 }} />
+                        </Box>
+                      )}
+                      {/* Bottom scroll indicator */}
+                      {showNewBookingScrollBottom && (
+                        <Box
+                          sx={{
+                            position: 'absolute',
+                            bottom: 0,
+                            left: 0,
+                            right: 0,
+                            height: '40px',
+                            background: 'linear-gradient(to bottom, transparent, rgba(255,255,255,0.8))',
+                            display: 'flex',
+                            justifyContent: 'center',
+                            alignItems: 'flex-end',
+                            pointerEvents: 'none',
+                            pb: 0.5,
+                            borderRadius: '0 0 4px 4px',
+                          }}
+                        >
+                          <KeyboardArrowDownIcon sx={{ color: 'text.secondary', opacity: 0.7 }} />
+                        </Box>
+                      )}
+                    </Box>
                   ) : (
                     <Alert severity="info">
                       {t('pages.booking.noAvailableSessions')}
@@ -2201,7 +2408,8 @@ const BookingPage = ({ sessionTypeId: propSessionTypeId, hideMyBookings = false 
           <DialogActions>
             <Button
               onClick={handleCancelDialogClose}
-              color="inherit"
+              variant="contained"
+              color="primary"
               disabled={cancelling}
               sx={{ textTransform: 'none' }}
             >
@@ -2209,7 +2417,7 @@ const BookingPage = ({ sessionTypeId: propSessionTypeId, hideMyBookings = false 
             </Button>
             <Button
               onClick={handleConfirmCancel}
-              variant="contained"
+              variant="outlined"
               color="error"
               disabled={cancelling}
               sx={{ textTransform: 'none' }}
@@ -2331,39 +2539,96 @@ const BookingPage = ({ sessionTypeId: propSessionTypeId, hideMyBookings = false 
                         <CircularProgress />
                       </Box>
                     ) : updateAvailableSlots.length > 0 ? (
-                      <List>
-                        {updateAvailableSlots.map((slot, index) => {
-                          const startTime = slot.startTime
-                            ? formatTime(slot.startTime)
-                            : (slot.startTimeInstant ? formatTimeFromInstant(slot.startTimeInstant) : 'N/A');
-                          const endTime = slot.endTime
-                            ? formatTime(slot.endTime)
-                            : 'N/A';
-                          const isSelected = updateSelectedSlot?.startTimeInstant === slot.startTimeInstant;
+                      <Box sx={{ position: 'relative' }}>
+                        <Box
+                          ref={updateBookingSlotsScrollRef}
+                          sx={{ maxHeight: '240px', overflowY: 'auto', pr: 1 }}
+                          onScroll={(e) => {
+                            const element = e.target;
+                            const isAtTop = element.scrollTop === 0;
+                            const isAtBottom = Math.abs(element.scrollHeight - element.scrollTop - element.clientHeight) < 1;
 
-                          return (
-                            <ListItemButton
-                              key={slot.startTimeInstant || `slot-${index}`}
-                              onClick={() => handleUpdateSlotClick(slot)}
-                              selected={isSelected}
-                              sx={{
-                                border: 1,
-                                borderColor: isSelected ? 'primary.main' : 'divider',
-                                borderRadius: 1,
-                                mb: 1,
-                                bgcolor: isSelected ? 'action.selected' : 'transparent',
-                                '&:hover': {
-                                  bgcolor: 'action.hover',
-                                },
-                              }}
-                            >
-                              <Typography variant="body1">
-                                {startTime}{endTime !== 'N/A' ? ` - ${endTime}` : ''}
-                              </Typography>
-                            </ListItemButton>
-                          );
-                        })}
-                      </List>
+                            setShowUpdateBookingScrollTop(!isAtTop);
+                            setShowUpdateBookingScrollBottom(!isAtBottom && updateAvailableSlots.length > 4);
+                          }}
+                        >
+                          <List>
+                            {updateAvailableSlots.map((slot, index) => {
+                              const startTime = slot.startTime
+                                ? formatTime(slot.startTime)
+                                : (slot.startTimeInstant ? formatTimeFromInstant(slot.startTimeInstant) : 'N/A');
+                              const endTime = slot.endTime
+                                ? formatTime(slot.endTime)
+                                : 'N/A';
+                              const isSelected = updateSelectedSlot?.startTimeInstant === slot.startTimeInstant;
+
+                              return (
+                                <ListItemButton
+                                  key={slot.startTimeInstant || `slot-${index}`}
+                                  onClick={() => handleUpdateSlotClick(slot)}
+                                  selected={isSelected}
+                                  sx={{
+                                    border: 1,
+                                    borderColor: isSelected ? 'primary.main' : 'divider',
+                                    borderRadius: 1,
+                                    mb: 1,
+                                    bgcolor: isSelected ? 'action.selected' : 'transparent',
+                                    '&:hover': {
+                                      bgcolor: 'action.hover',
+                                    },
+                                  }}
+                                >
+                                  <Typography variant="body1">
+                                    {startTime}{endTime !== 'N/A' ? ` - ${endTime}` : ''}
+                                  </Typography>
+                                </ListItemButton>
+                              );
+                            })}
+                          </List>
+                        </Box>
+                        {/* Top scroll indicator */}
+                        {showUpdateBookingScrollTop && (
+                          <Box
+                            sx={{
+                              position: 'absolute',
+                              top: 0,
+                              left: 0,
+                              right: 0,
+                              height: '40px',
+                              background: 'linear-gradient(to top, transparent, rgba(255,255,255,0.8))',
+                              display: 'flex',
+                              justifyContent: 'center',
+                              alignItems: 'flex-start',
+                              pointerEvents: 'none',
+                              pt: 0.5,
+                              borderRadius: '4px 4px 0 0',
+                            }}
+                          >
+                            <KeyboardArrowUpIcon sx={{ color: 'text.secondary', opacity: 0.7 }} />
+                          </Box>
+                        )}
+                        {/* Bottom scroll indicator */}
+                        {showUpdateBookingScrollBottom && (
+                          <Box
+                            sx={{
+                              position: 'absolute',
+                              bottom: 0,
+                              left: 0,
+                              right: 0,
+                              height: '40px',
+                              background: 'linear-gradient(to bottom, transparent, rgba(255,255,255,0.8))',
+                              display: 'flex',
+                              justifyContent: 'center',
+                              alignItems: 'flex-end',
+                              pointerEvents: 'none',
+                              pb: 0.5,
+                              borderRadius: '0 0 4px 4px',
+                            }}
+                          >
+                            <KeyboardArrowDownIcon sx={{ color: 'text.secondary', opacity: 0.7 }} />
+                          </Box>
+                        )}
+                      </Box>
                     ) : (
                       <Alert severity="info">
                         {t('pages.booking.noAvailableSessions')}
@@ -2385,14 +2650,19 @@ const BookingPage = ({ sessionTypeId: propSessionTypeId, hideMyBookings = false 
                       setUpdateClientMessage(value);
                     }
                   }}
-                  disabled={updatingBooking}
+                  disabled={updatingBooking || !updateSelectedSlot}
                   error={updateClientMessage.length > 2000}
                   helperText={
                     updateClientMessage.length > 2000
                       ? t('pages.booking.messageMaxLength')
                       : `${updateClientMessage.length}/2000 ${t('common.characters')}`
                   }
-                  sx={{ mt: 3 }}
+                  sx={{
+                    mt: 3,
+                    '& .MuiOutlinedInput-root': {
+                      backgroundColor: (updatingBooking || !updateSelectedSlot) ? 'action.hover' : 'inherit'
+                    }
+                  }}
                 />
               </>
             )}

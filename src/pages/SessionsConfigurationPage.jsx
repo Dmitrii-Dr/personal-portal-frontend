@@ -40,6 +40,8 @@ import {
 import EditIcon from '@mui/icons-material/Edit';
 import DeleteIcon from '@mui/icons-material/Delete';
 import AddIcon from '@mui/icons-material/Add';
+import KeyboardArrowDownIcon from '@mui/icons-material/KeyboardArrowDown';
+import KeyboardArrowUpIcon from '@mui/icons-material/KeyboardArrowUp';
 import { DateCalendar } from '@mui/x-date-pickers/DateCalendar';
 import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
 import { AdapterDayjs } from '@mui/x-date-pickers/AdapterDayjs';
@@ -88,6 +90,12 @@ const SessionsConfigurationPage = () => {
   const [selectedTimezone, setSelectedTimezone] = useState(null);
   const [userTimezone, setUserTimezone] = useState(null);
   const hasFetchedSessionTypesRef = useRef(false);
+
+  // Available Slots Scroll state
+  const slotsScrollRef = useRef(null);
+  const [showScrollTop, setShowScrollTop] = useState(false);
+  const [showScrollBottom, setShowScrollBottom] = useState(false);
+
 
   // Timezones state
   const [timezones, setTimezones] = useState([]);
@@ -268,6 +276,20 @@ const SessionsConfigurationPage = () => {
       setLoadingSlots(false);
     }
   };
+
+  // Effect to handle scroll indicator initial state when slots are loaded
+  useEffect(() => {
+    if (availableSlots.length > 0) {
+      // Small timeout to allow render
+      setTimeout(() => {
+        if (slotsScrollRef.current) {
+          const element = slotsScrollRef.current;
+          const isScrollable = element.scrollHeight > element.clientHeight;
+          setShowScrollBottom(isScrollable);
+        }
+      }, 100);
+    }
+  }, [availableSlots]);
 
   // Handle session type form
   const handleOpenSessionTypeDialog = (sessionType = null) => {
@@ -665,33 +687,90 @@ const SessionsConfigurationPage = () => {
                           <CircularProgress />
                         </Box>
                       ) : availableSlots.length > 0 ? (
-                        <List>
-                          {availableSlots.map((slot, index) => {
-                            const startTime = slot.startTime
-                              ? formatTime(slot.startTime)
-                              : slot.startTimeInstant
-                                ? formatTimeFromInstant(slot.startTimeInstant)
-                                : 'N/A';
-                            const endTime = slot.endTime ? formatTime(slot.endTime) : 'N/A';
+                        <Box sx={{ position: 'relative' }}>
+                          <Box
+                            ref={slotsScrollRef}
+                            sx={{ maxHeight: '240px', overflowY: 'auto', pr: 1 }}
+                            onScroll={(e) => {
+                              const element = e.target;
+                              const isAtTop = element.scrollTop === 0;
+                              const isAtBottom = Math.abs(element.scrollHeight - element.scrollTop - element.clientHeight) < 1;
 
-                            return (
-                              <ListItem
-                                key={slot.startTimeInstant || `slot-${index}`}
-                                sx={{
-                                  border: 1,
-                                  borderColor: 'divider',
-                                  borderRadius: 1,
-                                  mb: 1,
-                                }}
-                              >
-                                <ListItemText
-                                  primary={startTime}
-                                  secondary={endTime !== 'N/A' ? t('admin.sessionConfiguration.endsAt', { time: endTime }) : null}
-                                />
-                              </ListItem>
-                            );
-                          })}
-                        </List>
+                              setShowScrollTop(!isAtTop);
+                              setShowScrollBottom(!isAtBottom && availableSlots.length > 4);
+                            }}
+                          >
+                            <List>
+                              {availableSlots.map((slot, index) => {
+                                const startTime = slot.startTime
+                                  ? formatTime(slot.startTime)
+                                  : slot.startTimeInstant
+                                    ? formatTimeFromInstant(slot.startTimeInstant)
+                                    : 'N/A';
+                                const endTime = slot.endTime ? formatTime(slot.endTime) : 'N/A';
+
+                                return (
+                                  <ListItem
+                                    key={slot.startTimeInstant || `slot-${index}`}
+                                    sx={{
+                                      border: 1,
+                                      borderColor: 'divider',
+                                      borderRadius: 1,
+                                      mb: 1,
+                                    }}
+                                  >
+                                    <ListItemText
+                                      primary={startTime}
+                                      secondary={endTime !== 'N/A' ? t('admin.sessionConfiguration.endsAt', { time: endTime }) : null}
+                                    />
+                                  </ListItem>
+                                );
+                              })}
+                            </List>
+                          </Box>
+                          {/* Top scroll indicator */}
+                          {showScrollTop && (
+                            <Box
+                              sx={{
+                                position: 'absolute',
+                                top: 0,
+                                left: 0,
+                                right: 0,
+                                height: '40px',
+                                background: 'linear-gradient(to top, transparent, rgba(255,255,255,0.8))',
+                                display: 'flex',
+                                justifyContent: 'center',
+                                alignItems: 'flex-start',
+                                pointerEvents: 'none',
+                                pt: 0.5,
+                                borderRadius: '4px 4px 0 0',
+                              }}
+                            >
+                              <KeyboardArrowUpIcon sx={{ color: 'text.secondary', opacity: 0.7 }} />
+                            </Box>
+                          )}
+                          {/* Bottom scroll indicator */}
+                          {showScrollBottom && (
+                            <Box
+                              sx={{
+                                position: 'absolute',
+                                bottom: 0,
+                                left: 0,
+                                right: 0,
+                                height: '40px',
+                                background: 'linear-gradient(to bottom, transparent, rgba(255,255,255,0.8))',
+                                display: 'flex',
+                                justifyContent: 'center',
+                                alignItems: 'flex-end',
+                                pointerEvents: 'none',
+                                pb: 0.5,
+                                borderRadius: '0 0 4px 4px',
+                              }}
+                            >
+                              <KeyboardArrowDownIcon sx={{ color: 'text.secondary', opacity: 0.7 }} />
+                            </Box>
+                          )}
+                        </Box>
                       ) : (
                         <Alert severity="info">{t('admin.sessionConfiguration.noAvailableSlots')}</Alert>
                       )}
