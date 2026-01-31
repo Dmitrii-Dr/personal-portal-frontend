@@ -797,26 +797,31 @@ const BookingPage = ({ sessionTypeId: propSessionTypeId, hideMyBookings = false 
   const handleUpdateDialogClose = () => {
     if (updatingBooking) return; // Prevent closing during update
     setUpdateDialogOpen(false);
-    setBookingToUpdate(null);
-    setUpdateSelectedSlot(null);
-    setUpdateClientMessage('');
-    setUpdateBookingError(null);
-    setUpdateAvailableSlots([]);
-    setUpdateSlotError(null);
-    setUpdateSessionTypeId(null);
-    // Clear cache when update dialog closes
-    clearAllCache();
+    // Delay clearing state until after dialog close animation completes
+    setTimeout(() => {
+      setBookingToUpdate(null);
+      setUpdateSelectedSlot(null);
+      setUpdateClientMessage('');
+      setUpdateBookingError(null);
+      setUpdateAvailableSlots([]);
+      setUpdateSlotError(null);
+      setUpdateSessionTypeId(null);
+      // Clear cache when update dialog closes
+      clearAllCache();
+    }, 300);
   };
 
   // Handle booking update confirmation
   const handleConfirmUpdate = async () => {
     if (!bookingToUpdate || !bookingToUpdate.id || !updateSelectedSlot || !updateSelectedSlot.startTimeInstant) {
-      setUpdateBookingError(t('pages.booking.selectTimeSlot'));
+      // Use setBookingError (Snackbar) for validation to be consistent with handling logic
+      setBookingError(t('pages.booking.selectTimeSlot'));
       return;
     }
 
     setUpdatingBooking(true);
     setUpdateBookingError(null);
+    setBookingError(null);
 
     try {
       const payload = {
@@ -835,6 +840,8 @@ const BookingPage = ({ sessionTypeId: propSessionTypeId, hideMyBookings = false 
 
       // Success - close dialog and refresh bookings and slots
       handleUpdateDialogClose();
+      setSuccessMessage(t('pages.booking.bookingUpdated'));
+
       if (hasToken) {
         await fetchBookings(); // Refresh bookings list when user is logged in
         await fetchPastBookings(); // Refresh past sessions
@@ -850,7 +857,16 @@ const BookingPage = ({ sessionTypeId: propSessionTypeId, hideMyBookings = false 
       console.error('Error updating booking:', err);
       let errorMessage = t('pages.booking.failedToUpdateBooking');
 
-      if (err.code === 'ECONNABORTED') {
+      // Check for 400 or 500 errors and show user-friendly message
+      if (err.response && (err.response.status === 400 || err.response.status >= 500)) {
+        errorMessage = t('pages.booking.bookingErrorRetry');
+        // Invalidate cache to refresh slots (e.g. if slot taken)
+        const dateString = formatDateForAPI(updateSelectedDate);
+        const currentTimezone = getCurrentTimezone();
+        if (updateSessionTypeId) {
+          invalidateCache(updateSessionTypeId, dateString, currentTimezone);
+        }
+      } else if (err.code === 'ECONNABORTED') {
         errorMessage = 'Request timed out. Please try again.';
       } else if (err.response) {
         errorMessage = err.response.data?.message || `Server error: ${err.response.status}`;
@@ -866,7 +882,8 @@ const BookingPage = ({ sessionTypeId: propSessionTypeId, hideMyBookings = false 
         errorMessage = err.message || errorMessage;
       }
 
-      setUpdateBookingError(errorMessage);
+      // Use setBookingError (Snackbar) instead of inline setUpdateBookingError
+      setBookingError(errorMessage);
     } finally {
       setUpdatingBooking(false);
     }
@@ -963,6 +980,7 @@ const BookingPage = ({ sessionTypeId: propSessionTypeId, hideMyBookings = false 
 
       // Show login/signup dialog
       setLoginRequiredDialogOpen(true);
+      setOpenDialog(false);
       return;
     }
 
@@ -996,6 +1014,7 @@ const BookingPage = ({ sessionTypeId: propSessionTypeId, hideMyBookings = false 
       handleDialogClose();
       handleNewBookingDialogClose(); // Close new booking dialog (also clears cache)
       setSuccessMessage(t('pages.booking.bookingSuccess'));
+      navigate('/booking'); // Redirect to booking page on success
       if (hasToken) {
         await fetchBookings(); // Refresh bookings list when user is logged in
       }
@@ -1680,7 +1699,21 @@ const BookingPage = ({ sessionTypeId: propSessionTypeId, hideMyBookings = false 
                     </FormControl>
                   ) : (
                     <Alert severity="info" sx={{ mb: 2 }}>
-                      {t('pages.booking.slotsTimezone', { timezone: getCurrentTimezone() })}
+                      <Tooltip title={t('pages.booking.slotsTimezoneTooltip')} placement="bottom">
+                        <span>
+                          {(() => {
+                            const currentOffset = getCurrentTimezone();
+                            const found = timezones.find(tz => tz.offset === currentOffset);
+                            const displayName = found
+                              ? t(`pages.profile.timezones.${found.id}`, { defaultValue: found.displayName })
+                              : currentOffset;
+
+                            return t('pages.booking.slotsTimezone', {
+                              timezone: found ? `${displayName} (${currentOffset})` : currentOffset
+                            });
+                          })()}
+                        </span>
+                      </Tooltip>
                     </Alert>
                   )
                 )}
@@ -1919,17 +1952,21 @@ const BookingPage = ({ sessionTypeId: propSessionTypeId, hideMyBookings = false 
                       </FormControl>
                     ) : (
                       <Alert severity="info" sx={{ mb: 2 }}>
-                        {(() => {
-                          const currentOffset = getCurrentTimezone();
-                          const found = timezones.find(tz => tz.offset === currentOffset);
-                          const displayName = found
-                            ? t(`pages.profile.timezones.${found.id}`, { defaultValue: found.displayName })
-                            : currentOffset;
+                        <Tooltip title={t('pages.booking.slotsTimezoneTooltip')} placement="bottom">
+                          <span>
+                            {(() => {
+                              const currentOffset = getCurrentTimezone();
+                              const found = timezones.find(tz => tz.offset === currentOffset);
+                              const displayName = found
+                                ? t(`pages.profile.timezones.${found.id}`, { defaultValue: found.displayName })
+                                : currentOffset;
 
-                          return t('pages.booking.slotsTimezone', {
-                            timezone: `${displayName} (${currentOffset})`
-                          });
-                        })()}
+                              return t('pages.booking.slotsTimezone', {
+                                timezone: `${displayName} (${currentOffset})`
+                              });
+                            })()}
+                          </span>
+                        </Tooltip>
                       </Alert>
                     )
                   )}
@@ -2191,7 +2228,22 @@ const BookingPage = ({ sessionTypeId: propSessionTypeId, hideMyBookings = false 
 
         {/* Update Booking Dialog */}
         <Dialog open={updateDialogOpen} onClose={handleUpdateDialogClose} maxWidth="md" fullWidth>
-          <DialogTitle>{t('pages.booking.updateSessionDateTimeTitle')}</DialogTitle>
+          <DialogTitle sx={{ m: 0, p: 2, pr: 6 }}>
+            {t('pages.booking.updateSessionDateTimeTitle')}
+            <IconButton
+              aria-label="close"
+              onClick={handleUpdateDialogClose}
+              disabled={updatingBooking}
+              sx={{
+                position: 'absolute',
+                right: 8,
+                top: 8,
+                color: (theme) => theme.palette.grey[500],
+              }}
+            >
+              <CloseIcon />
+            </IconButton>
+          </DialogTitle>
           <DialogContent>
             {bookingToUpdate && (
               <>
@@ -2240,6 +2292,26 @@ const BookingPage = ({ sessionTypeId: propSessionTypeId, hideMyBookings = false 
                     <Typography variant="h6" gutterBottom>
                       {t('pages.booking.availableTimes')} {formatDateForDisplay(updateSelectedDate)}
                     </Typography>
+
+                    {(updateLoadingSlots || updateAvailableSlots.length > 0) && (
+                      <Alert severity="info" sx={{ mb: 2 }}>
+                        <Tooltip title={t('pages.booking.slotsTimezoneTooltip')} placement="bottom">
+                          <span>
+                            {(() => {
+                              const currentOffset = getCurrentTimezone();
+                              const found = timezones.find(tz => tz.offset === currentOffset);
+                              const displayName = found
+                                ? t(`pages.profile.timezones.${found.id}`, { defaultValue: found.displayName })
+                                : currentOffset;
+
+                              return t('pages.booking.slotsTimezone', {
+                                timezone: found ? `${displayName} (${currentOffset})` : currentOffset
+                              });
+                            })()}
+                          </span>
+                        </Tooltip>
+                      </Alert>
+                    )}
 
                     {updateSlotError && (
                       <Alert severity="error" sx={{ mb: 2 }}>
@@ -2327,14 +2399,6 @@ const BookingPage = ({ sessionTypeId: propSessionTypeId, hideMyBookings = false 
           </DialogContent>
           <DialogActions>
             <Button
-              onClick={handleUpdateDialogClose}
-              color="inherit"
-              disabled={updatingBooking}
-              sx={{ textTransform: 'none' }}
-            >
-              {t('common.cancel')}
-            </Button>
-            <Button
               onClick={handleConfirmUpdate}
               color="primary"
               variant="contained"
@@ -2359,7 +2423,7 @@ const BookingPage = ({ sessionTypeId: propSessionTypeId, hideMyBookings = false 
           autoHideDuration={6000}
           onClose={() => setSuccessMessage(null)}
           anchorOrigin={{ vertical: 'top', horizontal: 'right' }}
-          sx={{ mt: { xs: 8, sm: 9, md: 10 } }}
+          sx={{ mt: { xs: 8, sm: 9, md: 10 }, zIndex: 99999, position: 'fixed' }}
         >
           <Alert onClose={() => setSuccessMessage(null)} severity="success" sx={{ width: '100%' }}>
             {successMessage}
@@ -2372,7 +2436,7 @@ const BookingPage = ({ sessionTypeId: propSessionTypeId, hideMyBookings = false 
           autoHideDuration={8000}
           onClose={() => setBookingError(null)}
           anchorOrigin={{ vertical: 'top', horizontal: 'right' }}
-          sx={{ mt: { xs: 8, sm: 9, md: 10 } }}
+          sx={{ mt: { xs: 8, sm: 9, md: 10 }, zIndex: 99999, position: 'fixed' }}
         >
           <Alert onClose={() => setBookingError(null)} severity="error" sx={{ width: '100%' }}>
             {bookingError}

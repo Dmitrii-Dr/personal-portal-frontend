@@ -35,6 +35,7 @@ import {
   Snackbar,
   Popover,
   InputLabel as MuiInputLabel,
+  Tooltip,
 } from '@mui/material';
 import EditIcon from '@mui/icons-material/Edit';
 import DeleteIcon from '@mui/icons-material/Delete';
@@ -44,9 +45,11 @@ import { DateCalendar } from '@mui/x-date-pickers/DateCalendar';
 import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
 import { AdapterDayjs } from '@mui/x-date-pickers/AdapterDayjs';
 import dayjs from 'dayjs';
+import 'dayjs/locale/en-gb';
+import 'dayjs/locale/ru';
 
 const AvailabilityRuleComponent = () => {
-  const { t } = useTranslation();
+  const { t, i18n: i18nInstance } = useTranslation();
 
   const DAYS_OF_WEEK = [
     { value: 'MONDAY', label: t('admin.sessionConfiguration.availabilityRules.monday') },
@@ -474,14 +477,14 @@ const AvailabilityRuleComponent = () => {
     <Box>
       <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
         <Typography variant="h6">{t('admin.sessionConfiguration.availabilityRules.title')}</Typography>
-        <Button
-          variant="contained"
-          startIcon={<AddIcon />}
-          onClick={() => handleOpenDialog()}
-          sx={{ textTransform: 'none' }}
-        >
-          {t('admin.sessionConfiguration.availabilityRules.addRule')}
-        </Button>
+        <Tooltip title={t('admin.sessionConfiguration.availabilityRules.addRule')}>
+          <IconButton
+            color="primary"
+            onClick={() => handleOpenDialog()}
+          >
+            <AddIcon />
+          </IconButton>
+        </Tooltip>
       </Box>
 
       {error && (
@@ -575,7 +578,7 @@ const AvailabilityRuleComponent = () => {
             </Alert>
           )}
 
-          <LocalizationProvider dateAdapter={AdapterDayjs} adapterLocale="en-gb">
+          <LocalizationProvider dateAdapter={AdapterDayjs} adapterLocale={i18nInstance.language === 'ru' ? 'ru' : 'en-gb'}>
             <Grid container spacing={2} sx={{ mt: 1 }}>
               {/* Row 1: Rule Start Date and Rule End Date */}
               <Grid item xs={12} sm={6}>

@@ -29,6 +29,7 @@ import {
   Snackbar,
   Popover,
   InputLabel as MuiInputLabel,
+  Tooltip,
 } from '@mui/material';
 import EditIcon from '@mui/icons-material/Edit';
 import DeleteIcon from '@mui/icons-material/Delete';
@@ -40,9 +41,11 @@ import { DateCalendar } from '@mui/x-date-pickers/DateCalendar';
 import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
 import { AdapterDayjs } from '@mui/x-date-pickers/AdapterDayjs';
 import dayjs from 'dayjs';
+import 'dayjs/locale/en-gb';
+import 'dayjs/locale/ru';
 
 const AvailabilityOverrideComponent = () => {
-  const { t } = useTranslation();
+  const { t, i18n: i18nInstance } = useTranslation();
   const [overrides, setOverrides] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
@@ -532,6 +535,7 @@ const AvailabilityOverrideComponent = () => {
         startTime: formatTimeForAPI(formData.startTime),
         endTime: formatTimeForAPI(formData.endTime),
         isAvailable: formData.isAvailable,
+        ...(editingOverride && { id: editingOverride.id }),
       };
 
       let response;
@@ -610,14 +614,14 @@ const AvailabilityOverrideComponent = () => {
     <Box>
       <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
         <Typography variant="h6">{t('admin.sessionConfiguration.availabilityOverrides.title')}</Typography>
-        <Button
-          variant="contained"
-          startIcon={<AddIcon />}
-          onClick={() => handleOpenDialog()}
-          sx={{ textTransform: 'none' }}
-        >
-          {t('admin.sessionConfiguration.availabilityOverrides.addOverride')}
-        </Button>
+        <Tooltip title={t('admin.sessionConfiguration.availabilityOverrides.addOverride')}>
+          <IconButton
+            color="primary"
+            onClick={() => handleOpenDialog()}
+          >
+            <AddIcon />
+          </IconButton>
+        </Tooltip>
       </Box>
 
       {error && (
@@ -711,7 +715,7 @@ const AvailabilityOverrideComponent = () => {
             </Alert>
           )}
 
-          <LocalizationProvider dateAdapter={AdapterDayjs}>
+          <LocalizationProvider dateAdapter={AdapterDayjs} adapterLocale={i18nInstance.language === 'ru' ? 'ru' : 'en-gb'}>
             <Grid container spacing={2} sx={{ mt: 1 }}>
               {/* Override Date */}
               <Grid item xs={12}>

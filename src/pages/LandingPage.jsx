@@ -544,7 +544,7 @@ const LandingPage = () => {
                     variant="h2"
                     component="h2"
                     sx={{
-                      fontSize: { xs: '2rem', sm: '2.5rem', md: '3rem' },
+                      fontSize: { xs: '1.5rem', sm: '1.75rem', md: '2rem' },
                       fontWeight: 700,
                       color: 'black',
                       letterSpacing: '0.05em',
@@ -616,39 +616,32 @@ const LandingPage = () => {
                 <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap', mt: 4 }}>
                   <Button
                     variant="contained"
+                    color="primary"
                     onClick={() => navigate('/about-me')}
                     sx={{
-                      bgcolor: 'black',
-                      color: 'white',
                       textTransform: 'none',
                       px: 4,
                       py: 1.5,
                       fontSize: '1rem',
                       fontWeight: 500,
-                      borderRadius: 0,
-                      '&:hover': {
-                        bgcolor: '#333',
-                      },
+                      flex: 1,
+                      minWidth: '180px',
                     }}
                   >
                     {t('landing.about.readMore')}
                   </Button>
                   <Button
-                    variant="outlined"
+                    variant="contained"
+                    color="primary"
                     onClick={() => scrollToSection(servicesRef)}
                     sx={{
-                      borderColor: 'black',
-                      color: 'black',
                       textTransform: 'none',
                       px: 4,
                       py: 1.5,
                       fontSize: '1rem',
                       fontWeight: 500,
-                      borderRadius: 0,
-                      '&:hover': {
-                        borderColor: '#333',
-                        bgcolor: 'rgba(0, 0, 0, 0.05)',
-                      },
+                      flex: 1,
+                      minWidth: '180px',
                     }}
                   >
                     {t('landing.about.freeConsultation')}
@@ -774,7 +767,7 @@ const LandingPage = () => {
                     variant="h2"
                     component="h2"
                     sx={{
-                      fontSize: { xs: '2rem', sm: '2.5rem', md: '3rem' },
+                      fontSize: { xs: '1.5rem', sm: '1.75rem', md: '2rem' },
                       fontWeight: 700,
                       color: 'black',
                       letterSpacing: '0.05em',
@@ -844,7 +837,11 @@ const LandingPage = () => {
             component="h2"
             align="center"
             gutterBottom
-            sx={{ mb: 2, fontWeight: 600 }}
+            sx={{
+              mb: 2,
+              fontWeight: 600,
+              fontSize: { xs: '1.5rem', sm: '1.75rem', md: '2rem' },
+            }}
           >
             {t('landing.services.title')}
           </Typography>
@@ -1156,7 +1153,7 @@ const LandingPage = () => {
               variant="h2"
               component="h2"
               sx={{
-                fontSize: { xs: '2rem', sm: '2.5rem', md: '3rem' },
+                fontSize: { xs: '1.5rem', sm: '1.75rem', md: '2rem' },
                 fontWeight: 700,
                 color: 'black',
                 letterSpacing: '0.05em',
@@ -1183,7 +1180,7 @@ const LandingPage = () => {
                 <>
                   <Grid container spacing={3}>
                     {blogArticles.map((article) => {
-                      // Get first 300 characters of content, stripping HTML tags
+                      // Use excerpt if available, otherwise get first 250 characters of content
                       const stripHtml = (html) => {
                         if (!html) return '';
                         // Remove HTML tags using regex
@@ -1191,9 +1188,13 @@ const LandingPage = () => {
                       };
 
                       const plainContent = stripHtml(article.content || '');
-                      const contentPreview = plainContent.length > 300
-                        ? plainContent.substring(0, 300) + '...'
-                        : plainContent;
+                      const cleanExcerpt = article.excerpt ? article.excerpt.trim() : '';
+
+                      const contentPreview = cleanExcerpt
+                        ? cleanExcerpt
+                        : (plainContent.length > 250
+                          ? plainContent.substring(0, 250) + '...'
+                          : plainContent);
 
                       return (
                         <Grid item xs={12} md={4} key={article.articleId}>
@@ -1211,17 +1212,13 @@ const LandingPage = () => {
                           >
                             <CardContent sx={{ flexGrow: 1 }}>
                               <Typography
-                                variant="h5"
+                                variant="subtitle1"
                                 component="h3"
                                 gutterBottom
                                 sx={{
                                   fontWeight: 600,
-                                  mb: 2,
-                                  minHeight: '3em',
-                                  display: '-webkit-box',
-                                  WebkitLineClamp: 2,
-                                  WebkitBoxOrient: 'vertical',
-                                  overflow: 'hidden',
+                                  lineHeight: 1.4,
+                                  mb: 1,
                                 }}
                               >
                                 {article.title || 'Untitled'}
@@ -1230,13 +1227,9 @@ const LandingPage = () => {
                                 variant="body2"
                                 color="text.secondary"
                                 sx={{
-                                  lineHeight: 1.6,
+                                  fontSize: '0.8rem',
+                                  lineHeight: 1.5,
                                   mb: 2,
-                                  minHeight: '4.5em',
-                                  display: '-webkit-box',
-                                  WebkitLineClamp: 3,
-                                  WebkitBoxOrient: 'vertical',
-                                  overflow: 'hidden',
                                 }}
                               >
                                 {contentPreview}
@@ -1263,19 +1256,14 @@ const LandingPage = () => {
                   <Box sx={{ display: 'flex', justifyContent: 'center', mt: 4 }}>
                     <Button
                       variant="contained"
+                      color="primary"
                       onClick={() => navigate('/blog')}
                       sx={{
-                        bgcolor: 'black',
-                        color: 'white',
                         textTransform: 'none',
                         px: 4,
                         py: 1.5,
                         fontSize: '1rem',
                         fontWeight: 500,
-                        borderRadius: 0,
-                        '&:hover': {
-                          bgcolor: '#333',
-                        },
                       }}
                     >
                       {t('landing.blog.viewAllArticles')}
@@ -1324,7 +1312,7 @@ const LandingPage = () => {
                 variant="h2"
                 component="h2"
                 sx={{
-                  fontSize: { xs: '2rem', sm: '2.5rem', md: '3rem' },
+                  fontSize: { xs: '1.5rem', sm: '1.75rem', md: '2rem' },
                   fontWeight: 700,
                   color: 'black',
                   letterSpacing: '0.05em',

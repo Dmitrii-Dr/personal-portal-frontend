@@ -35,6 +35,7 @@ import {
   Container,
   FormControlLabel,
   Checkbox,
+  Tooltip,
 } from '@mui/material';
 import EditIcon from '@mui/icons-material/Edit';
 import DeleteIcon from '@mui/icons-material/Delete';
@@ -46,6 +47,7 @@ import dayjs from 'dayjs';
 import updateLocale from 'dayjs/plugin/updateLocale';
 import localeData from 'dayjs/plugin/localeData';
 import 'dayjs/locale/en-gb';
+import 'dayjs/locale/ru';
 
 // Configure dayjs to start week on Monday
 dayjs.extend(updateLocale);
@@ -53,7 +55,7 @@ dayjs.extend(localeData);
 dayjs.locale('en-gb'); // Use en-gb locale which starts week on Monday
 
 const SessionsConfigurationPage = () => {
-  const { t } = useTranslation();
+  const { t, i18n: i18nInstance } = useTranslation();
 
   // Session types state
   const [sessionTypes, setSessionTypes] = useState([]);
@@ -73,6 +75,9 @@ const SessionsConfigurationPage = () => {
     },
   });
   const [error, setError] = useState(null);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [sessionTypeToDelete, setSessionTypeToDelete] = useState(null);
+  const [deleting, setDeleting] = useState(false);
 
   // Available slots state
   const [selectedDate, setSelectedDate] = useState(dayjs());
@@ -386,14 +391,23 @@ const SessionsConfigurationPage = () => {
     }
   };
 
-  const handleDeleteSessionType = async (sessionType) => {
-    if (!window.confirm(t('admin.sessionConfiguration.confirmDelete', { name: sessionType.name }))) {
-      return;
-    }
+  const handleDeleteSessionType = (sessionType) => {
+    setSessionTypeToDelete(sessionType);
+    setDeleteDialogOpen(true);
+  };
 
+  const handleCloseDeleteDialog = () => {
+    setDeleteDialogOpen(false);
+    setSessionTypeToDelete(null);
+  };
+
+  const handleConfirmDelete = async () => {
+    if (!sessionTypeToDelete) return;
+
+    setDeleting(true);
     try {
       const response = await fetchWithAuth(
-        `/api/v1/admin/session/type/${sessionType.id || sessionType.sessionTypeId}`,
+        `/api/v1/admin/session/type/${sessionTypeToDelete.id || sessionTypeToDelete.sessionTypeId}`,
         {
           method: 'DELETE',
         }
@@ -416,9 +430,12 @@ const SessionsConfigurationPage = () => {
           setSelectedSessionTypeId(null);
         }
       }
+      handleCloseDeleteDialog();
     } catch (err) {
       console.error('Error deleting session type:', err);
       setError(err.message || t('admin.sessionConfiguration.failedToDelete'));
+    } finally {
+      setDeleting(false);
     }
   };
 
@@ -464,14 +481,14 @@ const SessionsConfigurationPage = () => {
                 <CardContent>
                   <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
                     <Typography variant="h6">{t('admin.sessionConfiguration.sessionTypes')}</Typography>
-                    <Button
-                      variant="contained"
-                      startIcon={<AddIcon />}
-                      onClick={() => handleOpenSessionTypeDialog()}
-                      sx={{ textTransform: 'none' }}
-                    >
-                      {t('admin.sessionConfiguration.addSessionType')}
-                    </Button>
+                    <Tooltip title={t('admin.sessionConfiguration.addSessionType')}>
+                      <IconButton
+                        color="primary"
+                        onClick={() => handleOpenSessionTypeDialog()}
+                      >
+                        <AddIcon />
+                      </IconButton>
+                    </Tooltip>
                   </Box>
 
                   {loadingSessionTypes ? (
@@ -622,7 +639,7 @@ const SessionsConfigurationPage = () => {
 
                   <Grid container spacing={2}>
                     <Grid item xs={12} md={6}>
-                      <LocalizationProvider dateAdapter={AdapterDayjs} adapterLocale="en-gb">
+                      <LocalizationProvider dateAdapter={AdapterDayjs} adapterLocale={i18nInstance.language === 'ru' ? 'ru' : 'en-gb'}>
                         <DateCalendar
                           value={selectedDate}
                           onChange={(newDate) => setSelectedDate(newDate)}
@@ -809,7 +826,41 @@ const SessionsConfigurationPage = () => {
           </Button>
         </DialogActions>
       </Dialog>
-    </Box>
+
+      {/* Delete Confirmation Dialog */}
+      <Dialog open={deleteDialogOpen} onClose={handleCloseDeleteDialog}>
+        <DialogTitle>{t('admin.sessionConfiguration.deleteSessionType')}</DialogTitle>
+        <DialogContent>
+          <Typography>
+            {sessionTypeToDelete && t('admin.sessionConfiguration.confirmDelete', { name: sessionTypeToDelete.name })}
+          </Typography>
+          <Alert severity="warning" sx={{ mt: 2 }}>
+            {t('admin.sessionConfiguration.deleteSessionTypeWarning')}
+          </Alert>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={handleCloseDeleteDialog} disabled={deleting} sx={{ textTransform: 'none' }}>
+            {t('admin.sessionConfiguration.cancel')}
+          </Button>
+          <Button
+            onClick={handleConfirmDelete}
+            variant="contained"
+            color="error"
+            disabled={deleting}
+            sx={{ textTransform: 'none' }}
+          >
+            {deleting ? (
+              <>
+                <CircularProgress size={16} sx={{ mr: 1 }} />
+                {t('admin.sessionConfiguration.deleting')}
+              </>
+            ) : (
+              t('admin.sessionConfiguration.delete')
+            )}
+          </Button>
+        </DialogActions>
+      </Dialog>
+    </Box >
   );
 };
 

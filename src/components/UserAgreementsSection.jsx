@@ -19,6 +19,7 @@ import {
     CircularProgress,
     Alert,
     Chip,
+    Tooltip,
 } from '@mui/material';
 import AddIcon from '@mui/icons-material/Add';
 import EditIcon from '@mui/icons-material/Edit';
@@ -158,14 +159,14 @@ const UserAgreementsSection = () => {
             <CardContent>
                 <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
                     <Typography variant="h6">{t('admin.sessionConfiguration.userAgreements.title')}</Typography>
-                    <Button
-                        variant="contained"
-                        startIcon={<AddIcon />}
-                        onClick={() => handleOpenDialog()}
-                        sx={{ textTransform: 'none' }}
-                    >
-                        {t('admin.sessionConfiguration.userAgreements.addAgreement')}
-                    </Button>
+                    <Tooltip title={t('admin.sessionConfiguration.userAgreements.addAgreement')}>
+                        <IconButton
+                            color="primary"
+                            onClick={() => handleOpenDialog()}
+                        >
+                            <AddIcon />
+                        </IconButton>
+                    </Tooltip>
                 </Box>
 
                 {error && (

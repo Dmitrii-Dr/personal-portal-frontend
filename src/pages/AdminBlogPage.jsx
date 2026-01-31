@@ -37,6 +37,7 @@ import {
   FormControlLabel,
   Pagination,
   CardMedia,
+  Snackbar,
 } from '@mui/material';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import EditIcon from '@mui/icons-material/Edit';
@@ -55,7 +56,7 @@ import { loadThumbnailWithCache } from '../utils/imageCache';
 
 const AdminBlogPage = () => {
   const { t } = useTranslation();
-  
+
   // Helper function to translate article status
   const getStatusLabel = (status) => {
     if (!status) return t('admin.blog.statusDraft');
@@ -67,7 +68,7 @@ const AdminBlogPage = () => {
     };
     return statusMap[status] || status;
   };
-  
+
   const [articles, setArticles] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -133,6 +134,8 @@ const AdminBlogPage = () => {
   const [galleryPage, setGalleryPage] = useState(0);
   const [galleryTotalPages, setGalleryTotalPages] = useState(1);
   const [isGalleryForEdit, setIsGalleryForEdit] = useState(false);
+  const [snackbarOpen, setSnackbarOpen] = useState(false);
+  const [snackbarMessage, setSnackbarMessage] = useState('');
 
   // Cleanup image URLs on unmount
   useEffect(() => {
@@ -149,13 +152,13 @@ const AdminBlogPage = () => {
       try {
         setLoading(true);
         setError(null);
-        
+
         // Add timeout and signal to cancel request if component unmounts
         const response = await apiClient.get('/api/v1/admin/articles', {
           signal: controller.signal,
           timeout: 10000, // 10 second timeout
         });
-        
+
         if (isMounted) {
           setArticles(Array.isArray(response.data) ? response.data : []);
           setLoading(false);
@@ -165,11 +168,11 @@ const AdminBlogPage = () => {
         if (err.name === 'AbortError' || err.name === 'CanceledError' || err.code === 'ERR_CANCELED') {
           return;
         }
-        
+
         console.error('Error fetching articles:', err);
         if (isMounted) {
           let errorMessage = t('admin.blog.failedToLoadArticles');
-          
+
           if (err.code === 'ECONNABORTED') {
             errorMessage = t('admin.blog.requestTimeout');
           } else if (err.response) {
@@ -182,7 +185,7 @@ const AdminBlogPage = () => {
             // Something else happened
             errorMessage = err.message || errorMessage;
           }
-          
+
           setError(errorMessage);
           setLoading(false);
         }
@@ -216,11 +219,11 @@ const AdminBlogPage = () => {
     const imgTagRegex = new RegExp(`<img[^>]*mediaId=["']${mediaId}["'][^>]*>`, 'i');
     const match = content.match(imgTagRegex);
     if (!match) return null;
-    
+
     const imgTag = match[0];
     const widthMatch = imgTag.match(/width=["']?(\d+)["']?/i);
     const heightMatch = imgTag.match(/height=["']?(\d+)["']?/i);
-    
+
     // Parse alignment from style attribute or align attribute
     let alignment = 'center';
     const styleMatch = imgTag.match(/style=["']([^"']*)["']/i);
@@ -238,7 +241,7 @@ const AdminBlogPage = () => {
     if (alignMatch) {
       alignment = alignMatch[1].toLowerCase();
     }
-    
+
     return {
       width: widthMatch ? parseInt(widthMatch[1], 10) : null,
       height: heightMatch ? parseInt(heightMatch[1], 10) : null,
@@ -280,28 +283,28 @@ const AdminBlogPage = () => {
   const handleImageSizeSave = () => {
     const mediaId = isEditingCreateImage ? editingCreateImageMediaId : editingImageMediaId;
     if (!mediaId) return;
-    
+
     const content = isEditingCreateImage ? createArticleData.content : articleData.content;
     const attrs = parseImageAttributes(content, mediaId);
     if (!attrs) return;
-    
+
     // Build new img tag with updated dimensions and alignment
     let newImgTag = attrs.imgTag;
-    
+
     // Update or add width attribute
     if (newImgTag.includes('width=')) {
       newImgTag = newImgTag.replace(/width=["']?\d+["']?/i, `width="${imageWidth}"`);
     } else {
       newImgTag = newImgTag.replace(/mediaId=["']([^"']+)["']/, `mediaId="$1" width="${imageWidth}"`);
     }
-    
+
     // Update or add height attribute
     if (newImgTag.includes('height=')) {
       newImgTag = newImgTag.replace(/height=["']?\d+["']?/i, `height="${imageHeight}"`);
     } else {
       newImgTag = newImgTag.replace(/mediaId=["']([^"']+)["']/, `mediaId="$1" height="${imageHeight}"`);
     }
-    
+
     // Update alignment in style attribute
     let styleValue = '';
     if (imageAlignment === 'left') {
@@ -311,21 +314,21 @@ const AdminBlogPage = () => {
     } else {
       styleValue = 'display:block;margin-left:auto;margin-right:auto;';
     }
-    
+
     // Remove old style and align attributes
     newImgTag = newImgTag.replace(/style=["'][^"']*["']/gi, '');
     newImgTag = newImgTag.replace(/align=["'][^"']*["']/gi, '');
-    
+
     // Add new style attribute
     if (newImgTag.includes('style=')) {
       newImgTag = newImgTag.replace(/style=["']([^"']*)["']/i, `style="${styleValue}$1"`);
     } else {
       newImgTag = newImgTag.replace(/mediaId=["']([^"']+)["']/, `mediaId="$1" style="${styleValue}"`);
     }
-    
+
     // Replace img tag in content
     const imgTagRegex = new RegExp(`<img[^>]*mediaId=["']${mediaId}["'][^>]*>`, 'gi');
-    
+
     if (isEditingCreateImage) {
       setCreateArticleData((prev) => ({
         ...prev,
@@ -337,7 +340,7 @@ const AdminBlogPage = () => {
         content: prev.content.replace(imgTagRegex, newImgTag),
       }));
     }
-    
+
     setImageSizeDialogOpen(false);
     setEditingImageMediaId(null);
     setEditingCreateImageMediaId(null);
@@ -356,31 +359,31 @@ const AdminBlogPage = () => {
   useEffect(() => {
     const handleMouseMove = (e) => {
       if (!isResizing) return;
-      
+
       const deltaX = e.clientX - resizeStart.x;
       const deltaY = e.clientY - resizeStart.y;
-      
+
       // Calculate new dimensions
       let newWidth = resizeStart.width + deltaX;
       let newHeight = resizeStart.height + deltaY;
-      
+
       // Apply constraints
       newWidth = Math.max(50, Math.min(2000, newWidth));
       newHeight = Math.max(50, Math.min(2000, newHeight));
-      
+
       if (maintainAspectRatio && originalImageSize.width > 0) {
         const ratio = originalImageSize.height / originalImageSize.width;
         newHeight = Math.round(newWidth * ratio);
       }
-      
+
       setImageWidth(Math.round(newWidth));
       setImageHeight(Math.round(newHeight));
     };
-    
+
     const handleMouseUp = () => {
       setIsResizing(false);
     };
-    
+
     if (isResizing) {
       document.addEventListener('mousemove', handleMouseMove);
       document.addEventListener('mouseup', handleMouseUp);
@@ -416,9 +419,8 @@ const AdminBlogPage = () => {
       : [];
     setSelectedUserIds(initialUserIds);
     setOriginalSelectedUserIds(initialUserIds);
-    // Initialize selected tags from article.tags if provided
     const initialTagIds = Array.isArray(article.tags)
-      ? article.tags.map((t) => t.tagId)
+      ? article.tags.map((t) => t.tagId).filter(id => id)
       : [];
     setSelectedTagIds(initialTagIds);
     setOriginalSelectedTagIds(initialTagIds);
@@ -598,7 +600,10 @@ const AdminBlogPage = () => {
       fetchArticles();
     } catch (err) {
       console.error('Error deleting article:', err);
-      alert(err.message || 'Failed to delete article. Please try again.');
+      const msg = err.response?.data?.message || err.response?.data?.error || err.message || 'Failed to delete article. Please try again.';
+      setSnackbarMessage(msg);
+      setSnackbarOpen(true);
+      setDeleteDialogOpen(false);
     } finally {
       setDeleting(false);
     }
@@ -696,32 +701,32 @@ const AdminBlogPage = () => {
       // Build update payload - send original value if unchanged, new value if changed, null/empty to remove
       // Always include selectedUserIds: empty array if PUBLISHED (erase), otherwise current selection
       const userIdsToSend = articleData.status === 'PUBLISHED' ? [] : (Array.isArray(selectedUserIds) ? selectedUserIds : []);
-      
+
       // Extract mediaIds from current content - this ensures we only send IDs that are actually in content
       const mediaIdsFromContent = extractMediaIdsFromContent(articleData.content);
       // Always send an empty array if no images, never null or undefined
-      const mediaIdsToSend = Array.isArray(mediaIdsFromContent) && mediaIdsFromContent.length > 0 
-        ? mediaIdsFromContent 
+      const mediaIdsToSend = Array.isArray(mediaIdsFromContent) && mediaIdsFromContent.length > 0
+        ? mediaIdsFromContent
         : [];
-      
+
       const payload = {
-        title: articleData.title !== originalData.title 
-          ? articleData.title.trim() 
+        title: articleData.title !== originalData.title
+          ? articleData.title.trim()
           : originalData.title,
-        slug: articleData.slug !== originalData.slug 
-          ? articleData.slug.trim() 
+        slug: articleData.slug !== originalData.slug
+          ? articleData.slug.trim()
           : originalData.slug,
-        content: articleData.content !== originalData.content 
-          ? articleData.content.trim() 
+        content: articleData.content !== originalData.content
+          ? articleData.content.trim()
           : originalData.content,
-        excerpt: articleData.excerpt !== originalData.excerpt 
-          ? (articleData.excerpt.trim() || null) 
+        excerpt: articleData.excerpt !== originalData.excerpt
+          ? (articleData.excerpt.trim() || null)
           : (originalData.excerpt ? originalData.excerpt : null),
-        status: articleData.status !== originalData.status 
-          ? articleData.status 
+        status: articleData.status !== originalData.status
+          ? articleData.status
           : originalData.status,
         allowedUserIds: userIdsToSend,
-        tagIds: Array.isArray(selectedTagIds) ? selectedTagIds : [],
+        tagIds: Array.isArray(selectedTagIds) ? selectedTagIds.filter((id) => id) : [],
         mediaIds: Array.isArray(mediaIdsToSend) ? mediaIdsToSend : [],
       };
 
@@ -733,7 +738,8 @@ const AdminBlogPage = () => {
       fetchArticles();
     } catch (err) {
       console.error('Error updating article:', err);
-      setSubmitError(err.message || 'Failed to update article. Please try again.');
+      const msg = err.response?.data?.message || err.response?.data?.error || err.message || 'Failed to update article. Please try again.';
+      setSubmitError(msg);
     } finally {
       setSubmitting(false);
     }
@@ -741,7 +747,7 @@ const AdminBlogPage = () => {
 
   const handleImageUpload = async (file, isEdit = false) => {
     if (!file) return;
-    
+
     // Validate file type
     const validImageTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/webp'];
     if (!validImageTypes.includes(file.type)) {
@@ -762,10 +768,10 @@ const AdminBlogPage = () => {
 
       if (response.data && response.data.mediaId) {
         const mediaId = response.data.mediaId;
-        
+
         // Insert <img> tag into content at cursor position or at the end
         const imgTag = `<img mediaId="${mediaId}" alt="Uploaded image" />`;
-        
+
         if (isEdit) {
           setArticleData((prev) => ({
             ...prev,
@@ -897,7 +903,7 @@ const AdminBlogPage = () => {
   const handleSelectGalleryImage = (mediaId) => {
     // Insert <img> tag into content at cursor position or at the end
     const imgTag = `<img mediaId="${mediaId}" alt="Gallery image" />`;
-    
+
     if (isGalleryForEdit) {
       setArticleData((prev) => ({
         ...prev,
@@ -925,7 +931,7 @@ const AdminBlogPage = () => {
       // Load image URL for display
       loadCreateImageUrls([mediaId]);
     }
-    
+
     // Close gallery dialog
     handleCloseGallery();
   };
@@ -933,14 +939,14 @@ const AdminBlogPage = () => {
   const handleDeleteImage = (mediaId) => {
     // Remove mediaId from editMediaIds
     setEditMediaIds((prev) => prev.filter((id) => id !== mediaId));
-    
+
     // Remove img tag from content
     const imgTagRegex = new RegExp(`<img[^>]*mediaId=["']${mediaId}["'][^>]*/?>\\s*`, 'gi');
     setArticleData((prev) => ({
       ...prev,
       content: prev.content.replace(imgTagRegex, ''),
     }));
-    
+
     // Clean up image URL
     if (imageUrls[mediaId]) {
       URL.revokeObjectURL(imageUrls[mediaId]);
@@ -966,7 +972,7 @@ const AdminBlogPage = () => {
       const allMediaIds = [...new Set([...createMediaIdsArray, ...mediaIdsFromContentArray])];
       // Always send an empty array if no images, never null or undefined
       const mediaIdsToSend = Array.isArray(allMediaIds) && allMediaIds.length > 0 ? allMediaIds : [];
-      
+
       const response = await apiClient.post('/api/v1/admin/articles', {
         title: createArticleData.title.trim(),
         slug: createArticleData.slug.trim(),
@@ -974,7 +980,7 @@ const AdminBlogPage = () => {
         excerpt: createArticleData.excerpt.trim() || null,
         status: createArticleData.status,
         allowedUserIds: createArticleData.status === 'PUBLISHED' ? [] : (Array.isArray(selectedUserIds) ? selectedUserIds : []),
-        tagIds: Array.isArray(createTagIds) ? createTagIds : [],
+        tagIds: Array.isArray(createTagIds) ? createTagIds.filter((id) => id) : [],
         mediaIds: mediaIdsToSend,
       });
       if (!response || (response.status && response.status >= 400)) {
@@ -984,7 +990,8 @@ const AdminBlogPage = () => {
       fetchArticles();
     } catch (err) {
       console.error('Error creating article:', err);
-      setCreateError(err.message || 'Failed to create article. Please try again.');
+      const msg = err.response?.data?.message || err.response?.data?.error || err.message || 'Failed to create article. Please try again.';
+      setCreateError(msg);
     } finally {
       setCreating(false);
     }
@@ -994,17 +1001,17 @@ const AdminBlogPage = () => {
     try {
       setLoading(true);
       setError(null);
-      
+
       const response = await apiClient.get('/api/v1/admin/articles', {
         timeout: 10000,
       });
-      
+
       setArticles(Array.isArray(response.data) ? response.data : []);
       setLoading(false);
     } catch (err) {
       console.error('Error fetching articles:', err);
       let errorMessage = t('admin.blog.failedToLoadArticles');
-      
+
       if (err.code === 'ECONNABORTED') {
         errorMessage = t('admin.blog.requestTimeout');
       } else if (err.response) {
@@ -1014,7 +1021,7 @@ const AdminBlogPage = () => {
       } else {
         errorMessage = err.message || errorMessage;
       }
-      
+
       setError(errorMessage);
       setLoading(false);
     }
@@ -1267,7 +1274,7 @@ const AdminBlogPage = () => {
               {(() => {
                 const mediaIdsInContent = extractMediaIdsFromContent(articleData.content);
                 if (mediaIdsInContent.length === 0) return null;
-                
+
                 return (
                   <Box sx={{ mt: 2 }}>
                     <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
@@ -1275,98 +1282,98 @@ const AdminBlogPage = () => {
                     </Typography>
                     <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 2 }}>
                       {mediaIdsInContent.map((mediaId) => {
-                      
-                      return (
-                        <Box
-                          key={mediaId}
-                          sx={{
-                            position: 'relative',
-                            border: '1px solid',
-                            borderColor: 'divider',
-                            borderRadius: 1,
-                            overflow: 'hidden',
-                            width: 120,
-                            height: 120,
-                            '&:hover .image-action-button': {
-                              opacity: 1,
-                            },
-                          }}
-                        >
-                          {imageUrls[mediaId] ? (
-                            <Box
-                              component="img"
-                              src={imageUrls[mediaId]}
-                              alt="Article image"
+
+                        return (
+                          <Box
+                            key={mediaId}
+                            sx={{
+                              position: 'relative',
+                              border: '1px solid',
+                              borderColor: 'divider',
+                              borderRadius: 1,
+                              overflow: 'hidden',
+                              width: 120,
+                              height: 120,
+                              '&:hover .image-action-button': {
+                                opacity: 1,
+                              },
+                            }}
+                          >
+                            {imageUrls[mediaId] ? (
+                              <Box
+                                component="img"
+                                src={imageUrls[mediaId]}
+                                alt="Article image"
+                                sx={{
+                                  width: '100%',
+                                  height: '100%',
+                                  objectFit: 'cover',
+                                  display: 'block',
+                                }}
+                                onError={(e) => {
+                                  e.target.style.display = 'none';
+                                }}
+                              />
+                            ) : (
+                              <Box
+                                sx={{
+                                  width: '100%',
+                                  height: '100%',
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  justifyContent: 'center',
+                                  bgcolor: 'action.hover',
+                                }}
+                              >
+                                <CircularProgress size={24} />
+                              </Box>
+                            )}
+                            <IconButton
+                              className="image-action-button"
+                              size="small"
+                              onClick={() => handleDeleteImage(mediaId)}
+                              disabled={submitting}
                               sx={{
-                                width: '100%',
-                                height: '100%',
-                                objectFit: 'cover',
-                                display: 'block',
+                                position: 'absolute',
+                                top: 4,
+                                right: 4,
+                                bgcolor: 'error.main',
+                                color: 'white',
+                                opacity: 0.8,
+                                '&:hover': {
+                                  bgcolor: 'error.dark',
+                                  opacity: 1,
+                                },
+                                transition: 'opacity 0.2s',
                               }}
-                              onError={(e) => {
-                                e.target.style.display = 'none';
-                              }}
-                            />
-                          ) : (
-                            <Box
-                              sx={{
-                                width: '100%',
-                                height: '100%',
-                                display: 'flex',
-                                alignItems: 'center',
-                                justifyContent: 'center',
-                                bgcolor: 'action.hover',
-                              }}
+                              aria-label={t('admin.blog.deleteImage')}
                             >
-                              <CircularProgress size={24} />
-                            </Box>
-                          )}
-                          <IconButton
-                            className="image-action-button"
-                            size="small"
-                            onClick={() => handleDeleteImage(mediaId)}
-                            disabled={submitting}
-                            sx={{
-                              position: 'absolute',
-                              top: 4,
-                              right: 4,
-                              bgcolor: 'error.main',
-                              color: 'white',
-                              opacity: 0.8,
-                              '&:hover': {
-                                bgcolor: 'error.dark',
-                                opacity: 1,
-                              },
-                              transition: 'opacity 0.2s',
-                            }}
-                            aria-label={t('admin.blog.deleteImage')}
-                          >
-                            <CloseIcon fontSize="small" />
-                          </IconButton>
-                          <IconButton
-                            className="image-action-button"
-                            size="small"
-                            onClick={() => handleImageSizeClick(mediaId)}
-                            disabled={submitting}
-                            sx={{
-                              position: 'absolute',
-                              top: 4,
-                              left: 4,
-                              bgcolor: 'primary.main',
-                              color: 'white',
-                              opacity: 0.8,
-                              '&:hover': {
-                                bgcolor: 'primary.dark',
-                                opacity: 1,
-                              },
-                              transition: 'opacity 0.2s',
-                            }}
-                            aria-label={t('admin.blog.adjustImageSize')}
-                          >
-                            <SettingsIcon fontSize="small" />
-                          </IconButton>
-                        </Box>
-                      );
+                              <CloseIcon fontSize="small" />
+                            </IconButton>
+                            <IconButton
+                              className="image-action-button"
+                              size="small"
+                              onClick={() => handleImageSizeClick(mediaId)}
+                              disabled={submitting}
+                              sx={{
+                                position: 'absolute',
+                                top: 4,
+                                left: 4,
+                                bgcolor: 'primary.main',
+                                color: 'white',
+                                opacity: 0.8,
+                                '&:hover': {
+                                  bgcolor: 'primary.dark',
+                                  opacity: 1,
+                                },
+                                transition: 'opacity 0.2s',
+                              }}
+                              aria-label={t('admin.blog.adjustImageSize')}
+                            >
+                              <SettingsIcon fontSize="small" />
+                            </IconButton>
+                          </Box>
+                        );
                       })}
                     </Box>
                   </Box>
@@ -1383,7 +1390,8 @@ const AdminBlogPage = () => {
                 value={articleData.excerpt}
                 onChange={handleFieldChange('excerpt')}
                 disabled={submitting}
-                helperText={t('admin.blog.excerptHelper')}
+                helperText={`${t('admin.blog.excerptHelper')} (${articleData.excerpt?.length || 0}/250)`}
+                inputProps={{ maxLength: 250 }}
               />
             </Grid>
             <Grid item xs={12}>
@@ -1476,11 +1484,24 @@ const AdminBlogPage = () => {
                     </MenuItem>
                   )}
                   {!loadingTags &&
-                    availableTags.map((tag) => (
-                      <MenuItem key={tag.tagId} value={tag.tagId}>
-                        {tag.name}
-                      </MenuItem>
-                    ))}
+                    availableTags.map((tag) => {
+                      const isSelected = selectedTagIds.indexOf(tag.tagId) > -1;
+                      return (
+                        <MenuItem
+                          key={tag.tagId}
+                          value={tag.tagId}
+                          sx={{
+                            bgcolor: isSelected ? 'action.selected' : 'transparent',
+                            '&:hover': {
+                              bgcolor: isSelected ? 'action.selected' : 'action.hover',
+                            },
+                          }}
+                        >
+                          <Checkbox checked={isSelected} />
+                          {tag.name}
+                        </MenuItem>
+                      );
+                    })}
                   <MenuItem
                     onClick={(e) => {
                       e.stopPropagation();
@@ -1488,21 +1509,10 @@ const AdminBlogPage = () => {
                     }}
                     sx={{ fontStyle: 'italic', color: 'primary.main' }}
                   >
-                    + Create new tag
+                    {t('admin.blog.createNewTag')}
                   </MenuItem>
                 </Select>
               </FormControl>
-              {showCreateTagForm && (
-                <CreateTagForm
-                  onTagCreated={(tagId) => {
-                    setSelectedTagIds((prev) => [...prev, tagId]);
-                    setShowCreateTagForm(false);
-                  }}
-                  onCancel={() => setShowCreateTagForm(false)}
-                  availableTags={availableTags}
-                  setAvailableTags={setAvailableTags}
-                />
-              )}
               {selectedTagIds.length > 0 && (
                 <Stack direction="row" spacing={1} sx={{ mt: 1, flexWrap: 'wrap', gap: 1 }}>
                   {selectedTagIds.map((tagId) => {
@@ -1584,7 +1594,7 @@ const AdminBlogPage = () => {
         <DialogTitle>{t('admin.blog.deleteArticle')}</DialogTitle>
         <DialogContent>
           <Typography>
-            {articleToDelete?.title 
+            {articleToDelete?.title
               ? t('admin.blog.deleteArticleMessage', { title: articleToDelete.title })
               : t('admin.blog.deleteArticleMessageFallback')}
           </Typography>
@@ -1626,7 +1636,7 @@ const AdminBlogPage = () => {
             </Alert>
           )}
           {createArticleData.status === 'PUBLISHED' && selectedUserIds.length > 0 && (
-              <Alert severity="warning" sx={{ mb: 2 }}>
+            <Alert severity="warning" sx={{ mb: 2 }}>
               {t('admin.blog.usersWarning')}
             </Alert>
           )}
@@ -1716,7 +1726,8 @@ const AdminBlogPage = () => {
                 value={createArticleData.excerpt}
                 onChange={handleCreateFieldChange('excerpt')}
                 disabled={creating}
-                helperText={t('admin.blog.excerptHelperCreate')}
+                helperText={`${t('admin.blog.excerptHelperCreate')} (${createArticleData.excerpt?.length || 0}/250)`}
+                inputProps={{ maxLength: 250 }}
               />
             </Grid>
             <Grid item xs={12}>
@@ -2091,80 +2102,80 @@ const AdminBlogPage = () => {
                   </ToggleButton>
                 </ToggleButtonGroup>
               </Grid>
-              {((editingImageMediaId && imageUrls[editingImageMediaId]) || 
+              {((editingImageMediaId && imageUrls[editingImageMediaId]) ||
                 (editingCreateImageMediaId && createImageUrls[editingCreateImageMediaId])) && (
-                <Grid item xs={12}>
-                  <Box 
-                    sx={{ 
-                      mt: 2,
-                      display: 'flex',
-                      justifyContent: imageAlignment === 'left' ? 'flex-start' : 
-                                     imageAlignment === 'right' ? 'flex-end' : 'center',
-                    }}
-                  >
+                  <Grid item xs={12}>
                     <Box
                       sx={{
-                        position: 'relative',
-                        display: 'inline-block',
-                        border: '2px solid',
-                        borderColor: 'primary.main',
-                        borderRadius: 1,
-                        p: 0.5,
+                        mt: 2,
+                        display: 'flex',
+                        justifyContent: imageAlignment === 'left' ? 'flex-start' :
+                          imageAlignment === 'right' ? 'flex-end' : 'center',
                       }}
                     >
                       <Box
-                        component="img"
-                        src={isEditingCreateImage 
-                          ? createImageUrls[editingCreateImageMediaId]
-                          : imageUrls[editingImageMediaId]}
-                        alt={t('admin.blog.preview')}
                         sx={{
-                          display: 'block',
-                          width: `${Math.min(imageWidth, 400)}px`,
-                          height: `${Math.min(imageHeight, 400)}px`,
-                          objectFit: 'contain',
-                          userSelect: 'none',
-                          pointerEvents: 'none',
+                          position: 'relative',
+                          display: 'inline-block',
+                          border: '2px solid',
+                          borderColor: 'primary.main',
+                          borderRadius: 1,
+                          p: 0.5,
                         }}
-                        draggable={false}
-                      />
-                      {/* Resize handles */}
-                      <Box
-                        onMouseDown={(e) => {
-                          e.preventDefault();
-                          setIsResizing(true);
-                          setResizeStart({
-                            x: e.clientX,
-                            y: e.clientY,
-                            width: imageWidth,
-                            height: imageHeight,
-                          });
-                        }}
-                        sx={{
-                          position: 'absolute',
-                          bottom: -4,
-                          right: -4,
-                          width: 16,
-                          height: 16,
-                          bgcolor: 'primary.main',
-                          border: '2px solid white',
-                          borderRadius: '50%',
-                          cursor: 'nwse-resize',
-                          zIndex: 1,
-                          '&:hover': {
-                            bgcolor: 'primary.dark',
-                            transform: 'scale(1.2)',
-                          },
-                          transition: 'all 0.2s',
-                        }}
-                      />
+                      >
+                        <Box
+                          component="img"
+                          src={isEditingCreateImage
+                            ? createImageUrls[editingCreateImageMediaId]
+                            : imageUrls[editingImageMediaId]}
+                          alt={t('admin.blog.preview')}
+                          sx={{
+                            display: 'block',
+                            width: `${Math.min(imageWidth, 400)}px`,
+                            height: `${Math.min(imageHeight, 400)}px`,
+                            objectFit: 'contain',
+                            userSelect: 'none',
+                            pointerEvents: 'none',
+                          }}
+                          draggable={false}
+                        />
+                        {/* Resize handles */}
+                        <Box
+                          onMouseDown={(e) => {
+                            e.preventDefault();
+                            setIsResizing(true);
+                            setResizeStart({
+                              x: e.clientX,
+                              y: e.clientY,
+                              width: imageWidth,
+                              height: imageHeight,
+                            });
+                          }}
+                          sx={{
+                            position: 'absolute',
+                            bottom: -4,
+                            right: -4,
+                            width: 16,
+                            height: 16,
+                            bgcolor: 'primary.main',
+                            border: '2px solid white',
+                            borderRadius: '50%',
+                            cursor: 'nwse-resize',
+                            zIndex: 1,
+                            '&:hover': {
+                              bgcolor: 'primary.dark',
+                              transform: 'scale(1.2)',
+                            },
+                            transition: 'all 0.2s',
+                          }}
+                        />
+                      </Box>
                     </Box>
-                  </Box>
-                  <Typography variant="caption" color="text.secondary" sx={{ mt: 1, display: 'block', textAlign: 'center' }}>
-                    {t('admin.blog.previewSize', { width: imageWidth, height: imageHeight })}
-                  </Typography>
-                </Grid>
-              )}
+                    <Typography variant="caption" color="text.secondary" sx={{ mt: 1, display: 'block', textAlign: 'center' }}>
+                      {t('admin.blog.previewSize', { width: imageWidth, height: imageHeight })}
+                    </Typography>
+                  </Grid>
+                )}
             </Grid>
           </Box>
         </DialogContent>
@@ -2186,7 +2197,36 @@ const AdminBlogPage = () => {
           </Button>
         </DialogActions>
       </Dialog>
-    </Box>
+
+
+      {/* Create Tag Dialog */}
+      <Dialog open={showCreateTagForm} onClose={() => setShowCreateTagForm(false)} maxWidth="sm" fullWidth>
+        <DialogTitle>{t('admin.blog.createTag')}</DialogTitle>
+        <DialogContent>
+          <CreateTagForm
+            onTagCreated={(tagId) => {
+              setSelectedTagIds((prev) => [...prev, tagId]);
+              setShowCreateTagForm(false);
+            }}
+            onCancel={() => setShowCreateTagForm(false)}
+            availableTags={availableTags}
+            setAvailableTags={setAvailableTags}
+          />
+        </DialogContent>
+      </Dialog>
+
+      {/* Snackbar for notifications */}
+      <Snackbar
+        open={snackbarOpen}
+        autoHideDuration={6000}
+        onClose={() => setSnackbarOpen(false)}
+        anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
+      >
+        <Alert onClose={() => setSnackbarOpen(false)} severity="error" sx={{ width: '100%' }}>
+          {snackbarMessage}
+        </Alert>
+      </Snackbar>
+    </Box >
   );
 };
 

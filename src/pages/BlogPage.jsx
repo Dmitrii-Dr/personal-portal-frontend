@@ -60,20 +60,20 @@ const BlogPage = () => {
       try {
         setLoading(true);
         setError(null);
-        
+
         // Use different endpoint based on active tab
         // Tab 0 = Public articles, Tab 1 = Private articles (only with auth)
         const endpoint =
           activeTab === 0 || !hasToken
             ? '/api/v1/public/articles'
             : '/api/v1/articles';
-        
+
         // Add timeout and signal to cancel request if component unmounts
         const response = await apiClient.get(endpoint, {
           signal: controller.signal,
           timeout: 10000, // 10 second timeout
         });
-        
+
         if (isMounted) {
           setArticles(Array.isArray(response.data) ? response.data : []);
           setLoading(false);
@@ -83,11 +83,11 @@ const BlogPage = () => {
         if (err.name === 'AbortError' || err.name === 'CanceledError' || err.code === 'ERR_CANCELED') {
           return;
         }
-        
+
         console.error('Error fetching articles:', err);
         if (isMounted) {
           let errorMessage = t('pages.blog.errorLoadFailed');
-          
+
           if (err.code === 'ECONNABORTED') {
             errorMessage = t('pages.blog.errorTimeout');
           } else if (err.response) {
@@ -100,7 +100,7 @@ const BlogPage = () => {
             // Something else happened
             errorMessage = err.message || errorMessage;
           }
-          
+
           setError(errorMessage);
           setLoading(false);
         }
@@ -166,7 +166,7 @@ const BlogPage = () => {
           {t('pages.blog.title')}
         </Typography>
       </Box>
-      
+
       <Tabs value={activeTab} onChange={handleTabChange} sx={{ mb: 3 }}>
         <Tab label={t('pages.blog.publicArticles')} />
         {hasToken && <Tab label={t('pages.blog.privateArticles')} />}
@@ -187,11 +187,20 @@ const BlogPage = () => {
       ) : articles.length > 0 ? (
         <Grid container spacing={3} sx={{ mt: 2 }}>
           {articles.map((article) => {
-            const previewText = article.excerpt 
-              ? truncatePreview(article.excerpt, 150)
-              : article.content 
-              ? truncatePreview(article.content, 150)
-              : '';
+            // Use excerpt if available, otherwise get first 250 characters of content
+            const stripHtml = (html) => {
+              if (!html) return '';
+              return html.replace(/<[^>]*>/g, '').replace(/\s+/g, ' ').trim();
+            };
+
+            const plainContent = stripHtml(article.content || '');
+            const cleanExcerpt = article.excerpt ? article.excerpt.trim() : '';
+
+            const previewText = cleanExcerpt
+              ? cleanExcerpt
+              : (plainContent.length > 250
+                ? plainContent.substring(0, 250) + '...'
+                : plainContent);
 
             return (
               <Grid item xs={12} sm={6} md={4} key={article.articleId}>
@@ -211,13 +220,13 @@ const BlogPage = () => {
                 >
                   <CardActionArea sx={{ height: '100%', display: 'flex', flexDirection: 'column', alignItems: 'flex-start' }}>
                     <CardContent sx={{ flexGrow: 1, width: '100%', p: 3 }}>
-                      <Typography 
-                        variant="h5" 
-                        component="h2" 
-                        sx={{ 
+                      <Typography
+                        variant="subtitle1"
+                        component="h2"
+                        sx={{
                           fontWeight: 600,
-                          mb: 1.5,
-                          lineHeight: 1.3,
+                          mb: 1,
+                          lineHeight: 1.4,
                         }}
                       >
                         {article.title || t('pages.blog.untitled')}
@@ -237,13 +246,10 @@ const BlogPage = () => {
                         <Typography
                           variant="body2"
                           color="text.secondary"
-                          sx={{ 
+                          sx={{
                             mb: 2,
-                            lineHeight: 1.6,
-                            display: '-webkit-box',
-                            WebkitLineClamp: 3,
-                            WebkitBoxOrient: 'vertical',
-                            overflow: 'hidden',
+                            fontSize: '0.8rem',
+                            lineHeight: 1.5,
                           }}
                         >
                           {previewText}
@@ -251,11 +257,11 @@ const BlogPage = () => {
                       )}
 
                       {article.tags && Array.isArray(article.tags) && article.tags.length > 0 && (
-                        <Stack 
-                          direction="row" 
-                          spacing={1} 
-                          sx={{ 
-                            flexWrap: 'wrap', 
+                        <Stack
+                          direction="row"
+                          spacing={1}
+                          sx={{
+                            flexWrap: 'wrap',
                             gap: 1,
                             mt: 'auto',
                             pt: 2,

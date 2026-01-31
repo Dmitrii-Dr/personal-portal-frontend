@@ -22,6 +22,7 @@ import {
   Switch,
   FormControlLabel,
   CardHeader,
+  Snackbar,
 } from '@mui/material';
 import EditIcon from '@mui/icons-material/Edit';
 
@@ -433,11 +434,6 @@ const ProfilePage = ({ isAdminProfile = false }) => {
       } else if (settingsChanged) {
         setSaveSuccess(t('pages.profile.settingsUpdated'));
       }
-
-      // Clear success message after 3 seconds
-      setTimeout(() => {
-        setSaveSuccess('');
-      }, 3000);
     }
 
     setSaving(false);
@@ -520,11 +516,7 @@ const ProfilePage = ({ isAdminProfile = false }) => {
                 {saveError}
               </Alert>
             )}
-            {saveSuccess && (
-              <Alert severity="success" sx={{ mb: 2 }}>
-                {saveSuccess}
-              </Alert>
-            )}
+
 
             {/* Personal Information Card */}
             <Card sx={{ mb: 4 }}>
@@ -808,6 +800,19 @@ const ProfilePage = ({ isAdminProfile = false }) => {
           </Grid>
         </Grid>
       )}
+
+      {/* Success Snackbar */}
+      <Snackbar
+        open={!!saveSuccess}
+        autoHideDuration={3000}
+        onClose={() => setSaveSuccess('')}
+        anchorOrigin={{ vertical: 'top', horizontal: 'right' }}
+        sx={{ mt: { xs: 8, sm: 9, md: 10 } }}
+      >
+        <Alert onClose={() => setSaveSuccess('')} severity="success" sx={{ width: '100%' }}>
+          {saveSuccess}
+        </Alert>
+      </Snackbar>
     </Box>
   );
 };

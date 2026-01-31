@@ -17,6 +17,8 @@ import {
   MenuItem,
   Grid,
   Snackbar,
+  IconButton,
+  Tooltip,
 } from '@mui/material';
 import EditIcon from '@mui/icons-material/Edit';
 import SaveIcon from '@mui/icons-material/Save';
@@ -269,14 +271,14 @@ const BookingSettings = () => {
       <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
         <Typography variant="h6">{t('admin.sessionConfiguration.bookingSettings.title')}</Typography>
         {!isEditing && (
-          <Button
-            variant="outlined"
-            startIcon={<EditIcon />}
-            onClick={handleEdit}
-            sx={{ textTransform: 'none' }}
-          >
-            {t('admin.sessionConfiguration.bookingSettings.edit')}
-          </Button>
+          <Tooltip title={t('admin.sessionConfiguration.bookingSettings.edit')}>
+            <IconButton
+              color="primary"
+              onClick={handleEdit}
+            >
+              <EditIcon />
+            </IconButton>
+          </Tooltip>
         )}
       </Box>
 

@@ -989,7 +989,7 @@ const AdminDashboard = () => {
           excerpt: articleData.excerpt.trim() || null,
           status: articleData.status,
           allowedUserIds: allowedUserIds,
-          tagIds: Array.isArray(selectedTagIds) ? selectedTagIds : [],
+          tagIds: Array.isArray(selectedTagIds) ? selectedTagIds.filter((id) => id) : [],
         }),
       });
 
@@ -1831,11 +1831,24 @@ const AdminDashboard = () => {
                       </MenuItem>
                     )}
                     {!loadingTags &&
-                      availableTags.map((tag) => (
-                        <MenuItem key={tag.tagId} value={tag.tagId}>
-                          {tag.name}
-                        </MenuItem>
-                      ))}
+                      availableTags.map((tag) => {
+                        const isSelected = selectedTagIds.indexOf(tag.tagId) > -1;
+                        return (
+                          <MenuItem
+                            key={tag.tagId}
+                            value={tag.tagId}
+                            sx={{
+                              bgcolor: isSelected ? 'action.selected' : 'transparent',
+                              '&:hover': {
+                                bgcolor: isSelected ? 'action.selected' : 'action.hover',
+                              },
+                            }}
+                          >
+                            <Checkbox checked={isSelected} />
+                            {tag.name}
+                          </MenuItem>
+                        );
+                      })}
                     <MenuItem
                       onClick={(e) => {
                         e.stopPropagation();
@@ -1843,21 +1856,10 @@ const AdminDashboard = () => {
                       }}
                       sx={{ fontStyle: 'italic', color: 'primary.main' }}
                     >
-                      + Create new tag
+                      {t('admin.blog.createNewTag')}
                     </MenuItem>
                   </Select>
                 </FormControl>
-                {showCreateTagForm && (
-                  <CreateTagForm
-                    onTagCreated={(tagId) => {
-                      setSelectedTagIds((prev) => [...prev, tagId]);
-                      setShowCreateTagForm(false);
-                    }}
-                    onCancel={() => setShowCreateTagForm(false)}
-                    availableTags={availableTags}
-                    setAvailableTags={setAvailableTags}
-                  />
-                )}
                 {selectedTagIds.length > 0 && (
                   <Stack direction="row" spacing={1} sx={{ mt: 1, flexWrap: 'wrap', gap: 1 }}>
                     {selectedTagIds.map((tagId) => {
@@ -1876,7 +1878,9 @@ const AdminDashboard = () => {
                   </Stack>
                 )}
               </Grid>
+
             </Grid>
+
           </DialogContent>
           <DialogActions>
             <Button
@@ -2528,6 +2532,22 @@ const AdminDashboard = () => {
           </DialogActions>
         </Dialog>
 
+        {/* Create Tag Dialog */}
+        <Dialog open={showCreateTagForm} onClose={() => setShowCreateTagForm(false)} maxWidth="sm" fullWidth>
+          <DialogTitle>{t('admin.blog.createTag')}</DialogTitle>
+          <DialogContent>
+            <CreateTagForm
+              onTagCreated={(tagId) => {
+                setSelectedTagIds((prev) => [...prev, tagId]);
+                setShowCreateTagForm(false);
+              }}
+              onCancel={() => setShowCreateTagForm(false)}
+              availableTags={availableTags}
+              setAvailableTags={setAvailableTags}
+            />
+          </DialogContent>
+        </Dialog>
+
         {/* Create New Client Dialog */}
         <Dialog open={createClientOpen} onClose={handleCreateClientClose} maxWidth="sm" fullWidth>
           <DialogTitle>{t('admin.dashboard.createNewClient')}</DialogTitle>
@@ -2663,7 +2683,7 @@ const AdminDashboard = () => {
           </Alert>
         </Snackbar>
       </Box>
-    </LocalizationProvider>
+    </LocalizationProvider >
   );
 };
 
