@@ -91,10 +91,12 @@ const LandingPage = () => {
   const [welcomeImageUrl, setWelcomeImageUrl] = useState(null);
   const [aboutImageUrl, setAboutImageUrl] = useState(null);
   const [educationImageUrl, setEducationImageUrl] = useState(null);
+  const [reviewMediaIds, setReviewMediaIds] = useState([]);
   const [reviewImageUrls, setReviewImageUrls] = useState([]);
+  const [loadingReviewImages, setLoadingReviewImages] = useState({});
   const [reviewCarouselIndex, setReviewCarouselIndex] = useState(0);
   const imagesToShow = isMobile ? 1 : 3;
-  const showArrows = reviewImageUrls.length > imagesToShow;
+  const showArrows = reviewMediaIds.length > imagesToShow;
   const [sessionTypesCarouselIndex, setSessionTypesCarouselIndex] = useState(0);
   const educationRef = useRef(null);
 
@@ -193,21 +195,13 @@ const LandingPage = () => {
           });
         }
 
-        // Load review images if reviewMediaIds exist
+        // Store review media IDs for lazy loading
         if (data.reviewMediaIds && Array.isArray(data.reviewMediaIds) && data.reviewMediaIds.length > 0) {
-          const loadReviewImages = async () => {
-            const imagePromises = data.reviewMediaIds.map(mediaId =>
-              loadImageWithCache(mediaId).catch(err => {
-                console.error(`Error loading review image ${mediaId}:`, err);
-                return null;
-              })
-            );
-            const urls = await Promise.all(imagePromises);
-            if (isMounted) {
-              setReviewImageUrls(urls.filter(url => url !== null));
-            }
-          };
-          loadReviewImages();
+          if (isMounted) {
+            setReviewMediaIds(data.reviewMediaIds);
+            // Initialize reviewImageUrls array with nulls
+            setReviewImageUrls(new Array(data.reviewMediaIds.length).fill(null));
+          }
         }
 
         // Load contact links if available
@@ -273,6 +267,53 @@ const LandingPage = () => {
       controller.abort();
     };
   }, []);
+
+  // Lazy load review images based on carousel position
+  useEffect(() => {
+    if (!reviewMediaIds || reviewMediaIds.length === 0) return;
+
+    const loadImageGroup = async (startIndex, endIndex) => {
+      for (let i = startIndex; i < endIndex && i < reviewMediaIds.length; i++) {
+        // Skip if already loaded or loading
+        if (reviewImageUrls[i] || loadingReviewImages[i]) continue;
+
+        const mediaId = reviewMediaIds[i];
+
+        // Mark as loading
+        setLoadingReviewImages(prev => ({ ...prev, [i]: true }));
+
+        try {
+          const url = await loadImageWithCache(mediaId);
+          setReviewImageUrls(prev => {
+            const newUrls = [...prev];
+            newUrls[i] = url;
+            return newUrls;
+          });
+        } catch (err) {
+          console.error(`Error loading review image ${mediaId}:`, err);
+          setReviewImageUrls(prev => {
+            const newUrls = [...prev];
+            newUrls[i] = null;
+            return newUrls;
+          });
+        } finally {
+          setLoadingReviewImages(prev => ({ ...prev, [i]: false }));
+        }
+      }
+    };
+
+    // Load current visible group
+    const currentGroupStart = reviewCarouselIndex;
+    const currentGroupEnd = reviewCarouselIndex + imagesToShow;
+    loadImageGroup(currentGroupStart, currentGroupEnd);
+
+    // Preload next group
+    const nextGroupStart = currentGroupEnd;
+    const nextGroupEnd = nextGroupStart + imagesToShow;
+    if (nextGroupStart < reviewMediaIds.length) {
+      loadImageGroup(nextGroupStart, nextGroupEnd);
+    }
+  }, [reviewMediaIds, reviewCarouselIndex, imagesToShow]);
 
   // Fetch session types
   useEffect(() => {
@@ -1256,7 +1297,7 @@ const LandingPage = () => {
       </Box>
 
       {/* Testimonials/Reviews Section */}
-      {welcomeData?.reviewMessage || (reviewImageUrls && reviewImageUrls.length > 0) ? (
+      {welcomeData?.reviewMessage || (reviewMediaIds && reviewMediaIds.length > 0) ? (
         <Box
           ref={testimonialsRef}
           id="testimonials"
@@ -1315,7 +1356,7 @@ const LandingPage = () => {
             )}
 
             {/* Review Images Carousel */}
-            {reviewImageUrls && reviewImageUrls.length > 0 && (
+            {reviewMediaIds && reviewMediaIds.length > 0 && (
               <Box sx={{ position: 'relative', width: '100%' }}>
                 <Box
                   sx={{
@@ -1330,26 +1371,29 @@ const LandingPage = () => {
                   {showArrows && (
                     <IconButton
                       onClick={() => {
-                        setReviewCarouselIndex((prev) => {
-                          if (prev === 0) {
-                            // Wrap to end
-                            return reviewImageUrls.length - imagesToShow;
-                          }
-                          return prev - 1;
-                        });
+                        setReviewCarouselIndex((prev) => Math.max(0, prev - 1));
                       }}
+                      disabled={reviewCarouselIndex === 0}
                       sx={{
                         position: 'absolute',
-                        left: { xs: -10, md: -40 },
+                        left: { xs: -15, md: -50 },
                         zIndex: 2,
                         bgcolor: 'white',
                         boxShadow: 2,
+                        width: 40,
+                        height: 40,
+                        padding: 1,
+                        borderRadius: '50%',
                         '&:hover': {
                           bgcolor: 'grey.100',
                         },
+                        '&.Mui-disabled': {
+                          bgcolor: 'grey.200',
+                          opacity: 0.5,
+                        },
                       }}
                     >
-                      <ArrowBackIosIcon />
+                      <ArrowBackIosIcon sx={{ ml: 0.5, fontSize: 20 }} />
                     </IconButton>
                   )}
 
@@ -1366,7 +1410,9 @@ const LandingPage = () => {
                   >
                     {Array.from({ length: imagesToShow }).map((_, frameIndex) => {
                       const imageIndex = reviewCarouselIndex + frameIndex;
-                      const imageUrl = reviewImageUrls[imageIndex] || null;
+                      const imageUrl = reviewImageUrls[imageIndex];
+                      const isLoading = loadingReviewImages[imageIndex];
+                      const imageExists = imageIndex < reviewMediaIds.length;
 
                       return (
                         <Box
@@ -1397,26 +1443,27 @@ const LandingPage = () => {
                                 objectFit: 'contain',
                               }}
                             />
-                          ) : (
+                          ) : isLoading ? (
+                            <CircularProgress size={40} />
+                          ) : imageExists ? (
                             <Box
                               sx={{
-                                width: '100%',
-                                height: '100%',
                                 display: 'flex',
+                                flexDirection: 'column',
                                 alignItems: 'center',
-                                justifyContent: 'center',
-                                bgcolor: '#E0E0E0',
+                                gap: 1,
                               }}
                             >
+                              <CircularProgress size={40} />
                               <Typography
                                 variant="body2"
                                 color="text.secondary"
                                 sx={{ fontStyle: 'italic' }}
                               >
-                                {imageIndex < reviewImageUrls.length ? 'Loading...' : ''}
+                                Loading...
                               </Typography>
                             </Box>
-                          )}
+                          ) : null}
                         </Box>
                       );
                     })}
@@ -1426,26 +1473,30 @@ const LandingPage = () => {
                   {showArrows && (
                     <IconButton
                       onClick={() => {
-                        const maxIndex = reviewImageUrls.length - imagesToShow;
-                        setReviewCarouselIndex((prev) => {
-                          if (prev >= maxIndex) {
-                            return 0;
-                          }
-                          return prev + 1;
-                        });
+                        const maxIndex = reviewMediaIds.length - imagesToShow;
+                        setReviewCarouselIndex((prev) => Math.min(maxIndex, prev + 1));
                       }}
+                      disabled={reviewCarouselIndex >= reviewMediaIds.length - imagesToShow}
                       sx={{
                         position: 'absolute',
-                        right: { xs: -10, md: -40 },
+                        right: { xs: -15, md: -50 },
                         zIndex: 2,
                         bgcolor: 'white',
                         boxShadow: 2,
+                        width: 40,
+                        height: 40,
+                        padding: 1,
+                        borderRadius: '50%',
                         '&:hover': {
                           bgcolor: 'grey.100',
                         },
+                        '&.Mui-disabled': {
+                          bgcolor: 'grey.200',
+                          opacity: 0.5,
+                        },
                       }}
                     >
-                      <ArrowForwardIosIcon />
+                      <ArrowForwardIosIcon sx={{ fontSize: 20 }} />
                     </IconButton>
                   )}
                 </Box>
