@@ -25,7 +25,7 @@ import {
 } from '@mui/material';
 import EditIcon from '@mui/icons-material/Edit';
 
-const ProfilePage = () => {
+const ProfilePage = ({ isAdminProfile = false }) => {
   const { t } = useTranslation();
   const [profile, setProfile] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -503,7 +503,7 @@ const ProfilePage = () => {
   return (
     <Box>
       <Typography variant="h4" component="h1" gutterBottom sx={{ mb: 3 }}>
-        {t('pages.profile.title')}
+        {isAdminProfile ? t('pages.profile.adminTitle') : t('pages.profile.title')}
       </Typography>
 
       {loading ? (

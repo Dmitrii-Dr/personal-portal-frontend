@@ -28,6 +28,8 @@ import {
   MenuItem,
   Menu,
   Tooltip,
+  useTheme,
+  useMediaQuery,
 } from '@mui/material';
 import CloseIcon from '@mui/icons-material/Close';
 import ArrowBackIosIcon from '@mui/icons-material/ArrowBackIos';
@@ -70,6 +72,8 @@ const areAllPricesZero = (prices) => {
 const LandingPage = () => {
   const { t } = useTranslation();
   const navigate = useNavigate();
+  const theme = useTheme();
+  const isMobile = useMediaQuery(theme.breakpoints.down('md'));
   const heroRef = useRef(null);
   const aboutRef = useRef(null);
   const servicesRef = useRef(null);
@@ -89,6 +93,8 @@ const LandingPage = () => {
   const [educationImageUrl, setEducationImageUrl] = useState(null);
   const [reviewImageUrls, setReviewImageUrls] = useState([]);
   const [reviewCarouselIndex, setReviewCarouselIndex] = useState(0);
+  const imagesToShow = isMobile ? 1 : 3;
+  const showArrows = reviewImageUrls.length > imagesToShow;
   const [sessionTypesCarouselIndex, setSessionTypesCarouselIndex] = useState(0);
   const educationRef = useRef(null);
 
@@ -835,7 +841,7 @@ const LandingPage = () => {
               >
                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
                   <Typography variant="caption" color="text.secondary" sx={{ fontSize: '0.75rem' }}>
-                    Currency:
+                    {t('landing.services.currency')}:
                   </Typography>
                   <Tooltip title="Select currency">
                     <IconButton
@@ -1321,13 +1327,13 @@ const LandingPage = () => {
                   }}
                 >
                   {/* Left Arrow */}
-                  {reviewImageUrls.length > 3 && (
+                  {showArrows && (
                     <IconButton
                       onClick={() => {
                         setReviewCarouselIndex((prev) => {
                           if (prev === 0) {
                             // Wrap to end
-                            return reviewImageUrls.length - 3;
+                            return reviewImageUrls.length - imagesToShow;
                           }
                           return prev - 1;
                         });
@@ -1355,10 +1361,10 @@ const LandingPage = () => {
                       overflow: 'hidden',
                       width: '100%',
                       justifyContent: 'center',
-                      maxWidth: { xs: '100%', md: '900px' },
+                      maxWidth: { xs: '100%', md: '1950px' },
                     }}
                   >
-                    {Array.from({ length: 3 }).map((_, frameIndex) => {
+                    {Array.from({ length: imagesToShow }).map((_, frameIndex) => {
                       const imageIndex = reviewCarouselIndex + frameIndex;
                       const imageUrl = reviewImageUrls[imageIndex] || null;
 
@@ -1368,7 +1374,7 @@ const LandingPage = () => {
                           sx={{
                             flex: '1 1 0',
                             minWidth: 0,
-                            maxWidth: { xs: '100%', sm: '300px' },
+                            maxWidth: { xs: '100%', sm: '650px' },
                             aspectRatio: '4/3',
                             position: 'relative',
                             overflow: 'hidden',
@@ -1417,13 +1423,12 @@ const LandingPage = () => {
                   </Box>
 
                   {/* Right Arrow */}
-                  {reviewImageUrls.length > 3 && (
+                  {showArrows && (
                     <IconButton
                       onClick={() => {
-                        const maxIndex = reviewImageUrls.length - 3;
+                        const maxIndex = reviewImageUrls.length - imagesToShow;
                         setReviewCarouselIndex((prev) => {
                           if (prev >= maxIndex) {
-                            // Wrap to beginning
                             return 0;
                           }
                           return prev + 1;

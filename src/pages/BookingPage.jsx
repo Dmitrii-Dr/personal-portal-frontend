@@ -1142,12 +1142,15 @@ const BookingPage = ({ sessionTypeId: propSessionTypeId, hideMyBookings = false 
   // Format date for display
   const formatDateForDisplay = (date) => {
     const locale = i18nInstance.language === 'ru' ? 'ru' : 'en-gb';
-    const formatted = dayjs(date).locale(locale).format('MMMM D, YYYY');
-    // Capitalize first letter of month name for Russian
     if (locale === 'ru') {
-      return formatted.charAt(0).toUpperCase() + formatted.slice(1);
+      const d = dayjs(date);
+      const day = d.format('D');
+      const monthIndex = d.month();
+      const monthGenitive = monthsGenitive[monthIndex];
+      const year = d.format('YYYY');
+      return `${day} ${monthGenitive}, ${year}`;
     }
-    return formatted;
+    return dayjs(date).locale(locale).format('MMMM D, YYYY');
   };
 
   // Format instant for display (24-hour format) using user's timezone
@@ -1163,12 +1166,33 @@ const BookingPage = ({ sessionTypeId: propSessionTypeId, hideMyBookings = false 
 
       // Convert UTC to user's timezone and format with locale
       const localTime = utcTime.tz(timezone);
+
+      if (locale === 'ru') {
+        const day = localTime.format('D');
+        const monthIndex = localTime.month();
+        const monthGenitive = monthsGenitive[monthIndex];
+        const year = localTime.format('YYYY');
+        const time = localTime.format('HH:mm');
+        return `${day} ${monthGenitive}, ${year}, ${time}`;
+      }
+
       return localTime.locale(locale).format('MMMM D, YYYY, HH:mm');
     } catch {
       // Fallback: try without timezone conversion
       try {
         const locale = i18nInstance.language === 'ru' ? 'ru' : 'en-gb';
-        return dayjs(instantString).locale(locale).format('MMMM D, YYYY, HH:mm');
+        const localTime = dayjs(instantString);
+
+        if (locale === 'ru') {
+          const day = localTime.format('D');
+          const monthIndex = localTime.month();
+          const monthGenitive = monthsGenitive[monthIndex];
+          const year = localTime.format('YYYY');
+          const time = localTime.format('HH:mm');
+          return `${day} ${monthGenitive}, ${year}, ${time}`;
+        }
+
+        return localTime.locale(locale).format('MMMM D, YYYY, HH:mm');
       } catch {
         return instantString;
       }
@@ -1783,7 +1807,21 @@ const BookingPage = ({ sessionTypeId: propSessionTypeId, hideMyBookings = false 
             maxWidth="md"
             fullWidth
           >
-            <DialogTitle>{t('landing.booking.title')}</DialogTitle>
+            <DialogTitle>
+              {t('landing.booking.title')}
+              <IconButton
+                aria-label="close"
+                onClick={handleNewBookingDialogClose}
+                sx={{
+                  position: 'absolute',
+                  right: 8,
+                  top: 8,
+                  color: (theme) => theme.palette.grey[500],
+                }}
+              >
+                <CloseIcon />
+              </IconButton>
+            </DialogTitle>
             <DialogContent sx={{ pb: 4, minHeight: '620px' }}>
               {/* Session Type Selection - only show if not provided as prop */}
               {!propSessionTypeId && (
@@ -1952,15 +1990,7 @@ const BookingPage = ({ sessionTypeId: propSessionTypeId, hideMyBookings = false 
                 </Grid>
               </Grid>
             </DialogContent>
-            <DialogActions>
-              <Button
-                onClick={handleNewBookingDialogClose}
-                color="inherit"
-                sx={{ textTransform: 'none' }}
-              >
-                Close
-              </Button>
-            </DialogActions>
+
           </Dialog>
         )}
 

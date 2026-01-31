@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { fetchWithAuth } from '../utils/api';
 import apiClient from '../utils/api';
-import { loadImageWithCache } from '../utils/imageCache';
+import { loadImageWithCache, loadThumbnailWithCache } from '../utils/imageCache';
 import {
   Box,
   Typography,
@@ -23,6 +23,12 @@ import {
   InputLabel,
   Paper,
   Stack,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
+  Pagination,
+  CardMedia,
 } from '@mui/material';
 import CloudUploadIcon from '@mui/icons-material/CloudUpload';
 import DeleteIcon from '@mui/icons-material/Delete';
@@ -38,6 +44,8 @@ import InstagramIcon from '@mui/icons-material/Instagram';
 import TwitterIcon from '@mui/icons-material/Twitter';
 import FacebookIcon from '@mui/icons-material/Facebook';
 import YouTubeIcon from '@mui/icons-material/YouTube';
+import PhotoLibraryIcon from '@mui/icons-material/PhotoLibrary';
+import CloseIcon from '@mui/icons-material/Close';
 
 const AdminHomePage = () => {
   const { t } = useTranslation();
@@ -52,26 +60,26 @@ const AdminHomePage = () => {
   const [aboutMeContent, setAboutMeContent] = useState('');
   const [educationContent, setEducationContent] = useState('');
   const [reviewMessage, setReviewMessage] = useState('');
-  
+
   // Blog articles state
   const [welcomeArticleIds, setWelcomeArticleIds] = useState([]);
   const [availableArticles, setAvailableArticles] = useState([]);
   const [loadingArticles, setLoadingArticles] = useState(false);
   const [articlesError, setArticlesError] = useState(null);
   const [invalidArticleIdsError, setInvalidArticleIdsError] = useState(null);
-  
+
   // Media IDs state
   const [welcomeMediaId, setWelcomeMediaId] = useState(null);
   const [aboutMediaId, setAboutMediaId] = useState(null);
   const [educationMediaId, setEducationMediaId] = useState(null);
   const [reviewMediaIds, setReviewMediaIds] = useState([]);
-  
+
   // Image upload states
   const [uploadingWelcomeImage, setUploadingWelcomeImage] = useState(false);
   const [uploadingAboutImage, setUploadingAboutImage] = useState(false);
   const [uploadingEducationImage, setUploadingEducationImage] = useState(false);
   const [uploadingReviewImage, setUploadingReviewImage] = useState(false);
-  
+
   // Image preview URLs
   const [welcomeImageUrl, setWelcomeImageUrl] = useState(null);
   const [aboutImageUrl, setAboutImageUrl] = useState(null);
@@ -127,6 +135,16 @@ const AdminHomePage = () => {
     'B17',
   ];
 
+  // Gallery dialog state
+  const [galleryDialogOpen, setGalleryDialogOpen] = useState(false);
+  const [galleryImages, setGalleryImages] = useState([]);
+  const [loadingGallery, setLoadingGallery] = useState(false);
+  const [galleryError, setGalleryError] = useState(null);
+  const [galleryThumbnailUrls, setGalleryThumbnailUrls] = useState({});
+  const [galleryPage, setGalleryPage] = useState(0);
+  const [galleryTotalPages, setGalleryTotalPages] = useState(1);
+
+
 
   // Fetch welcome data
   useEffect(() => {
@@ -149,7 +167,7 @@ const AdminHomePage = () => {
         setEducationMediaId(data.educationMediaId || null);
         setReviewMediaIds(data.reviewMediaIds || []);
         setWelcomeArticleIds(data.welcomeArticleIds || []);
-        
+
         // Load contact links if available
         if (data.contact && Array.isArray(data.contact)) {
           setContactLinks(data.contact.map(link => ({
@@ -158,7 +176,7 @@ const AdminHomePage = () => {
             description: link.description || '',
           })));
         }
-        
+
         // Load images if mediaIds exist
         if (data.welcomeMediaId) {
           loadImage(data.welcomeMediaId, 'welcome').catch(err => {
@@ -175,7 +193,7 @@ const AdminHomePage = () => {
             console.error('Error loading education image:', err);
           });
         }
-        
+
         // Load review images if reviewMediaIds exist
         if (data.reviewMediaIds && Array.isArray(data.reviewMediaIds) && data.reviewMediaIds.length > 0) {
           loadReviewImages(data.reviewMediaIds);
@@ -241,12 +259,12 @@ const AdminHomePage = () => {
         // Show error message above Blog section
         const errorMessage = t('admin.home.invalidArticleIds', { ids: invalidArticleIds.join(', ') });
         setInvalidArticleIdsError(errorMessage);
-        
+
         // Clear invalid article IDs - keep only valid ones
         const validArticleIds = currentArticleIds.filter(
           articleId => !articleId || availableArticleIds.has(articleId)
         );
-        
+
         console.warn('Invalid welcomeArticleIds detected and cleared:', invalidArticleIds);
         return validArticleIds;
       }
@@ -260,10 +278,10 @@ const AdminHomePage = () => {
   // Load image from mediaId with caching
   const loadImage = async (mediaId, type) => {
     if (!mediaId) return;
-    
+
     try {
       const objectUrl = await loadImageWithCache(mediaId);
-      
+
       if (type === 'welcome') {
         setWelcomeImageUrl(objectUrl);
       } else if (type === 'about') {
@@ -279,9 +297,9 @@ const AdminHomePage = () => {
   // Load multiple review images
   const loadReviewImages = async (mediaIds) => {
     if (!mediaIds || !Array.isArray(mediaIds) || mediaIds.length === 0) return;
-    
+
     try {
-      const imagePromises = mediaIds.map(mediaId => 
+      const imagePromises = mediaIds.map(mediaId =>
         loadImageWithCache(mediaId).catch(err => {
           console.error(`Error loading review image ${mediaId}:`, err);
           return null;
@@ -344,11 +362,11 @@ const AdminHomePage = () => {
         // Add to review media IDs array
         const newReviewMediaIds = [...reviewMediaIds, mediaId];
         setReviewMediaIds(newReviewMediaIds);
-        
+
         // Load and display the new image
         const objectUrl = await loadImageWithCache(mediaId);
         setReviewImageUrls(prev => [...prev, objectUrl]);
-        
+
         // Immediately update via PUT request
         const updatePayload = {
           welcomeMessage: welcomeMessage,
@@ -374,7 +392,7 @@ const AdminHomePage = () => {
         if (!updateResponse.ok) {
           throw new Error(`Failed to update review mediaIds: ${updateResponse.status}`);
         }
-        
+
         return; // Early return for review type
       }
 
@@ -387,10 +405,10 @@ const AdminHomePage = () => {
         welcomeMediaId: type === 'welcome' ? mediaId : welcomeMediaId,
         aboutMediaId: type === 'about' ? mediaId : aboutMediaId,
         educationMediaId: type === 'education' ? mediaId : educationMediaId,
-          reviewMediaIds: reviewMediaIds,
-          welcomeArticleIds: welcomeArticleIds,
-          contact: formatContactForBackend(),
-        };
+        reviewMediaIds: reviewMediaIds,
+        welcomeArticleIds: welcomeArticleIds,
+        contact: formatContactForBackend(),
+      };
 
       const updateResponse = await fetchWithAuth('/api/v1/admin/home', {
         method: 'PUT',
@@ -427,7 +445,7 @@ const AdminHomePage = () => {
     try {
       const newReviewMediaIds = reviewMediaIds.filter((_, i) => i !== index);
       const newReviewImageUrls = reviewImageUrls.filter((_, i) => i !== index);
-      
+
       setReviewMediaIds(newReviewMediaIds);
       setReviewImageUrls(newReviewImageUrls);
 
@@ -462,6 +480,137 @@ const AdminHomePage = () => {
     }
   };
 
+  // Fetch gallery images
+  const fetchGalleryImages = async (pageNum = 0) => {
+    let isMounted = true;
+    const controller = new AbortController();
+
+    try {
+      setLoadingGallery(true);
+      setGalleryError(null);
+
+      const response = await apiClient.get('/api/v1/admin/media', {
+        params: {
+          page: pageNum,
+          size: 20, // Show 20 images per page in gallery selector
+        },
+        signal: controller.signal,
+        timeout: 10000,
+      });
+
+      if (!isMounted) return;
+
+      const data = response.data;
+      const items = data.content || [];
+      setGalleryImages(items);
+      setGalleryTotalPages(data.totalPages || 1);
+
+      // Load thumbnails for all images
+      const thumbnailUrls = {};
+      const thumbnailPromises = items.map(async (item) => {
+        if (!item.mediaId) return;
+        try {
+          const thumbnailUrl = await loadThumbnailWithCache(item.mediaId);
+          if (isMounted) {
+            thumbnailUrls[item.mediaId] = thumbnailUrl;
+          }
+        } catch (err) {
+          console.error(`Error loading thumbnail for mediaId ${item.mediaId}:`, err);
+        }
+      });
+
+      await Promise.all(thumbnailPromises);
+      if (isMounted) {
+        setGalleryThumbnailUrls((prev) => ({ ...prev, ...thumbnailUrls }));
+      }
+    } catch (err) {
+      if (err.name === 'AbortError' || err.name === 'CanceledError' || err.code === 'ERR_CANCELED') {
+        return;
+      }
+
+      console.error('Error fetching gallery images:', err);
+      if (isMounted) {
+        let errorMessage = 'Failed to load gallery images. Please try again.';
+        if (err.response) {
+          errorMessage = err.response.data?.message || `Server error: ${err.response.status}`;
+        } else if (err.request) {
+          errorMessage = 'Unable to reach the server. Please check your connection.';
+        } else {
+          errorMessage = err.message || errorMessage;
+        }
+        setGalleryError(errorMessage);
+      }
+    } finally {
+      if (isMounted) {
+        setLoadingGallery(false);
+      }
+    }
+  };
+
+  const handleOpenGallery = () => {
+    setGalleryDialogOpen(true);
+    setGalleryPage(0);
+    setGalleryError(null);
+    fetchGalleryImages(0);
+  };
+
+  const handleCloseGallery = () => {
+    setGalleryDialogOpen(false);
+    setGalleryImages([]);
+    setGalleryThumbnailUrls({});
+    setGalleryError(null);
+  };
+
+  const handleGalleryPageChange = (event, value) => {
+    setGalleryPage(value - 1);
+    fetchGalleryImages(value - 1);
+  };
+
+  const handleSelectGalleryImage = async (mediaId) => {
+    try {
+      // Add the selected mediaId to reviewMediaIds
+      const newReviewMediaIds = [...reviewMediaIds, mediaId];
+      setReviewMediaIds(newReviewMediaIds);
+
+      // Load the image and add to reviewImageUrls
+      const objectUrl = await loadImageWithCache(mediaId);
+      setReviewImageUrls((prev) => [...prev, objectUrl]);
+
+      // Update via PUT request
+      const updatePayload = {
+        welcomeMessage: welcomeMessage,
+        aboutMessage: aboutMeContent,
+        educationMessage: educationContent,
+        reviewMessage: reviewMessage,
+        welcomeMediaId: welcomeMediaId,
+        aboutMediaId: aboutMediaId,
+        educationMediaId: educationMediaId,
+        reviewMediaIds: newReviewMediaIds,
+        welcomeArticleIds: welcomeArticleIds,
+        contact: formatContactForBackend(),
+      };
+
+      const updateResponse = await fetchWithAuth('/api/v1/admin/home', {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(updatePayload),
+      });
+
+      if (!updateResponse.ok) {
+        throw new Error(`Failed to add review image: ${updateResponse.status}`);
+      }
+
+      // Close gallery dialog
+      handleCloseGallery();
+    } catch (err) {
+      console.error('Error selecting gallery image:', err);
+      setError(err.message || 'Failed to add review image');
+    }
+  };
+
+
   // Helper function to format contact links for backend
   const formatContactForBackend = () => {
     return contactLinks.map(link => ({
@@ -477,7 +626,7 @@ const AdminHomePage = () => {
       setError(t('admin.home.pleaseEnterContactValue'));
       return;
     }
-    
+
     // Format value based on platform
     let formattedValue = newContactLink.value.trim();
     if (newContactLink.platform === 'Email' && !formattedValue.startsWith('mailto:')) {
@@ -496,7 +645,7 @@ const AdminHomePage = () => {
         formattedValue = `https://${formattedValue}`;
       }
     }
-    
+
     setContactLinks([
       ...contactLinks,
       {
@@ -526,7 +675,7 @@ const AdminHomePage = () => {
       setError(t('admin.home.pleaseEnterContactValue'));
       return;
     }
-    
+
     // Format value based on platform
     let formattedValue = newContactLink.value.trim();
     if (newContactLink.platform === 'Email' && !formattedValue.startsWith('mailto:')) {
@@ -545,7 +694,7 @@ const AdminHomePage = () => {
         formattedValue = `https://${formattedValue}`;
       }
     }
-    
+
     const updatedLinks = [...contactLinks];
     updatedLinks[editingContactIndex] = {
       platform: newContactLink.platform,
@@ -673,7 +822,7 @@ const AdminHomePage = () => {
             background: 'linear-gradient(135deg, rgba(44, 95, 95, 0.3) 0%, rgba(31, 69, 69, 0.4) 100%)',
             zIndex: 0,
           } : {},
-          background: welcomeImageUrl 
+          background: welcomeImageUrl
             ? 'transparent'
             : 'linear-gradient(135deg, #2C5F5F 0%, #1F4545 100%)',
         }}
@@ -700,7 +849,7 @@ const AdminHomePage = () => {
                 component="span"
                 startIcon={uploadingWelcomeImage ? <CircularProgress size={20} sx={{ color: 'white' }} /> : <CloudUploadIcon />}
                 disabled={uploadingWelcomeImage}
-                sx={{ 
+                sx={{
                   textTransform: 'none',
                   bgcolor: 'rgba(255, 255, 255, 0.2)',
                   '&:hover': { bgcolor: 'rgba(255, 255, 255, 0.3)' },
@@ -757,13 +906,13 @@ const AdminHomePage = () => {
             <Grid item xs={12} md={6} sx={{ px: { xs: 2, sm: 4, md: 6 }, py: { xs: 4, md: 6 } }}>
               <Box sx={{ maxWidth: '600px' }}>
                 <Box sx={{ mb: 3 }}>
-                  <Divider 
-                    sx={{ 
-                      width: '60px', 
-                      height: '2px', 
+                  <Divider
+                    sx={{
+                      width: '60px',
+                      height: '2px',
                       bgcolor: 'black',
                       mb: 2,
-                    }} 
+                    }}
                   />
                   <Typography
                     variant="h2"
@@ -970,13 +1119,13 @@ const AdminHomePage = () => {
             <Grid item xs={12} md={6} sx={{ px: { xs: 2, sm: 4, md: 6 }, py: { xs: 4, md: 6 }, order: { xs: 1, md: 2 } }}>
               <Box sx={{ maxWidth: '600px', mx: { xs: 'auto', md: 0 } }}>
                 <Box sx={{ mb: 3 }}>
-                  <Divider 
-                    sx={{ 
-                      width: '60px', 
-                      height: '2px', 
+                  <Divider
+                    sx={{
+                      width: '60px',
+                      height: '2px',
                       bgcolor: 'black',
                       mb: 2,
-                    }} 
+                    }}
                   />
                   <Typography
                     variant="h2"
@@ -1025,13 +1174,13 @@ const AdminHomePage = () => {
       >
         <Container maxWidth="lg">
           <Box sx={{ mb: 4 }}>
-            <Divider 
-              sx={{ 
-                width: '60px', 
-                height: '2px', 
+            <Divider
+              sx={{
+                width: '60px',
+                height: '2px',
                 bgcolor: 'black',
                 mb: 2,
-              }} 
+              }}
             />
             <Typography
               variant="h2"
@@ -1075,9 +1224,9 @@ const AdminHomePage = () => {
             <Typography variant="h6" component="h3" sx={{ mb: 2 }}>
               {t('admin.home.reviewImages')}
             </Typography>
-            
+
             {/* Upload Button */}
-            <Box sx={{ mb: 3 }}>
+            <Box sx={{ mb: 3, display: 'flex', gap: 2, alignItems: 'center' }}>
               <input
                 accept="image/*"
                 style={{ display: 'none' }}
@@ -1102,6 +1251,15 @@ const AdminHomePage = () => {
                   {uploadingReviewImage ? t('admin.home.uploading') : t('admin.home.uploadReviewImage')}
                 </Button>
               </label>
+              <Button
+                variant="outlined"
+                startIcon={<PhotoLibraryIcon />}
+                onClick={handleOpenGallery}
+                disabled={uploadingReviewImage}
+                sx={{ textTransform: 'none' }}
+              >
+                {t('admin.home.selectFromGallery')}
+              </Button>
             </Box>
 
             {/* Display Uploaded Images */}
@@ -1182,13 +1340,13 @@ const AdminHomePage = () => {
       >
         <Container maxWidth="lg">
           <Box sx={{ mb: 4 }}>
-            <Divider 
-              sx={{ 
-                width: '60px', 
-                height: '2px', 
+            <Divider
+              sx={{
+                width: '60px',
+                height: '2px',
                 bgcolor: 'black',
                 mb: 2,
-              }} 
+              }}
             />
             <Typography
               variant="h2"
@@ -1215,8 +1373,8 @@ const AdminHomePage = () => {
 
           {/* Invalid Article IDs Error */}
           {invalidArticleIdsError && (
-            <Alert 
-              severity="warning" 
+            <Alert
+              severity="warning"
               sx={{ mb: 3 }}
               onClose={() => setInvalidArticleIdsError(null)}
             >
@@ -1323,13 +1481,13 @@ const AdminHomePage = () => {
       >
         <Container maxWidth="lg">
           <Box sx={{ mb: 4 }}>
-            <Divider 
-              sx={{ 
-                width: '60px', 
-                height: '2px', 
+            <Divider
+              sx={{
+                width: '60px',
+                height: '2px',
                 bgcolor: 'white',
                 mb: 2,
-              }} 
+              }}
             />
             <Typography
               variant="h2"
@@ -1401,10 +1559,10 @@ const AdminHomePage = () => {
                       newContactLink.platform === 'Email'
                         ? t('admin.home.emailAddress')
                         : newContactLink.platform === 'Phone'
-                        ? t('admin.home.phoneNumber')
-                        : newContactLink.platform === 'WhatsApp'
-                        ? t('admin.home.whatsappNumberOrUrl')
-                        : t('admin.home.urlOrValue')
+                          ? t('admin.home.phoneNumber')
+                          : newContactLink.platform === 'WhatsApp'
+                            ? t('admin.home.whatsappNumberOrUrl')
+                            : t('admin.home.urlOrValue')
                     }
                     value={newContactLink.value}
                     onChange={(e) =>
@@ -1414,10 +1572,10 @@ const AdminHomePage = () => {
                       newContactLink.platform === 'Email'
                         ? t('admin.home.emailPlaceholder')
                         : newContactLink.platform === 'Phone'
-                        ? t('admin.home.phonePlaceholder')
-                        : newContactLink.platform === 'WhatsApp'
-                        ? t('admin.home.whatsappPlaceholder')
-                        : t('admin.home.urlPlaceholder')
+                          ? t('admin.home.phonePlaceholder')
+                          : newContactLink.platform === 'WhatsApp'
+                            ? t('admin.home.whatsappPlaceholder')
+                            : t('admin.home.urlPlaceholder')
                     }
                     sx={{
                       '& .MuiInputLabel-root': {
@@ -1473,9 +1631,9 @@ const AdminHomePage = () => {
                         <Button
                           variant="contained"
                           onClick={handleUpdateContactLink}
-                          sx={{ 
-                            textTransform: 'none', 
-                            minWidth: 'auto', 
+                          sx={{
+                            textTransform: 'none',
+                            minWidth: 'auto',
                             flex: 1,
                             bgcolor: 'white',
                             color: '#1F4545',
@@ -1489,9 +1647,9 @@ const AdminHomePage = () => {
                         <Button
                           variant="outlined"
                           onClick={handleCancelEdit}
-                          sx={{ 
-                            textTransform: 'none', 
-                            minWidth: 'auto', 
+                          sx={{
+                            textTransform: 'none',
+                            minWidth: 'auto',
                             flex: 1,
                             borderColor: 'white',
                             color: 'white',
@@ -1509,8 +1667,8 @@ const AdminHomePage = () => {
                         variant="contained"
                         startIcon={<AddIcon />}
                         onClick={handleAddContactLink}
-                        sx={{ 
-                          textTransform: 'none', 
+                        sx={{
+                          textTransform: 'none',
                           width: '100%',
                           bgcolor: 'white',
                           color: '#1F4545',
@@ -1670,7 +1828,7 @@ const AdminHomePage = () => {
                       }}
                     >
                       {getIcon(link.platform)}
-                      
+
                       {/* Edit/Delete Buttons Overlay */}
                       <Box
                         className="edit-delete-buttons"
@@ -1723,7 +1881,7 @@ const AdminHomePage = () => {
                         </IconButton>
                       </Box>
                     </Box>
-                    
+
                     {/* Label */}
                     <Typography
                       variant="caption"
@@ -1745,7 +1903,7 @@ const AdminHomePage = () => {
                     >
                       {getLabel(link)}
                     </Typography>
-                    
+
                     {/* URL Preview (small text below) */}
                     <Typography
                       variant="caption"
@@ -1813,9 +1971,109 @@ const AdminHomePage = () => {
         </Button>
       </Box>
 
+      {/* Gallery Selector Dialog */}
+      <Dialog open={galleryDialogOpen} onClose={handleCloseGallery} maxWidth="md" fullWidth>
+        <DialogTitle>
+          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <Typography variant="h6">{t('admin.home.selectImageFromGallery')}</Typography>
+            <IconButton onClick={handleCloseGallery} size="small">
+              <CloseIcon />
+            </IconButton>
+          </Box>
+        </DialogTitle>
+        <DialogContent>
+          {galleryError && (
+            <Alert severity="error" sx={{ mb: 2 }}>
+              {galleryError}
+            </Alert>
+          )}
+          {loadingGallery ? (
+            <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '200px' }}>
+              <CircularProgress />
+            </Box>
+          ) : galleryImages.length === 0 ? (
+            <Alert severity="info">
+              {t('admin.home.noImagesFound')}
+            </Alert>
+          ) : (
+            <>
+              <Grid container spacing={2} sx={{ mt: 1 }}>
+                {galleryImages.map((item) => (
+                  <Grid item xs={6} sm={4} md={3} key={item.mediaId}>
+                    <Card
+                      sx={{
+                        cursor: 'pointer',
+                        transition: 'transform 0.2s ease-in-out, box-shadow 0.2s ease-in-out',
+                        '&:hover': {
+                          transform: 'translateY(-4px)',
+                          boxShadow: 4,
+                        },
+                      }}
+                      onClick={() => handleSelectGalleryImage(item.mediaId)}
+                    >
+                      {galleryThumbnailUrls[item.mediaId] ? (
+                        <CardMedia
+                          component="img"
+                          image={galleryThumbnailUrls[item.mediaId]}
+                          alt={item.altText || item.fileUrl || 'Gallery image'}
+                          sx={{
+                            height: 150,
+                            objectFit: 'cover',
+                          }}
+                          onError={(e) => {
+                            console.error(`Error displaying thumbnail for mediaId ${item.mediaId}`);
+                            e.target.style.display = 'none';
+                          }}
+                        />
+                      ) : (
+                        <Box
+                          sx={{
+                            height: 150,
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            bgcolor: 'grey.200',
+                          }}
+                        >
+                          <CircularProgress size={24} />
+                        </Box>
+                      )}
+                      <CardContent sx={{ p: 1 }}>
+                        <Typography
+                          variant="caption"
+                          color="text.secondary"
+                          noWrap
+                          sx={{ fontSize: '0.7rem' }}
+                        >
+                          {item.fileUrl || t('admin.home.untitled')}
+                        </Typography>
+                      </CardContent>
+                    </Card>
+                  </Grid>
+                ))}
+              </Grid>
+              {galleryTotalPages > 1 && (
+                <Box sx={{ display: 'flex', justifyContent: 'center', mt: 3 }}>
+                  <Pagination
+                    count={galleryTotalPages}
+                    page={galleryPage + 1}
+                    onChange={handleGalleryPageChange}
+                    color="primary"
+                  />
+                </Box>
+              )}
+            </>
+          )}
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={handleCloseGallery} sx={{ textTransform: 'none' }}>
+            {t('admin.home.close')}
+          </Button>
+        </DialogActions>
+      </Dialog>
+
     </Box>
   );
 };
 
 export default AdminHomePage;
-

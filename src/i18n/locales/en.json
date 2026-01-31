@@ -177,6 +177,7 @@
     },
     "profile": {
       "title": "My Profile",
+      "adminTitle": "Administrator Profile",
       "personalInfo": "Personal Information",
       "settings": "Settings",
       "userSettings": "User Settings",
@@ -485,7 +486,12 @@
       "pleaseSelectImageFile": "Please select an image file",
       "failedToLoadWelcomeData": "Failed to load welcome data",
       "invalidArticleIds": "Invalid article ID(s) found: {{ids}}. These articles are not available and will be cleared.",
-      "failedToLoadArticles": "Failed to load articles"
+      "failedToLoadArticles": "Failed to load articles",
+      "selectFromGallery": "Select from Gallery",
+      "selectImageFromGallery": "Select Image from Gallery",
+      "noImagesFound": "No images found in the gallery. Upload images to see them here.",
+      "untitled": "Untitled",
+      "close": "Close"
     },
     "blog": {
       "title": "Blog Management",
@@ -814,6 +820,7 @@
     "services": {
       "title": "SERVICES & PRICING",
       "description": "Choose the service package that best fits your needs",
+      "currency": "Currency",
       "bookNow": "Book Now",
       "learnMore": "Learn More"
     },

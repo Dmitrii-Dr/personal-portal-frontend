@@ -64,6 +64,8 @@ const AppLayout = ({ children }) => {
   const isBlogPage = location.pathname.startsWith('/blog');
   // Check if we're on an agreement page where navigation buttons should be hidden
   const isAgreementPage = location.pathname.startsWith('/agreement');
+  // Check if we're on the About Me page where navigation buttons should be hidden
+  const isAboutMePage = location.pathname === '/about-me';
 
   // Handle scroll to change header background
   useEffect(() => {
@@ -564,7 +566,7 @@ const AppLayout = ({ children }) => {
               )}
 
               {/* Public Navigation Links */}
-              {!isAdminRoute && !isUserPage && !isBlogPage && !isAgreementPage && (
+              {!isAdminRoute && !isUserPage && !isBlogPage && !isAgreementPage && !isAboutMePage && (
                 <>
                   {/* Public Links - Scroll to section on landing page, navigate otherwise */}
                   {isLandingPage ? (
