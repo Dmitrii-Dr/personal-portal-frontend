@@ -48,6 +48,7 @@ import InfoIcon from '@mui/icons-material/Info';
 import AccessTimeIcon from '@mui/icons-material/AccessTime';
 import FilterAltIcon from '@mui/icons-material/FilterAlt';
 import ClearIcon from '@mui/icons-material/Clear';
+import CloseIcon from '@mui/icons-material/Close';
 import ArrowUpwardIcon from '@mui/icons-material/ArrowUpward';
 import ArrowDownwardIcon from '@mui/icons-material/ArrowDownward';
 import KeyboardArrowDownIcon from '@mui/icons-material/KeyboardArrowDown';
@@ -98,6 +99,7 @@ const BookingsManagement = () => {
   const [bookingToReschedule, setBookingToReschedule] = useState(null);
   const [rescheduleSelectedDate, setRescheduleSelectedDate] = useState(dayjs());
   const [rescheduleAvailableSlots, setRescheduleAvailableSlots] = useState([]);
+  const [confirmRescheduleDialogOpen, setConfirmRescheduleDialogOpen] = useState(false);
   const [rescheduleLoadingSlots, setRescheduleLoadingSlots] = useState(false);
   const [rescheduleSlotError, setRescheduleSlotError] = useState(null);
   const [rescheduleSelectedSlot, setRescheduleSelectedSlot] = useState(null);
@@ -793,11 +795,17 @@ const BookingsManagement = () => {
     }
   };
 
+  const handleConfirmRescheduleDialogClose = () => {
+    if (reschedulingBooking) return;
+    setConfirmRescheduleDialogOpen(false);
+  };
+
   // Handle reschedule slot selection
   const handleRescheduleSlotClick = (slot) => {
     setRescheduleSelectedSlot(slot);
     setShowCustomTimePicker(false);
     setCustomStartTime(null);
+    setConfirmRescheduleDialogOpen(true);
   };
 
   // Handle create new slot click
@@ -1739,7 +1747,7 @@ const BookingsManagement = () => {
         {/* Reschedule/Update Booking Dialog */}
         <Dialog open={rescheduleDialogOpen} onClose={handleRescheduleDialogClose} maxWidth="md" fullWidth>
           <DialogTitle>{t('admin.bookingsManagement.updateSessionDateTime')}</DialogTitle>
-          <DialogContent>
+          <DialogContent sx={{ pb: 1, minHeight: '555px' }}>
             {bookingToReschedule && (
               <>
                 <DialogContentText sx={{ mb: 2 }}>
@@ -1847,7 +1855,7 @@ const BookingsManagement = () => {
                       <Box sx={{ position: 'relative' }}>
                         <Box
                           ref={rescheduleSlotsScrollRef}
-                          sx={{ maxHeight: '240px', overflowY: 'auto', pr: 1 }}
+                          sx={{ maxHeight: '260px', overflowY: 'auto', pr: 1 }}
                           onScroll={(e) => {
                             const element = e.target;
                             const isAtTop = element.scrollTop === 0;
@@ -2275,46 +2283,76 @@ const BookingsManagement = () => {
                   </Grid>
                 </Grid>
 
-                <TextField
-                  fullWidth
-                  multiline
-                  rows={4}
-                  label={t('admin.bookingsManagement.messageOptional')}
-                  placeholder="Add any additional notes or questions..."
-                  value={rescheduleClientMessage}
-                  onChange={(e) => {
-                    const value = e.target.value;
-                    if (value.length <= 2000) {
-                      setRescheduleClientMessage(value);
-                    }
-                  }}
-                  disabled={reschedulingBooking}
-                  error={rescheduleClientMessage.length > 2000}
-                  helperText={
-                    rescheduleClientMessage.length > 2000
-                      ? t('admin.dashboard.messageMaxLength')
-                      : `${rescheduleClientMessage.length}/2000 ${t('common.characters')}`
-                  }
-                  sx={{ mt: 3 }}
-                />
               </>
             )}
           </DialogContent>
-          <DialogActions>
-            <Button
-              onClick={handleRescheduleDialogClose}
-              color="inherit"
+        </Dialog>
+
+        {/* Confirm Reschedule Dialog */}
+        <Dialog open={confirmRescheduleDialogOpen} onClose={handleConfirmRescheduleDialogClose} maxWidth="sm" fullWidth>
+          <DialogTitle sx={{ m: 0, p: 2, pr: 6 }}>
+            {t('pages.booking.confirmUpdateTitle')}
+            <IconButton
+              aria-label="close"
+              onClick={handleConfirmRescheduleDialogClose}
               disabled={reschedulingBooking}
-              sx={{ textTransform: 'none' }}
+              sx={{
+                position: 'absolute',
+                right: 8,
+                top: 8,
+                color: (theme) => theme.palette.grey[500],
+              }}
             >
-              {t('admin.bookingsManagement.cancel')}
-            </Button>
+              <CloseIcon />
+            </IconButton>
+          </DialogTitle>
+          <DialogContent>
+            <DialogContentText sx={{ mb: 2 }}>
+              {t('pages.booking.confirmUpdateMessage')}{' '}
+              <strong>
+                {rescheduleSelectedSlot && (rescheduleSelectedSlot.startTime
+                  ? formatTime(rescheduleSelectedSlot.startTime)
+                  : (rescheduleSelectedSlot.startTimeInstant ? formatTimeFromInstant(rescheduleSelectedSlot.startTimeInstant) : 'N/A'))}
+              </strong>{' '}
+              {rescheduleSelectedSlot && rescheduleSelectedSlot.endTime && (
+                <>
+                  - <strong>{formatTime(rescheduleSelectedSlot.endTime)}</strong>{' '}
+                </>
+              )}
+              {t('pages.booking.on')} <strong>{formatDateForDisplay(rescheduleSelectedDate)}</strong>?
+            </DialogContentText>
+
+            <TextField
+              fullWidth
+              multiline
+              rows={4}
+              label={t('admin.bookingsManagement.messageOptional')}
+              placeholder="Add any additional notes or questions..."
+              value={rescheduleClientMessage}
+              onChange={(e) => {
+                const value = e.target.value;
+                if (value.length <= 2000) {
+                  setRescheduleClientMessage(value);
+                }
+              }}
+              disabled={reschedulingBooking}
+              error={rescheduleClientMessage.length > 2000}
+              helperText={
+                rescheduleClientMessage.length > 2000
+                  ? t('admin.dashboard.messageMaxLength')
+                  : `${rescheduleClientMessage.length}/2000 ${t('common.characters')}`
+              }
+              sx={{ mt: 1 }}
+            />
+          </DialogContent>
+          <DialogActions sx={{ px: 3, pb: 2 }}>
             <Button
               onClick={handleConfirmReschedule}
               color="primary"
               variant="contained"
+              fullWidth
               disabled={reschedulingBooking || (!rescheduleSelectedSlot && !(customStartTime && rescheduleSelectedDate))}
-              sx={{ textTransform: 'none' }}
+              sx={{ py: 1 }}
             >
               {reschedulingBooking ? (
                 <>

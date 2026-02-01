@@ -10,6 +10,7 @@ import {
   Dialog,
   DialogTitle,
   DialogContent,
+  DialogContentText,
   DialogActions,
   TextField,
   MenuItem,
@@ -40,6 +41,7 @@ import utc from 'dayjs/plugin/utc';
 import timezone from 'dayjs/plugin/timezone';
 import FilterAltIcon from '@mui/icons-material/FilterAlt';
 import ClearIcon from '@mui/icons-material/Clear';
+import CloseIcon from '@mui/icons-material/Close';
 import AddIcon from '@mui/icons-material/Add';
 import AccessTimeIcon from '@mui/icons-material/AccessTime';
 import ArrowUpwardIcon from '@mui/icons-material/ArrowUpward';
@@ -867,6 +869,7 @@ const AdminDashboard = () => {
   });
   const [creatingClient, setCreatingClient] = useState(false);
   const [createClientError, setCreateClientError] = useState(null);
+  const [confirmBookingDialogOpen, setConfirmBookingDialogOpen] = useState(false);
 
   const handleAddPostOpen = () => {
     setAddPostOpen(true);
@@ -1083,6 +1086,12 @@ const AdminDashboard = () => {
     setBookingError(null);
     setShowCustomTimePicker(false);
     setCustomStartTime(null);
+    setConfirmBookingDialogOpen(false);
+  };
+
+  const handleConfirmBookingDialogClose = () => {
+    if (submittingBooking) return;
+    setConfirmBookingDialogOpen(false);
   };
 
   const fetchBookingSessionTypes = async () => {
@@ -1258,6 +1267,7 @@ const AdminDashboard = () => {
     setSelectedBookingSlot(slot);
     setShowCustomTimePicker(false);
     setCustomStartTime(null);
+    setConfirmBookingDialogOpen(true);
   };
 
   // Handle create new slot click
@@ -1942,8 +1952,22 @@ const AdminDashboard = () => {
 
         {/* New Booking Dialog */}
         <Dialog open={newBookingOpen} onClose={handleNewBookingClose} maxWidth="md" fullWidth>
-          <DialogTitle>{t('landing.booking.title')}</DialogTitle>
-          <DialogContent>
+          <DialogTitle>
+            {t('landing.booking.title')}
+            <IconButton
+              aria-label="close"
+              onClick={handleNewBookingClose}
+              sx={{
+                position: 'absolute',
+                right: 8,
+                top: 8,
+                color: (theme) => theme.palette.grey[500],
+              }}
+            >
+              <CloseIcon />
+            </IconButton>
+          </DialogTitle>
+          <DialogContent sx={{ pb: 1, minHeight: '555px' }}>
             {bookingError && (
               <Alert severity="error" sx={{ mb: 2 }} onClose={() => setBookingError(null)}>
                 {bookingError}
@@ -2115,7 +2139,7 @@ const AdminDashboard = () => {
                       <Box sx={{ position: 'relative' }}>
                         <Box
                           ref={bookingSlotsScrollRef}
-                          sx={{ maxHeight: '240px', overflowY: 'auto', pr: 1 }}
+                          sx={{ maxHeight: '260px', overflowY: 'auto', pr: 1 }}
                           onScroll={(e) => {
                             const element = e.target;
                             const isAtTop = element.scrollTop === 0;
@@ -2557,44 +2581,72 @@ const AdminDashboard = () => {
                 )}
               </Grid>
 
-              {/* Client Message */}
-              <Grid item xs={12}>
-                <TextField
-                  fullWidth
-                  multiline
-                  rows={4}
-                  label={t('admin.dashboard.messageOptional')}
-                  placeholder={t('admin.dashboard.messagePlaceholder')}
-                  value={bookingClientMessage}
-                  onChange={(e) => {
-                    const value = e.target.value;
-                    if (value.length <= 2000) {
-                      setBookingClientMessage(value);
-                    }
-                  }}
-                  disabled={submittingBooking}
-                  error={bookingClientMessage.length > 2000}
-                  helperText={
-                    bookingClientMessage.length > 2000
-                      ? t('admin.dashboard.messageMaxLength')
-                      : `${bookingClientMessage.length}/2000 ${t('common.characters')}`
-                  }
-                />
-              </Grid>
             </Grid>
           </DialogContent>
-          <DialogActions>
-            <Button
-              onClick={handleNewBookingClose}
-              sx={{ textTransform: 'none' }}
+        </Dialog>
+
+        {/* Confirm Booking Dialog */}
+        <Dialog open={confirmBookingDialogOpen} onClose={handleConfirmBookingDialogClose} maxWidth="sm" fullWidth>
+          <DialogTitle sx={{ m: 0, p: 2, pr: 6 }}>
+            {t('pages.booking.confirmBookingTitle')}
+            <IconButton
+              aria-label="close"
+              onClick={handleConfirmBookingDialogClose}
               disabled={submittingBooking}
+              sx={{
+                position: 'absolute',
+                right: 8,
+                top: 8,
+                color: (theme) => theme.palette.grey[500],
+              }}
             >
-              {t('admin.dashboard.cancel')}
-            </Button>
+              <CloseIcon />
+            </IconButton>
+          </DialogTitle>
+          <DialogContent>
+            <DialogContentText sx={{ mb: 2 }}>
+              {t('pages.booking.confirmBookingMessage')}{' '}
+              <strong>
+                {selectedBookingSlot && (selectedBookingSlot.startTime
+                  ? formatTime(selectedBookingSlot.startTime)
+                  : (selectedBookingSlot.startTimeInstant ? formatTimeFromInstant(selectedBookingSlot.startTimeInstant) : 'N/A'))}
+              </strong>{' '}
+              {selectedBookingSlot && selectedBookingSlot.endTime && (
+                <>
+                  - <strong>{formatTime(selectedBookingSlot.endTime)}</strong>{' '}
+                </>
+              )}
+              {t('pages.booking.on')} <strong>{formatDateForDisplay(bookingSelectedDate)}</strong>?
+            </DialogContentText>
+
+            <TextField
+              fullWidth
+              multiline
+              rows={4}
+              label={t('admin.dashboard.messageOptional')}
+              placeholder={t('admin.dashboard.messagePlaceholder')}
+              value={bookingClientMessage}
+              onChange={(e) => {
+                const value = e.target.value;
+                if (value.length <= 2000) {
+                  setBookingClientMessage(value);
+                }
+              }}
+              disabled={submittingBooking}
+              error={bookingClientMessage.length > 2000}
+              helperText={
+                bookingClientMessage.length > 2000
+                  ? t('admin.dashboard.messageMaxLength')
+                  : `${bookingClientMessage.length}/2000 ${t('common.characters')}`
+              }
+              sx={{ mt: 1 }}
+            />
+          </DialogContent>
+          <DialogActions sx={{ px: 3, pb: 2 }}>
             <Button
               onClick={handleSubmitBooking}
               variant="contained"
-              sx={{ textTransform: 'none' }}
+              fullWidth
               disabled={
                 submittingBooking ||
                 !selectedSessionTypeId ||
@@ -2602,6 +2654,7 @@ const AdminDashboard = () => {
                 (!selectedBookingSlot && !(customStartTime && bookingSelectedDate)) ||
                 !!bookingError
               }
+              sx={{ py: 1 }}
             >
               {submittingBooking ? (
                 <>

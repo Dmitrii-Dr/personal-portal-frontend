@@ -112,6 +112,7 @@ const BookingPage = ({ sessionTypeId: propSessionTypeId, hideMyBookings = false 
   const [hasToken, setHasToken] = useState(false);
   const [loginRequiredDialogOpen, setLoginRequiredDialogOpen] = useState(false);
   const [updateDialogOpen, setUpdateDialogOpen] = useState(false);
+  const [confirmUpdateDialogOpen, setConfirmUpdateDialogOpen] = useState(false);
   const [bookingToUpdate, setBookingToUpdate] = useState(null);
   const [updateSelectedDate, setUpdateSelectedDate] = useState(dayjs());
   const [updateAvailableSlots, setUpdateAvailableSlots] = useState([]);
@@ -818,12 +819,20 @@ const BookingPage = ({ sessionTypeId: propSessionTypeId, hideMyBookings = false 
   // Handle update slot selection
   const handleUpdateSlotClick = (slot) => {
     setUpdateSelectedSlot(slot);
+    setConfirmUpdateDialogOpen(true);
+  };
+
+  // Handle confirm update dialog close
+  const handleConfirmUpdateDialogClose = () => {
+    if (updatingBooking) return;
+    setConfirmUpdateDialogOpen(false);
   };
 
   // Handle update dialog close
   const handleUpdateDialogClose = () => {
     if (updatingBooking) return; // Prevent closing during update
     setUpdateDialogOpen(false);
+    setConfirmUpdateDialogOpen(false);
     // Delay clearing state until after dialog close animation completes
     setTimeout(() => {
       setBookingToUpdate(null);
@@ -1889,7 +1898,7 @@ const BookingPage = ({ sessionTypeId: propSessionTypeId, hideMyBookings = false 
                   <Box sx={{ position: 'relative' }}>
                     <Box
                       ref={slotsScrollRef}
-                      sx={{ maxHeight: '240px', overflowY: 'auto', pr: 1 }}
+                      sx={{ maxHeight: '260px', overflowY: 'auto', pr: 1 }}
                       onScroll={(e) => {
                         const element = e.target;
                         const isAtTop = element.scrollTop === 0;
@@ -2005,7 +2014,7 @@ const BookingPage = ({ sessionTypeId: propSessionTypeId, hideMyBookings = false 
                 <CloseIcon />
               </IconButton>
             </DialogTitle>
-            <DialogContent sx={{ pb: 4, minHeight: '620px' }}>
+            <DialogContent sx={{ pb: 1, minHeight: '555px' }}>
               {/* Session Type Selection - only show if not provided as prop */}
               {!propSessionTypeId && (
                 <Box sx={{ mb: 3, mt: 2 }}>
@@ -2142,7 +2151,7 @@ const BookingPage = ({ sessionTypeId: propSessionTypeId, hideMyBookings = false 
                     <Box sx={{ position: 'relative' }}>
                       <Box
                         ref={newBookingSlotsScrollRef}
-                        sx={{ maxHeight: '240px', overflowY: 'auto', pr: 1 }}
+                        sx={{ maxHeight: '260px', overflowY: 'auto', pr: 1 }}
                         onScroll={(e) => {
                           const element = e.target;
                           const isAtTop = element.scrollTop === 0;
@@ -2452,12 +2461,14 @@ const BookingPage = ({ sessionTypeId: propSessionTypeId, hideMyBookings = false 
               <CloseIcon />
             </IconButton>
           </DialogTitle>
-          <DialogContent>
+          <DialogContent sx={{ pb: 1, minHeight: '555px' }}>
             {bookingToUpdate && (
               <>
-                <DialogContentText sx={{ mb: 2 }}>
-                  {t('pages.booking.selectNewDateTime')} <strong>{bookingToUpdate.sessionName || t('pages.booking.session')}</strong> {t('pages.booking.booking')}.
-                </DialogContentText>
+                <Box sx={{ mb: 3, mt: 2 }}>
+                  <DialogContentText>
+                    {t('pages.booking.selectNewDateTime')} <strong>{bookingToUpdate.sessionName || t('pages.booking.session')}</strong> {t('pages.booking.booking')}.
+                  </DialogContentText>
+                </Box>
 
                 {updateBookingError && (
                   <Alert severity="error" sx={{ mb: 2 }}>
@@ -2465,7 +2476,7 @@ const BookingPage = ({ sessionTypeId: propSessionTypeId, hideMyBookings = false 
                   </Alert>
                 )}
 
-                <Grid container spacing={3} sx={{ mt: 1 }}>
+                <Grid container spacing={3} sx={{ mt: 2 }}>
                   {/* Left Column - Date Calendar */}
                   <Grid item xs={12} md={6}>
                     <Box
@@ -2484,13 +2495,6 @@ const BookingPage = ({ sessionTypeId: propSessionTypeId, hideMyBookings = false 
                         onChange={handleUpdateDateChange}
                         minDate={dayjs()}
                         sx={{ width: '100%' }}
-                        firstDayOfWeek={1}
-                        slotProps={{
-                          calendarHeader: {
-                            format: 'MMMM YYYY',
-                          },
-                        }}
-                        dayOfWeekFormatter={(day) => day.charAt(0).toUpperCase() + day.slice(1)}
                       />
                     </Box>
                   </Grid>
@@ -2542,7 +2546,7 @@ const BookingPage = ({ sessionTypeId: propSessionTypeId, hideMyBookings = false 
                       <Box sx={{ position: 'relative' }}>
                         <Box
                           ref={updateBookingSlotsScrollRef}
-                          sx={{ maxHeight: '240px', overflowY: 'auto', pr: 1 }}
+                          sx={{ maxHeight: '260px', overflowY: 'auto', pr: 1 }}
                           onScroll={(e) => {
                             const element = e.target;
                             const isAtTop = element.scrollTop === 0;
@@ -2637,42 +2641,84 @@ const BookingPage = ({ sessionTypeId: propSessionTypeId, hideMyBookings = false 
                   </Grid>
                 </Grid>
 
-                <TextField
-                  fullWidth
-                  multiline
-                  rows={4}
-                  label={t('pages.booking.messageOptional')}
-                  placeholder={t('pages.booking.messagePlaceholder')}
-                  value={updateClientMessage}
-                  onChange={(e) => {
-                    const value = e.target.value;
-                    if (value.length <= 2000) {
-                      setUpdateClientMessage(value);
-                    }
-                  }}
-                  disabled={updatingBooking || !updateSelectedSlot}
-                  error={updateClientMessage.length > 2000}
-                  helperText={
-                    updateClientMessage.length > 2000
-                      ? t('pages.booking.messageMaxLength')
-                      : `${updateClientMessage.length}/2000 ${t('common.characters')}`
-                  }
-                  sx={{
-                    mt: 3,
-                    '& .MuiOutlinedInput-root': {
-                      backgroundColor: (updatingBooking || !updateSelectedSlot) ? 'action.hover' : 'inherit'
-                    }
-                  }}
-                />
               </>
             )}
           </DialogContent>
-          <DialogActions>
+        </Dialog>
+
+        {/* Confirm Update Dialog */}
+        <Dialog open={confirmUpdateDialogOpen} onClose={handleConfirmUpdateDialogClose} maxWidth="sm" fullWidth>
+          <DialogTitle sx={{ m: 0, p: 2, pr: 6 }}>
+            {t('pages.booking.confirmUpdateTitle')}
+            <IconButton
+              aria-label="close"
+              onClick={handleConfirmUpdateDialogClose}
+              disabled={updatingBooking}
+              sx={{
+                position: 'absolute',
+                right: 8,
+                top: 8,
+                color: (theme) => theme.palette.grey[500],
+              }}
+            >
+              <CloseIcon />
+            </IconButton>
+          </DialogTitle>
+          <DialogContent>
+            <DialogContentText sx={{ mb: 2 }}>
+              {t('pages.booking.confirmUpdateMessage')}{' '}
+              {updateSelectedSlot && (
+                <strong>
+                  {updateSelectedSlot.startTime
+                    ? formatTime(updateSelectedSlot.startTime)
+                    : (updateSelectedSlot.startTimeInstant ? formatTimeFromInstant(updateSelectedSlot.startTimeInstant) : 'N/A')}
+                  {updateSelectedSlot.endTime && (
+                    <>
+                      {' - '}{formatTime(updateSelectedSlot.endTime)}
+                    </>
+                  )}
+                  {' '}
+                  {t('pages.booking.on')} {formatDateForDisplay(updateSelectedDate)}
+                </strong>
+              )}?
+            </DialogContentText>
+
+            <TextField
+              fullWidth
+              multiline
+              rows={4}
+              label={t('pages.booking.messageOptional')}
+              placeholder={t('pages.booking.messagePlaceholder')}
+              value={updateClientMessage}
+              onChange={(e) => {
+                const value = e.target.value;
+                if (value.length <= 2000) {
+                  setUpdateClientMessage(value);
+                }
+              }}
+              disabled={updatingBooking}
+              error={updateClientMessage.length > 2000}
+              helperText={
+                updateClientMessage.length > 2000
+                  ? t('pages.booking.messageMaxLength')
+                  : `${updateClientMessage.length}/2000 ${t('common.characters')}`
+              }
+              sx={{ mt: 1 }}
+            />
+          </DialogContent>
+          <DialogActions sx={{ px: 3, pb: 2 }}>
+            <Button
+              onClick={handleConfirmUpdateDialogClose}
+              sx={{ textTransform: 'none' }}
+              disabled={updatingBooking}
+            >
+              {t('common.cancel')}
+            </Button>
             <Button
               onClick={handleConfirmUpdate}
               color="primary"
               variant="contained"
-              disabled={updatingBooking || !updateSelectedSlot || !updateSelectedSlot.startTimeInstant}
+              disabled={updatingBooking}
               sx={{ textTransform: 'none' }}
             >
               {updatingBooking ? (
@@ -2681,7 +2727,7 @@ const BookingPage = ({ sessionTypeId: propSessionTypeId, hideMyBookings = false 
                   {t('pages.booking.updating')}
                 </>
               ) : (
-                t('pages.booking.updateBooking')
+                t('pages.booking.confirmUpdate')
               )}
             </Button>
           </DialogActions>
