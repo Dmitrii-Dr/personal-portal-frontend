@@ -35,6 +35,7 @@ import {
   FormControlLabel,
   Switch,
   IconButton,
+  Tooltip,
   Snackbar,
 } from '@mui/material';
 import dayjs from 'dayjs';
@@ -49,6 +50,7 @@ import ArrowUpwardIcon from '@mui/icons-material/ArrowUpward';
 import ArrowDownwardIcon from '@mui/icons-material/ArrowDownward';
 import KeyboardArrowDownIcon from '@mui/icons-material/KeyboardArrowDown';
 import KeyboardArrowUpIcon from '@mui/icons-material/KeyboardArrowUp';
+import InfoOutlinedIcon from '@mui/icons-material/InfoOutlined';
 import { DateCalendar } from '@mui/x-date-pickers/DateCalendar';
 import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
 import { AdapterDayjs } from '@mui/x-date-pickers/AdapterDayjs';
@@ -67,6 +69,8 @@ const monthsGenitive = 'Января_Февраля_Марта_Апреля_Ма
 
 const PastSessions = () => {
   const { t } = useTranslation();
+  const [infoDialogOpen, setInfoDialogOpen] = useState(false);
+  const [selectedBookingInfo, setSelectedBookingInfo] = useState(null);
 
   // Helper function to get translated status label
   const getStatusLabel = (status) => {
@@ -174,8 +178,8 @@ const PastSessions = () => {
 
     // Apply date filter if dates are set and timezone is loaded
     if (start && userTimezone) {
-      const startDateStr = dayjs(start).format('YYYY-MM-DD');
-      const endDateStr = end ? dayjs(end).format('YYYY-MM-DD') : startDateStr;
+      const startDateStr = normalizeDateInUserTimezone(start).format('YYYY-MM-DD');
+      const endDateStr = end ? normalizeDateInUserTimezone(end).format('YYYY-MM-DD') : startDateStr;
 
       const actualStartStr = startDateStr <= endDateStr ? startDateStr : endDateStr;
       const actualEndStr = startDateStr <= endDateStr ? endDateStr : startDateStr;
@@ -187,7 +191,7 @@ const PastSessions = () => {
 
         try {
           const bookingUtc = dayjs.utc(booking.startTimeInstant);
-          const bookingInTimezone = bookingUtc.tz(userTimezone);
+          const bookingInTimezone = bookingUtc.utcOffset(userTimezone);
           const bookingDateStr = bookingInTimezone.format('YYYY-MM-DD');
 
           return bookingDateStr >= actualStartStr && bookingDateStr <= actualEndStr;
@@ -209,11 +213,16 @@ const PastSessions = () => {
     setTotalPages(Math.ceil(totalFiltered / size));
   };
 
+  const getNowInUserTimezone = () => (userTimezone ? dayjs().utcOffset(userTimezone) : dayjs());
+  const normalizeDateInUserTimezone = (date) => (
+    userTimezone ? dayjs(date).utcOffset(userTimezone, true) : dayjs(date)
+  );
+
   // Handle date selection from calendar
   const handleDateSelect = (date) => {
     if (!date) return;
 
-    const selectedDay = dayjs(date).startOf('day');
+    const selectedDay = normalizeDateInUserTimezone(date).startOf('day');
 
     if (!startDate) {
       setStartDate(selectedDay);
@@ -248,7 +257,7 @@ const PastSessions = () => {
 
   // Handle predefined filter buttons
   const handleTodayFilter = () => {
-    const today = dayjs().startOf('day');
+    const today = getNowInUserTimezone().startOf('day');
     setStartDate(today);
     setEndDate(today);
     setPage(0); // Reset to first page
@@ -256,7 +265,7 @@ const PastSessions = () => {
   };
 
   const handleThisWeekFilter = () => {
-    const today = dayjs().startOf('day');
+    const today = getNowInUserTimezone().startOf('day');
     const startOfWeek = today.startOf('week');
     const endOfWeek = today.endOf('week');
     setStartDate(startOfWeek);
@@ -266,7 +275,7 @@ const PastSessions = () => {
   };
 
   const handleThisMonthFilter = () => {
-    const today = dayjs().startOf('day');
+    const today = getNowInUserTimezone().startOf('day');
     const startOfMonth = today.startOf('month');
     const endOfMonth = today.endOf('month');
     setStartDate(startOfMonth);
@@ -279,7 +288,7 @@ const PastSessions = () => {
   const getActiveFilter = () => {
     if (!startDate || !endDate) return null;
 
-    const today = dayjs().startOf('day');
+    const today = getNowInUserTimezone().startOf('day');
     const startDay = dayjs(startDate).startOf('day');
     const endDay = dayjs(endDate).startOf('day');
 
@@ -347,13 +356,23 @@ const PastSessions = () => {
 
         // Handle paginated response - use server-side pagination
         if (data.content && Array.isArray(data.content)) {
-          setBookings(data.content);
-          setTotalPages(data.totalPages || 0);
-          setTotalElements(data.totalElements || 0);
+          const items = data.content;
+          if (startDate && userTimezone) {
+            applyDateFilter(items, startDate, endDate);
+          } else {
+            setBookings(items);
+            setTotalPages(data.totalPages || 0);
+            setTotalElements(data.totalElements || 0);
+          }
         } else if (Array.isArray(data)) {
-          setBookings(data);
-          setTotalPages(1);
-          setTotalElements(data.length);
+          const items = data;
+          if (startDate && userTimezone) {
+            applyDateFilter(items, startDate, endDate);
+          } else {
+            setBookings(items);
+            setTotalPages(1);
+            setTotalElements(items.length);
+          }
         } else {
           setBookings([]);
           setTotalPages(0);
@@ -387,7 +406,7 @@ const PastSessions = () => {
 
     // Cleanup: don't clear refs here to prevent race condition with React StrictMode
     // The refs will be cleared in the finally block when the fetch completes
-  }, [status, page, size]);
+  }, [status, page, size, startDate, endDate, userTimezone]);
 
   const handleStatusChange = (e) => {
     setStatus(e.target.value);
@@ -435,6 +454,16 @@ const PastSessions = () => {
     const lastName = booking.clientLastName || '';
     const name = `${firstName} ${lastName}`.trim();
     return name || booking.clientEmail || 'Unknown';
+  };
+
+  const handleInfoClick = (booking) => {
+    setSelectedBookingInfo(booking);
+    setInfoDialogOpen(true);
+  };
+
+  const handleInfoClose = () => {
+    setInfoDialogOpen(false);
+    setSelectedBookingInfo(null);
   };
 
   const STATUS_COLORS = {
@@ -687,48 +716,43 @@ const PastSessions = () => {
             <Grid container spacing={2}>
               {bookings.map((booking) => {
                 const sessionTitle = booking.sessionName || 'N/A';
-                const sessionTitleDisplay = sessionTitle.length > 50 ? `${sessionTitle.slice(0, 50)}...` : sessionTitle;
+                const sessionTitleDisplay = sessionTitle.length > 200 ? `${sessionTitle.slice(0, 200)}...` : sessionTitle;
                 return (
-                <Grid item xs={12} key={booking.id}>
-                  <Card>
-                    <CardContent>
-                      <Box sx={{ display: 'flex', gap: 1, alignItems: 'center', mb: 2 }}>
-                        <Chip
-                          label={getStatusLabel(booking.status)}
-                          color={STATUS_COLORS[booking.status] || 'default'}
-                          size="small"
-                        />
-                      </Box>
+                  <Grid item xs={12} key={booking.id}>
+                    <Card sx={{ height: 210 }}>
+                      <CardContent sx={{ height: '100%', overflow: 'hidden' }}>
+                        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2, flexWrap: 'wrap', gap: 1 }}>
+                          <Box sx={{ display: 'flex', gap: 1, alignItems: 'center', flexWrap: 'wrap' }}>
+                            <Chip
+                              label={getStatusLabel(booking.status)}
+                              color={STATUS_COLORS[booking.status] || 'default'}
+                              size="small"
+                            />
+                            <Tooltip title={t('common.info')}>
+                              <IconButton size="small" onClick={() => handleInfoClick(booking)}>
+                                <InfoOutlinedIcon fontSize="small" />
+                              </IconButton>
+                            </Tooltip>
+                          </Box>
+                        </Box>
 
-                      <Box sx={{ mb: 1 }}>
-                        <Typography variant="h6">
-                          {getClientName(booking)}
-                        </Typography>
-                      </Box>
-
-                      <Box sx={{ mb: 2 }}>
-                        <Typography variant="body2" color="text.secondary">
-                          {booking.clientEmail}
-                        </Typography>
-                      </Box>
-
-                      <Divider sx={{ my: 2 }} />
-
-                      <Grid container spacing={2}>
-                        <Grid item xs={12} sm={6}>
+                        <Box sx={{ mb: 2, display: 'flex', alignItems: 'baseline', gap: 1, flexWrap: 'wrap' }}>
                           <Typography variant="body2" color="text.secondary">
-                            {t('admin.dashboard.sessionTypeLabel').replace(' *', '')}
+                            {t('admin.bookingsManagement.client')}
                           </Typography>
-                          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
-                            <Typography
-                              variant="body1"
-                              noWrap
-                              title={sessionTitle}
-                              sx={{ minWidth: 0, flex: 1 }}
-                            >
-                              {sessionTitleDisplay}
-                            </Typography>
-                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, flexShrink: 0 }}>
+                          <Typography variant="subtitle1">
+                            {getClientName(booking)}
+                          </Typography>
+                        </Box>
+
+                        <Divider sx={{ my: 2 }} />
+
+                        <Grid container spacing={2}>
+                          <Grid item xs={12} sm={6}>
+                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, flexWrap: 'wrap' }}>
+                              <Typography variant="body2" color="text.secondary">
+                                {t('admin.dashboard.sessionTypeLabel').replace(' *', '')}
+                              </Typography>
                               {booking.sessionDurationMinutes && (
                                 <Chip
                                   label={`${booking.sessionDurationMinutes} min`}
@@ -754,37 +778,27 @@ const PastSessions = () => {
                                 />
                               )}
                             </Box>
-                          </Box>
+                            <Typography variant="body2" title={sessionTitle} sx={{ mt: 0.5 }}>
+                              {sessionTitleDisplay}
+                            </Typography>
+                          </Grid>
+                          <Grid item xs={12} sm={6}>
+                            <Box sx={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'flex-start' }}>
+                              <Box sx={{ textAlign: 'right' }}>
+                                <Typography variant="body2" color="text.secondary">
+                                  {t('admin.dashboard.startTime')}
+                                </Typography>
+                                <Typography variant="body1" noWrap sx={{ mt: 0.5 }}>
+                                  {formatDateTime(booking.startTimeInstant)}
+                                </Typography>
+                              </Box>
+                            </Box>
+                          </Grid>
                         </Grid>
-                        <Grid item xs={12} sm={6}>
-                          <Typography variant="body2" color="text.secondary">
-                            {t('admin.dashboard.startTime')}
-                          </Typography>
-                          <Typography variant="body1" gutterBottom noWrap>
-                            {formatDateTime(booking.startTimeInstant)}
-                          </Typography>
-                        </Grid>
-                        <Grid item xs={12} sm={6}>
-                          <Typography variant="body2" color="text.secondary">
-                            {t('admin.dashboard.endTime')}
-                          </Typography>
-                          <Typography variant="body1" gutterBottom>
-                            {formatDateTime(booking.endTimeInstant)}
-                          </Typography>
-                        </Grid>
-                        <Grid item xs={12} sm={6}>
-                          <Typography variant="body2" color="text.secondary">
-                            {t('admin.dashboard.createdAt')}
-                          </Typography>
-                          <Typography variant="body1" gutterBottom>
-                            {formatDateTime(booking.createdAt)}
-                          </Typography>
-                        </Grid>
-                      </Grid>
-                    </CardContent>
-                  </Card>
-                </Grid>
-              );
+                      </CardContent>
+                    </Card>
+                  </Grid>
+                );
               })}
             </Grid>
 
@@ -820,6 +834,44 @@ const PastSessions = () => {
             </Box>
           </>
         )}
+
+        <Dialog open={infoDialogOpen} onClose={handleInfoClose} maxWidth="sm" fullWidth>
+          <DialogTitle>{t('admin.bookingsManagement.bookingDetails')}</DialogTitle>
+          <DialogContent>
+            {selectedBookingInfo && (
+              <Box>
+                <Typography variant="body2" color="text.secondary" gutterBottom>
+                  {t('admin.bookingsManagement.client')} {getClientName(selectedBookingInfo)}
+                </Typography>
+                <Typography variant="body2" color="text.secondary" gutterBottom>
+                  {t('admin.bookingsManagement.session')} {selectedBookingInfo.sessionName || 'N/A'}
+                </Typography>
+                <Typography variant="body2" color="text.secondary" gutterBottom>
+                  {t('admin.bookingsManagement.startTime')}{' '}
+                  {formatDateTime(selectedBookingInfo.startTimeInstant)}
+                </Typography>
+                <Typography variant="body2" color="text.secondary" gutterBottom>
+                  {t('admin.bookingsManagement.endTime')}{' '}
+                  {formatDateTime(selectedBookingInfo.endTimeInstant)}
+                </Typography>
+                <Typography variant="body2" color="text.secondary" gutterBottom>
+                  {t('admin.bookingsManagement.createdAt')}{' '}
+                  {formatDateTime(selectedBookingInfo.createdAt)}
+                </Typography>
+                {selectedBookingInfo.clientMessage && (
+                  <Typography variant="body2" color="text.secondary" gutterBottom>
+                    {t('admin.bookingsManagement.clientMessage')} {selectedBookingInfo.clientMessage}
+                  </Typography>
+                )}
+              </Box>
+            )}
+          </DialogContent>
+          <DialogActions>
+            <Button onClick={handleInfoClose} sx={{ textTransform: 'none' }}>
+              {t('common.close')}
+            </Button>
+          </DialogActions>
+        </Dialog>
       </Box>
     </LocalizationProvider>
   );
