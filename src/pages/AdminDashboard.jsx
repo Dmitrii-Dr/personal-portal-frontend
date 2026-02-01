@@ -41,6 +41,8 @@ import {
 import dayjs from 'dayjs';
 import utc from 'dayjs/plugin/utc';
 import timezone from 'dayjs/plugin/timezone';
+import 'dayjs/locale/en-gb';
+import 'dayjs/locale/ru';
 import FilterAltIcon from '@mui/icons-material/FilterAlt';
 import ClearIcon from '@mui/icons-material/Clear';
 import CloseIcon from '@mui/icons-material/Close';
@@ -58,6 +60,7 @@ import { AdapterDayjs } from '@mui/x-date-pickers/AdapterDayjs';
 // Extend dayjs with timezone support
 dayjs.extend(utc);
 dayjs.extend(timezone);
+dayjs.locale('en-gb');
 import apiClient from '../utils/api';
 import { fetchWithAuth, getToken, fetchUserSettings } from '../utils/api';
 import { getCachedSlots, setCachedSlots } from '../utils/bookingSlotCache';
@@ -105,6 +108,10 @@ const PastSessions = () => {
       mountedRef.current = false;
     };
   }, []);
+
+  useEffect(() => {
+    dayjs.locale(i18n.language === 'ru' ? 'ru' : 'en-gb');
+  }, [i18n.language]);
 
   // Fetch user timezone from settings
   const fetchUserTimezone = async () => {
@@ -485,7 +492,7 @@ const PastSessions = () => {
   };
 
   return (
-    <LocalizationProvider dateAdapter={AdapterDayjs}>
+    <LocalizationProvider dateAdapter={AdapterDayjs} adapterLocale={i18n.language === 'ru' ? 'ru' : 'en-gb'}>
       <Box>
         <Box sx={{ mb: 3, display: 'flex', alignItems: 'center', gap: 2 }}>
           <FormControl sx={{ minWidth: 200 }}>
@@ -959,6 +966,10 @@ const AdminDashboard = () => {
   const [creatingClient, setCreatingClient] = useState(false);
   const [createClientError, setCreateClientError] = useState(null);
   const [confirmBookingDialogOpen, setConfirmBookingDialogOpen] = useState(false);
+
+  useEffect(() => {
+    dayjs.locale(i18n.language === 'ru' ? 'ru' : 'en-gb');
+  }, [i18n.language]);
 
   const handleAddPostOpen = () => {
     setAddPostOpen(true);
@@ -1765,7 +1776,7 @@ const AdminDashboard = () => {
   };
 
   return (
-    <LocalizationProvider dateAdapter={AdapterDayjs}>
+    <LocalizationProvider dateAdapter={AdapterDayjs} adapterLocale={i18n.language === 'ru' ? 'ru' : 'en-gb'}>
       <Box>
         <Box sx={{ mb: 3 }}>
           <Typography variant="h4" component="h1">
