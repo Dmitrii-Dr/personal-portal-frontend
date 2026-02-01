@@ -138,6 +138,7 @@
       "confirmBookingMessage": "Подтвердите вашу запись на",
       "confirmUpdateTitle": "Подтвердить перенос",
       "confirmUpdateMessage": "Вы уверены, что хотите перенести запись на",
+      "dateTimeWillBeUpdated": "Дата/время будут обновлены с <strong>{{current}}</strong> на <strong>{{new}}</strong>.",
       "confirmUpdate": "Подтвердить перенос",
       "cancelBookingTitle": "Отменить запись",
       "cancelBookingMessage": "Вы уверены, что хотите отменить эту запись? Это действие нельзя отменить.",

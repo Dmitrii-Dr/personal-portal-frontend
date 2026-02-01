@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useTranslation } from 'react-i18next';
+import { Trans, useTranslation } from 'react-i18next';
 import i18n from '../i18n/i18n';
 import axios from 'axios';
 import dayjs from 'dayjs';
@@ -1206,6 +1206,55 @@ const BookingPage = ({ sessionTypeId: propSessionTypeId, hideMyBookings = false 
       return `${day} ${monthGenitive}, ${year}`;
     }
     return dayjs(date).locale(locale).format('MMMM D, YYYY');
+  };
+
+  const formatDateTimeForUpdate = (instantString) => {
+    if (!instantString) return 'N/A';
+    try {
+      const locale = i18nInstance.language === 'ru' ? 'ru' : 'en-gb';
+      const utcTime = dayjs.utc(instantString);
+      const timezone = userTimezone || selectedTimezone || 'Europe/Moscow';
+      const localTime = utcTime.tz(timezone);
+
+      if (locale === 'ru') {
+        const day = localTime.format('D');
+        const monthIndex = localTime.month();
+        const monthGenitive = monthsGenitive[monthIndex];
+        const year = localTime.format('YYYY');
+        const time = localTime.format('HH:mm');
+        return `${day} ${monthGenitive}, ${year} ${time}`;
+      }
+
+      return localTime.locale(locale).format('MMMM D, YYYY HH:mm');
+    } catch {
+      try {
+        const locale = i18nInstance.language === 'ru' ? 'ru' : 'en-gb';
+        const localTime = dayjs(instantString);
+
+        if (locale === 'ru') {
+          const day = localTime.format('D');
+          const monthIndex = localTime.month();
+          const monthGenitive = monthsGenitive[monthIndex];
+          const year = localTime.format('YYYY');
+          const time = localTime.format('HH:mm');
+          return `${day} ${monthGenitive}, ${year} ${time}`;
+        }
+
+        return localTime.locale(locale).format('MMMM D, YYYY HH:mm');
+      } catch {
+        return instantString;
+      }
+    }
+  };
+
+  const getUpdateStartTime = () => {
+    if (updateSelectedSlot?.startTime) {
+      return formatTime(updateSelectedSlot.startTime);
+    }
+    if (updateSelectedSlot?.startTimeInstant) {
+      return formatTimeFromInstant(updateSelectedSlot.startTimeInstant);
+    }
+    return 'N/A';
   };
 
   // Format instant for display (24-hour format) using user's timezone
@@ -2660,7 +2709,7 @@ const BookingPage = ({ sessionTypeId: propSessionTypeId, hideMyBookings = false 
         </Dialog>
 
         {/* Confirm Update Dialog */}
-        <Dialog open={confirmUpdateDialogOpen} onClose={handleConfirmUpdateDialogClose} maxWidth="sm" fullWidth>
+        <Dialog open={confirmUpdateDialogOpen} onClose={handleConfirmUpdateDialogClose} maxWidth="md" fullWidth>
           <DialogTitle sx={{ m: 0, p: 2, pr: 6 }}>
             {t('pages.booking.confirmUpdateTitle')}
             <IconButton
@@ -2678,22 +2727,49 @@ const BookingPage = ({ sessionTypeId: propSessionTypeId, hideMyBookings = false 
             </IconButton>
           </DialogTitle>
           <DialogContent>
-            <DialogContentText sx={{ mb: 2 }}>
+            {updateSelectedSlot && bookingToUpdate && (
+              <Alert severity="info" sx={{ mb: 2, '& .MuiAlert-message': { whiteSpace: 'nowrap' } }}>
+                <Trans
+                  i18nKey="pages.booking.dateTimeWillBeUpdated"
+                  values={{
+                    current: formatDateTimeForUpdate(bookingToUpdate.startTimeInstant),
+                    new: updateSelectedSlot.startTimeInstant
+                      ? formatDateTimeForUpdate(updateSelectedSlot.startTimeInstant)
+                      : '',
+                  }}
+                  components={{ strong: <strong /> }}
+                />
+              </Alert>
+            )}
+            <DialogContentText sx={{ mb: 2, whiteSpace: 'nowrap' }}>
               {t('pages.booking.confirmUpdateMessage')}{' '}
               {updateSelectedSlot && (
-                <strong>
-                  {updateSelectedSlot.startTime
-                    ? formatTime(updateSelectedSlot.startTime)
-                    : (updateSelectedSlot.startTimeInstant ? formatTimeFromInstant(updateSelectedSlot.startTimeInstant) : 'N/A')}
-                  {updateSelectedSlot.endTime && (
-                    <>
-                      {' - '}{formatTime(updateSelectedSlot.endTime)}
-                    </>
-                  )}
-                  {' '}
-                  {t('pages.booking.on')} {formatDateForDisplay(updateSelectedDate)}
-                </strong>
-              )}?
+                i18nInstance.language === 'ru' ? (
+                  <strong>
+                    {(() => {
+                      const day = updateSelectedDate ? dayjs(updateSelectedDate).format('D') : '';
+                      const monthGenitive = updateSelectedDate ? monthsGenitive[dayjs(updateSelectedDate).month()] : '';
+                      const year = updateSelectedDate ? dayjs(updateSelectedDate).format('YYYY') : '';
+                      const startTime = getUpdateStartTime();
+                      const endTime = updateSelectedSlot.endTime ? formatTime(updateSelectedSlot.endTime) : '';
+                      const timeRange = endTime ? `${startTime} - ${endTime}` : startTime;
+                      return `${day} ${monthGenitive} ${timeRange}, ${year}`;
+                    })()}
+                  </strong>
+                ) : (
+                  <strong>
+                    {getUpdateStartTime()}
+                    {updateSelectedSlot.endTime && (
+                      <>
+                        {' - '}{formatTime(updateSelectedSlot.endTime)}
+                      </>
+                    )}
+                    {' '}
+                    {t('pages.booking.on')} {formatDateForDisplay(updateSelectedDate)}
+                  </strong>
+                )
+              )}
+              ?
             </DialogContentText>
 
             <TextField
@@ -2721,18 +2797,12 @@ const BookingPage = ({ sessionTypeId: propSessionTypeId, hideMyBookings = false 
           </DialogContent>
           <DialogActions sx={{ px: 3, pb: 2 }}>
             <Button
-              onClick={handleConfirmUpdateDialogClose}
-              sx={{ textTransform: 'none' }}
-              disabled={updatingBooking}
-            >
-              {t('common.cancel')}
-            </Button>
-            <Button
               onClick={handleConfirmUpdate}
               color="primary"
               variant="contained"
               disabled={updatingBooking}
-              sx={{ textTransform: 'none' }}
+              fullWidth
+              sx={{ py: 1 }}
             >
               {updatingBooking ? (
                 <>

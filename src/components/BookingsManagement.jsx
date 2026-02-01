@@ -2322,7 +2322,7 @@ const BookingsManagement = () => {
         </Dialog>
 
         {/* Confirm Reschedule Dialog */}
-        <Dialog open={confirmRescheduleDialogOpen} onClose={handleConfirmRescheduleDialogClose} maxWidth="sm" fullWidth>
+        <Dialog open={confirmRescheduleDialogOpen} onClose={handleConfirmRescheduleDialogClose} maxWidth="md" fullWidth>
           <DialogTitle sx={{ m: 0, p: 2, pr: 6 }}>
             {t('pages.booking.confirmUpdateTitle')}
             <IconButton
@@ -2341,7 +2341,7 @@ const BookingsManagement = () => {
           </DialogTitle>
           <DialogContent>
             {(rescheduleSelectedSlot || (customStartTime && rescheduleSelectedDate)) && bookingToReschedule && (
-              <Alert severity="info" sx={{ mb: 2 }}>
+              <Alert severity="info" sx={{ mb: 2, '& .MuiAlert-message': { whiteSpace: 'nowrap' } }}>
                 <Trans
                   i18nKey="admin.bookingsManagement.dateTimeWillBeUpdated"
                   values={{
@@ -2363,7 +2363,7 @@ const BookingsManagement = () => {
                 />
               </Alert>
             )}
-            <DialogContentText sx={{ mb: 2 }}>
+            <DialogContentText sx={{ mb: 2, whiteSpace: 'nowrap' }}>
               {t('pages.booking.confirmUpdateMessage')}{' '}
               {i18n.language === 'ru' ? (
                 <strong>

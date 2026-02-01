@@ -132,6 +132,7 @@
       "confirmBookingMessage": "Confirm your booking for",
       "confirmUpdateTitle": "Confirm Reschedule",
       "confirmUpdateMessage": "Are you sure you want to reschedule to",
+      "dateTimeWillBeUpdated": "Date/time will be updated from <strong>{{current}}</strong> to <strong>{{new}}</strong>.",
       "confirmUpdate": "Confirm Reschedule",
       "cancelBookingTitle": "Cancel Booking",
       "cancelBookingMessage": "Are you sure you want to cancel this booking? This action cannot be undone.",
