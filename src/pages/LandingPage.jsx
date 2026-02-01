@@ -462,18 +462,7 @@ const LandingPage = () => {
             backgroundRepeat: 'no-repeat',
             zIndex: 0,
           } : {},
-          '&::after': welcomeImageUrl ? {
-            content: '""',
-            position: 'absolute',
-            top: 0,
-            left: 0,
-            right: 0,
-            bottom: 0,
-            width: '100%',
-            height: '100%',
-            background: 'linear-gradient(135deg, rgba(44, 95, 95, 0.3) 0%, rgba(31, 69, 69, 0.4) 100%)',
-            zIndex: 0,
-          } : {},
+          '&::after': {},
           background: welcomeImageUrl
             ? 'transparent'
             : 'linear-gradient(135deg, #2C5F5F 0%, #1F4545 100%)',
@@ -489,8 +478,8 @@ const LandingPage = () => {
             {welcomeLoading ? (
               <CircularProgress size={40} sx={{ color: 'white' }} />
             ) : welcomeError ? (
-              'Welcome to Your Journey'
-            ) : welcomeData?.welcomeMessage || 'Welcome to Your Journey'}
+              ''
+            ) : welcomeData?.welcomeMessage || ''}
           </Typography>
           <Button
             variant="contained"
@@ -1914,4 +1903,3 @@ const LandingPage = () => {
 };
 
 export default LandingPage;
-
