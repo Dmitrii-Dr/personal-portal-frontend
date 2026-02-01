@@ -1168,11 +1168,12 @@ const BookingsManagement = () => {
       <Card
         key={booking.id}
         sx={{
+          height: 210,
           mb: 2,
           bgcolor: (overdue || past) ? 'grey.300' : 'background.paper'
         }}
       >
-        <CardContent>
+        <CardContent sx={{ height: '100%', overflow: 'hidden' }}>
           {/* First row: Status chips and Info button on left, Update button on right */}
           <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2, flexWrap: 'wrap', gap: 1 }}>
             <Box sx={{ display: 'flex', gap: 1, alignItems: 'center', flexWrap: 'wrap' }}>
@@ -1272,8 +1273,8 @@ const BookingsManagement = () => {
                 title={booking.sessionName || 'N/A'}
                 sx={{ mt: 0.5 }}
               >
-                {(booking.sessionName || 'N/A').length > 100
-                  ? `${(booking.sessionName || 'N/A').slice(0, 100)}...`
+                {(booking.sessionName || 'N/A').length > 200
+                  ? `${(booking.sessionName || 'N/A').slice(0, 200)}...`
                   : (booking.sessionName || 'N/A')}
               </Typography>
             </Grid>
