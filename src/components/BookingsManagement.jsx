@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { useTranslation } from 'react-i18next';
+import { Trans, useTranslation } from 'react-i18next';
 import i18n from '../i18n/i18n';
 import dayjs from 'dayjs';
 import utc from 'dayjs/plugin/utc';
@@ -671,9 +671,35 @@ const BookingsManagement = () => {
     }
   };
 
+  const getRescheduleStartTime = () => {
+    if (rescheduleSelectedSlot?.startTime) {
+      return formatTime(rescheduleSelectedSlot.startTime);
+    }
+    if (rescheduleSelectedSlot?.startTimeInstant) {
+      return formatTimeFromInstant(rescheduleSelectedSlot.startTimeInstant);
+    }
+    if (customStartTime && rescheduleSelectedDate) {
+      const combinedDateTime = rescheduleSelectedDate
+        .hour(customStartTime.hour())
+        .minute(customStartTime.minute())
+        .second(0)
+        .millisecond(0);
+      return formatTimeFromInstant(combinedDateTime.toISOString());
+    }
+    return 'N/A';
+  };
+
   // Format date for display
   const formatDateForDisplay = (date) => {
-    return dayjs(date).format('MMMM D, YYYY');
+    const locale = i18n.language === 'ru' ? 'ru' : 'en-gb';
+    if (locale === 'ru') {
+      const d = dayjs(date);
+      const day = d.format('D');
+      const monthGenitive = monthsGenitive[d.month()];
+      const year = d.format('YYYY');
+      return `${day} ${monthGenitive}, ${year}`;
+    }
+    return dayjs(date).locale(locale).format('MMMM D, YYYY');
   };
 
   // Handle reschedule button click
@@ -2316,29 +2342,57 @@ const BookingsManagement = () => {
           <DialogContent>
             {(rescheduleSelectedSlot || (customStartTime && rescheduleSelectedDate)) && bookingToReschedule && (
               <Alert severity="info" sx={{ mb: 2 }}>
-                Date/time will be updated from <strong>{formatDateTime(bookingToReschedule.startTimeInstant)}</strong> to <strong>
-                  {rescheduleSelectedSlot
-                    ? formatDateTime(rescheduleSelectedSlot.startTimeInstant)
-                    : (customStartTime && rescheduleSelectedDate
-                      ? formatDateTime(rescheduleSelectedDate.hour(customStartTime.hour()).minute(customStartTime.minute()).second(0).millisecond(0).toISOString())
-                      : '')
-                  }
-                </strong>.
+                <Trans
+                  i18nKey="admin.bookingsManagement.dateTimeWillBeUpdated"
+                  values={{
+                    current: formatDateTime(bookingToReschedule.startTimeInstant),
+                    new: rescheduleSelectedSlot
+                      ? formatDateTime(rescheduleSelectedSlot.startTimeInstant)
+                      : (customStartTime && rescheduleSelectedDate
+                        ? formatDateTime(
+                          rescheduleSelectedDate
+                            .hour(customStartTime.hour())
+                            .minute(customStartTime.minute())
+                            .second(0)
+                            .millisecond(0)
+                            .toISOString()
+                        )
+                        : ''),
+                  }}
+                  components={{ strong: <strong /> }}
+                />
               </Alert>
             )}
             <DialogContentText sx={{ mb: 2 }}>
               {t('pages.booking.confirmUpdateMessage')}{' '}
-              <strong>
-                {rescheduleSelectedSlot && (rescheduleSelectedSlot.startTime
-                  ? formatTime(rescheduleSelectedSlot.startTime)
-                  : (rescheduleSelectedSlot.startTimeInstant ? formatTimeFromInstant(rescheduleSelectedSlot.startTimeInstant) : 'N/A'))}
-              </strong>{' '}
-              {rescheduleSelectedSlot && rescheduleSelectedSlot.endTime && (
+              {i18n.language === 'ru' ? (
+                <strong>
+                  {(() => {
+                    const day = rescheduleSelectedDate ? dayjs(rescheduleSelectedDate).format('D') : '';
+                    const monthGenitive = rescheduleSelectedDate ? monthsGenitive[dayjs(rescheduleSelectedDate).month()] : '';
+                    const year = rescheduleSelectedDate ? dayjs(rescheduleSelectedDate).format('YYYY') : '';
+                    const startTime = getRescheduleStartTime();
+                    const endTime = rescheduleSelectedSlot && rescheduleSelectedSlot.endTime
+                      ? formatTime(rescheduleSelectedSlot.endTime)
+                      : '';
+                    const timeRange = endTime ? `${startTime} - ${endTime}` : startTime;
+                    return `${day} ${monthGenitive} ${timeRange}, ${year}`;
+                  })()}
+                </strong>
+              ) : (
                 <>
-                  - <strong>{formatTime(rescheduleSelectedSlot.endTime)}</strong>{' '}
+                  <strong>
+                    {getRescheduleStartTime()}
+                  </strong>{' '}
+                  {rescheduleSelectedSlot && rescheduleSelectedSlot.endTime && (
+                    <>
+                      - <strong>{formatTime(rescheduleSelectedSlot.endTime)}</strong>{' '}
+                    </>
+                  )}
+                  {t('pages.booking.on')} <strong>{formatDateForDisplay(rescheduleSelectedDate)}</strong>?
                 </>
               )}
-              {t('pages.booking.on')} <strong>{formatDateForDisplay(rescheduleSelectedDate)}</strong>?
+              {i18n.language === 'ru' ? '?' : ''}
             </DialogContentText>
 
             <TextField
