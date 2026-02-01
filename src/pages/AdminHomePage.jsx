@@ -1624,7 +1624,7 @@ const AdminHomePage = () => {
                     }}
                   />
                 </Grid>
-                <Grid item xs={12} sm={1}>
+                <Grid item xs={12} sm={2}>
                   <Stack direction="row" spacing={1} sx={{ height: '100%' }}>
                     {editingContactIndex !== null ? (
                       <>
@@ -1670,6 +1670,7 @@ const AdminHomePage = () => {
                         sx={{
                           textTransform: 'none',
                           width: '100%',
+                          minWidth: 160,
                           bgcolor: 'white',
                           color: '#1F4545',
                           '&:hover': {

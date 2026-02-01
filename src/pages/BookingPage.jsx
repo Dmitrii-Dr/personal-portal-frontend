@@ -2298,7 +2298,7 @@ const BookingPage = ({ sessionTypeId: propSessionTypeId, hideMyBookings = false 
 
         {/* Booking Confirmation Dialog */}
         <Dialog open={openDialog} onClose={handleDialogClose} maxWidth="sm" fullWidth>
-          <DialogTitle sx={{ m: 0, p: 2, pr: 6 }}>
+          <DialogTitle sx={{ m: 0, px: 3, pt: 2, pb: 1, pr: 6, textAlign: 'left' }}>
             {t('pages.booking.confirmBookingTitle')}
             <IconButton
               aria-label="close"
@@ -2314,8 +2314,8 @@ const BookingPage = ({ sessionTypeId: propSessionTypeId, hideMyBookings = false 
               <CloseIcon />
             </IconButton>
           </DialogTitle>
-          <DialogContent>
-            <DialogContentText sx={{ mb: 2 }}>
+          <DialogContent sx={{ px: 3 }}>
+            <DialogContentText sx={{ mb: 2, textAlign: 'left' }}>
               {dialogSlot && (
                 <>
                   {t('pages.booking.confirmBookingMessage')}{' '}
