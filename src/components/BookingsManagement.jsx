@@ -1920,7 +1920,7 @@ const BookingsManagement = () => {
                       <Box sx={{ position: 'relative' }}>
                         <Box
                           ref={rescheduleSlotsScrollRef}
-                          sx={{ maxHeight: '260px', overflowY: 'auto', pr: 1 }}
+                          sx={{ maxHeight: '340px', overflowY: 'auto', pr: 1 }}
                           onScroll={(e) => {
                             const element = e.target;
                             const isAtTop = element.scrollTop === 0;
