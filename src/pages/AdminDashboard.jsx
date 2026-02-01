@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
+import i18n from '../i18n/i18n';
 import {
   Box,
   Typography,
@@ -61,6 +62,8 @@ import { getCachedSlots, setCachedSlots } from '../utils/bookingSlotCache';
 import { fetchTimezones, sortTimezonesByOffset, getOffsetFromTimezone, extractTimezoneOffset, findTimezoneIdByOffset } from '../utils/timezoneService';
 import CreateTagForm from '../components/CreateTagForm';
 import BookingsManagement from '../components/BookingsManagement';
+
+const monthsGenitive = 'Января_Февраля_Марта_Апреля_Мая_Июня_Июля_Августа_Сентября_Октября_Ноября_Декабря'.split('_');
 
 const PastSessions = () => {
   const { t } = useTranslation();
@@ -403,15 +406,25 @@ const PastSessions = () => {
   // Format date and time in admin's timezone
   const formatDateTime = (instantString) => {
     if (!instantString) return 'N/A';
+    const locale = i18n.language === 'ru' ? 'ru' : 'en-gb';
     try {
+      let localTime;
       if (userTimezone) {
         // Convert UTC time to admin's timezone using offset
         // userTimezone is an offset string (e.g. "+03:00"), so we use utcOffset
-        return dayjs.utc(instantString).utcOffset(userTimezone).format('MMM DD, YYYY HH:mm');
+        localTime = dayjs.utc(instantString).utcOffset(userTimezone);
       } else {
         // Fallback to browser timezone if admin timezone not loaded yet
-        return dayjs(instantString).format('MMM DD, YYYY HH:mm');
+        localTime = dayjs(instantString);
       }
+      if (locale === 'ru') {
+        const day = localTime.format('D');
+        const monthGenitive = monthsGenitive[localTime.month()];
+        const year = localTime.format('YYYY');
+        const time = localTime.format('HH:mm');
+        return `${day} ${monthGenitive}, ${year} ${time}`;
+      }
+      return localTime.locale(locale).format('MMM DD, YYYY HH:mm');
     } catch {
       return instantString;
     }
@@ -2825,4 +2838,3 @@ const AdminDashboard = () => {
 };
 
 export default AdminDashboard;
-

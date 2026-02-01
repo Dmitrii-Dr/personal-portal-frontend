@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
+import i18n from '../i18n/i18n';
 import dayjs from 'dayjs';
 import utc from 'dayjs/plugin/utc';
 import timezone from 'dayjs/plugin/timezone';
@@ -10,6 +11,8 @@ import { getCachedSlots, setCachedSlots, invalidateCache, clearAllCache } from '
 // Extend dayjs with timezone support
 dayjs.extend(utc);
 dayjs.extend(timezone);
+
+const monthsGenitive = 'Января_Февраля_Марта_Апреля_Мая_Июня_Июля_Августа_Сентября_Октября_Ноября_Декабря'.split('_');
 import {
   Box,
   Typography,
@@ -567,16 +570,26 @@ const BookingsManagement = () => {
   // Format date and time in admin's timezone
   const formatDateTime = (instantString) => {
     if (!instantString) return 'N/A';
+    const locale = i18n.language === 'ru' ? 'ru' : 'en-gb';
     try {
+      let localTime;
       if (userTimezone) {
         // Convert UTC time to admin's timezone using offset
         // userTimezone is an offset string (e.g. "+03:00" or object with gmtOffset), so we use utcOffset
         const offset = typeof userTimezone === 'object' ? (userTimezone.gmtOffset === 'Z' ? '+00:00' : userTimezone.gmtOffset) : userTimezone;
-        return dayjs.utc(instantString).utcOffset(offset).format('MMM DD, YYYY HH:mm');
+        localTime = dayjs.utc(instantString).utcOffset(offset);
       } else {
         // Fallback to browser timezone if admin timezone not loaded yet
-        return dayjs(instantString).format('MMM DD, YYYY HH:mm');
+        localTime = dayjs(instantString);
       }
+      if (locale === 'ru') {
+        const day = localTime.format('D');
+        const monthGenitive = monthsGenitive[localTime.month()];
+        const year = localTime.format('YYYY');
+        const time = localTime.format('HH:mm');
+        return `${day} ${monthGenitive}, ${year} ${time}`;
+      }
+      return localTime.locale(locale).format('MMM DD, YYYY HH:mm');
     } catch {
       return instantString;
     }
@@ -2389,4 +2402,3 @@ const BookingsManagement = () => {
 };
 
 export default BookingsManagement;
-
