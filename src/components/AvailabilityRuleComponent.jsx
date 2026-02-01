@@ -52,13 +52,13 @@ const AvailabilityRuleComponent = () => {
   const { t, i18n: i18nInstance } = useTranslation();
 
   const DAYS_OF_WEEK = [
-    { value: 'MONDAY', label: t('admin.sessionConfiguration.availabilityRules.monday') },
-    { value: 'TUESDAY', label: t('admin.sessionConfiguration.availabilityRules.tuesday') },
-    { value: 'WEDNESDAY', label: t('admin.sessionConfiguration.availabilityRules.wednesday') },
-    { value: 'THURSDAY', label: t('admin.sessionConfiguration.availabilityRules.thursday') },
-    { value: 'FRIDAY', label: t('admin.sessionConfiguration.availabilityRules.friday') },
-    { value: 'SATURDAY', label: t('admin.sessionConfiguration.availabilityRules.saturday') },
-    { value: 'SUNDAY', label: t('admin.sessionConfiguration.availabilityRules.sunday') },
+    { value: 'MONDAY', label: t('admin.sessionConfiguration.availabilityRules.monday'), shortLabel: t('admin.sessionConfiguration.availabilityRules.mondayShort') },
+    { value: 'TUESDAY', label: t('admin.sessionConfiguration.availabilityRules.tuesday'), shortLabel: t('admin.sessionConfiguration.availabilityRules.tuesdayShort') },
+    { value: 'WEDNESDAY', label: t('admin.sessionConfiguration.availabilityRules.wednesday'), shortLabel: t('admin.sessionConfiguration.availabilityRules.wednesdayShort') },
+    { value: 'THURSDAY', label: t('admin.sessionConfiguration.availabilityRules.thursday'), shortLabel: t('admin.sessionConfiguration.availabilityRules.thursdayShort') },
+    { value: 'FRIDAY', label: t('admin.sessionConfiguration.availabilityRules.friday'), shortLabel: t('admin.sessionConfiguration.availabilityRules.fridayShort') },
+    { value: 'SATURDAY', label: t('admin.sessionConfiguration.availabilityRules.saturday'), shortLabel: t('admin.sessionConfiguration.availabilityRules.saturdayShort') },
+    { value: 'SUNDAY', label: t('admin.sessionConfiguration.availabilityRules.sunday'), shortLabel: t('admin.sessionConfiguration.availabilityRules.sundayShort') },
   ];
 
   const STATUS_OPTIONS = [
@@ -152,7 +152,7 @@ const AvailabilityRuleComponent = () => {
     if (!Array.isArray(days) || days.length === 0) return t('admin.sessionConfiguration.availabilityRules.none');
     const dayLabels = days.map((day) => {
       const dayObj = DAYS_OF_WEEK.find((d) => d.value === day);
-      return dayObj ? dayObj.label.substring(0, 3) : day;
+      return dayObj ? dayObj.shortLabel : day;
     });
     return dayLabels.join(', ');
   };

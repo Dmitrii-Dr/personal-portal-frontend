@@ -494,7 +494,7 @@ const BookingsManagement = () => {
           params: {
             sessionTypeId: rescheduleSessionTypeId,
             suggestedDate: dateString,
-            timezone,
+            timezoneId: userTimezone?.id,
           },
           signal: controller.signal,
           timeout: 10000,
@@ -569,8 +569,10 @@ const BookingsManagement = () => {
     if (!instantString) return 'N/A';
     try {
       if (userTimezone) {
-        // Convert UTC time to admin's timezone
-        return dayjs.utc(instantString).tz(userTimezone).format('MMM DD, YYYY HH:mm');
+        // Convert UTC time to admin's timezone using offset
+        // userTimezone is an offset string (e.g. "+03:00" or object with gmtOffset), so we use utcOffset
+        const offset = typeof userTimezone === 'object' ? (userTimezone.gmtOffset === 'Z' ? '+00:00' : userTimezone.gmtOffset) : userTimezone;
+        return dayjs.utc(instantString).utcOffset(offset).format('MMM DD, YYYY HH:mm');
       } else {
         // Fallback to browser timezone if admin timezone not loaded yet
         return dayjs(instantString).format('MMM DD, YYYY HH:mm');
@@ -633,8 +635,9 @@ const BookingsManagement = () => {
     if (!instantString) return 'N/A';
     try {
       if (userTimezone) {
-        // Convert UTC time to admin's timezone
-        return dayjs.utc(instantString).tz(userTimezone).format('HH:mm');
+        // Convert UTC time to admin's timezone using offset
+        const offset = typeof userTimezone === 'object' ? (userTimezone.gmtOffset === 'Z' ? '+00:00' : userTimezone.gmtOffset) : userTimezone;
+        return dayjs.utc(instantString).utcOffset(offset).format('HH:mm');
       } else {
         // Fallback to browser timezone if admin timezone not loaded yet
         return dayjs(instantString).format('HH:mm');
@@ -731,7 +734,7 @@ const BookingsManagement = () => {
         params: {
           sessionTypeId,
           suggestedDate: dateString,
-          timezone,
+          timezoneId: userTimezone?.id,
         },
         timeout: 10000,
       });
@@ -1752,7 +1755,9 @@ const BookingsManagement = () => {
               <>
                 <DialogContentText sx={{ mb: 2 }}>
                   {bookingToReschedule.sessionName
-                    ? t('admin.bookingsManagement.selectNewDateTime', { sessionName: bookingToReschedule.sessionName })
+                    ? t('admin.bookingsManagement.selectNewDateTime', {
+                      sessionName: bookingToReschedule.sessionName.replace(/<[^>]*>?/gm, '')
+                    })
                     : t('admin.bookingsManagement.selectNewDateTimeFallback')}
                 </DialogContentText>
 
@@ -1778,18 +1783,7 @@ const BookingsManagement = () => {
                       </Grid>
                     )}
                   </Grid>
-                  {(rescheduleSelectedSlot || (customStartTime && rescheduleSelectedDate)) && (
-                    <Alert severity="info" sx={{ mt: 2 }}>
-                      Date/time will be updated from <strong>{formatDateTime(bookingToReschedule.startTimeInstant)}</strong> to <strong>
-                        {rescheduleSelectedSlot
-                          ? formatDateTime(rescheduleSelectedSlot.startTimeInstant)
-                          : (customStartTime && rescheduleSelectedDate
-                            ? formatDateTime(rescheduleSelectedDate.hour(customStartTime.hour()).minute(customStartTime.minute()).second(0).millisecond(0).toISOString())
-                            : '')
-                        }
-                      </strong>.
-                    </Alert>
-                  )}
+
                 </Box>
 
                 {rescheduleBookingError && (
@@ -2307,6 +2301,18 @@ const BookingsManagement = () => {
             </IconButton>
           </DialogTitle>
           <DialogContent>
+            {(rescheduleSelectedSlot || (customStartTime && rescheduleSelectedDate)) && bookingToReschedule && (
+              <Alert severity="info" sx={{ mb: 2 }}>
+                Date/time will be updated from <strong>{formatDateTime(bookingToReschedule.startTimeInstant)}</strong> to <strong>
+                  {rescheduleSelectedSlot
+                    ? formatDateTime(rescheduleSelectedSlot.startTimeInstant)
+                    : (customStartTime && rescheduleSelectedDate
+                      ? formatDateTime(rescheduleSelectedDate.hour(customStartTime.hour()).minute(customStartTime.minute()).second(0).millisecond(0).toISOString())
+                      : '')
+                  }
+                </strong>.
+              </Alert>
+            )}
             <DialogContentText sx={{ mb: 2 }}>
               {t('pages.booking.confirmUpdateMessage')}{' '}
               <strong>

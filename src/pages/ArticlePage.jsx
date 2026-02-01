@@ -60,13 +60,13 @@ const ArticlePage = () => {
       try {
         setLoading(true);
         setError(null);
-        
+
         // Check if the identifier is a UUID (articleId) or a slug
         const isArticleId = isUUID(articleId);
-        
+
         // Build the appropriate endpoint based on whether it's a slug or articleId
         let publicEndpoint, privateEndpoint;
-        
+
         if (isArticleId) {
           // Use articleId endpoint
           publicEndpoint = `/api/v1/public/articles/${articleId}`;
@@ -76,7 +76,7 @@ const ArticlePage = () => {
           publicEndpoint = `/api/v1/public/articles/slug/${articleId}`;
           privateEndpoint = `/api/v1/articles/slug/${articleId}`;
         }
-        
+
         // If user is authenticated, try private endpoint first
         if (hasToken) {
           try {
@@ -84,7 +84,7 @@ const ArticlePage = () => {
               signal: controller.signal,
               timeout: 10000,
             });
-            
+
             if (isMounted) {
               setArticle(response.data);
               setLoading(false);
@@ -100,13 +100,13 @@ const ArticlePage = () => {
             }
           }
         }
-        
+
         // Try public endpoint
         const response = await apiClient.get(publicEndpoint, {
           signal: controller.signal,
           timeout: 10000,
         });
-        
+
         if (isMounted) {
           setArticle(response.data);
           setLoading(false);
@@ -115,11 +115,11 @@ const ArticlePage = () => {
         if (err.name === 'AbortError' || err.name === 'CanceledError' || err.code === 'ERR_CANCELED') {
           return;
         }
-        
+
         console.error('Error fetching article:', err);
         if (isMounted) {
           let errorMessage = 'Failed to load article. Please try again later.';
-          
+
           if (err.code === 'ECONNABORTED') {
             errorMessage = 'Request timed out. Please try again.';
           } else if (err.response?.status === 404) {
@@ -131,7 +131,7 @@ const ArticlePage = () => {
           } else {
             errorMessage = err.message || errorMessage;
           }
-          
+
           setError(errorMessage);
           setLoading(false);
         }
@@ -220,7 +220,7 @@ const ArticlePage = () => {
       </Box>
 
       <Box sx={{ maxWidth: 800, mx: 'auto' }}>
-        <Typography variant="h3" component="h1" gutterBottom sx={{ fontWeight: 600, mb: 2 }}>
+        <Typography variant="h5" component="h1" gutterBottom sx={{ fontWeight: 600, mb: 2, lineHeight: 1.3 }}>
           {article.title || t('pages.blog.untitled')}
         </Typography>
 

@@ -361,6 +361,28 @@ const SessionsConfigurationPage = () => {
         prices[currency] = numValue;
       });
 
+      // Validation
+      if (!sessionTypeForm.name || sessionTypeForm.name.trim() === '') {
+        setError(t('common.required'));
+        return;
+      }
+      if (sessionTypeForm.name.length > 200) {
+        setError(t('admin.sessionConfiguration.nameTooLong'));
+        return;
+      }
+      if (sessionTypeForm.description && sessionTypeForm.description.length > 2000) {
+        setError(t('admin.sessionConfiguration.descriptionTooLong'));
+        return;
+      }
+      if (sessionTypeForm.durationMinutes < 1) {
+        setError(t('admin.sessionConfiguration.durationMustBePositive'));
+        return;
+      }
+      if (sessionTypeForm.bufferMinutes < 0) {
+        setError(t('admin.sessionConfiguration.bufferMustBeNonNegative'));
+        return;
+      }
+
       if (hasInvalidPrice) {
         setError(t('admin.sessionConfiguration.allPricesMustBeValid'));
         return;
@@ -794,6 +816,8 @@ const SessionsConfigurationPage = () => {
             onChange={(e) => setSessionTypeForm({ ...sessionTypeForm, name: e.target.value })}
             margin="normal"
             required
+            inputProps={{ maxLength: 200 }}
+            helperText={`${(sessionTypeForm.name || '').length}/200 ${t('common.characters')}`}
           />
           <TextField
             fullWidth
@@ -803,6 +827,8 @@ const SessionsConfigurationPage = () => {
             value={sessionTypeForm.description}
             onChange={(e) => setSessionTypeForm({ ...sessionTypeForm, description: e.target.value })}
             margin="normal"
+            inputProps={{ maxLength: 2000 }}
+            helperText={`${(sessionTypeForm.description || '').length}/2000 ${t('common.characters')}`}
           />
           <TextField
             fullWidth
@@ -814,6 +840,7 @@ const SessionsConfigurationPage = () => {
             }
             margin="normal"
             required
+            inputProps={{ min: 1 }}
           />
           <TextField
             fullWidth
@@ -825,6 +852,7 @@ const SessionsConfigurationPage = () => {
             }
             margin="normal"
             required
+            inputProps={{ min: 0 }}
           />
           <FormControlLabel
             control={

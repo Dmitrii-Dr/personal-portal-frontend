@@ -300,6 +300,11 @@ const AppLayout = ({ children }) => {
 
   const handleLoginClose = () => {
     setLoginModalOpen(false);
+    // If user closes login modal without logging in (no token), clear pending booking
+    // This prevents auto-booking if they change their mind
+    if (!getToken()) {
+      sessionStorage.removeItem('pending_booking');
+    }
   };
 
   const handleSwitchToSignUp = () => {
@@ -316,6 +321,10 @@ const AppLayout = ({ children }) => {
 
   const handleSignUpClose = () => {
     setSignUpModalOpen(false);
+    // If user closes signup modal without logging in (no token), clear pending booking
+    if (!getToken()) {
+      sessionStorage.removeItem('pending_booking');
+    }
   };
 
   const handleSwitchToLogin = () => {

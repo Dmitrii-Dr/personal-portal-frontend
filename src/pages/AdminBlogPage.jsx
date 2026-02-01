@@ -1104,56 +1104,88 @@ const AdminBlogPage = () => {
                   '&:hover': {
                     backgroundColor: 'action.hover',
                   },
+                  '& .MuiAccordionSummary-content': {
+                    width: '100%',
+                    overflow: 'hidden',
+                  }
                 }}
               >
-                <Typography variant="h6" component="h2" sx={{ flexGrow: 1 }}>
-                  {article.title || t('pages.article.untitled')}
-                </Typography>
-                {/* Status with colored dot */}
-                <Box sx={{ display: 'flex', alignItems: 'center', mr: 1 }}>
+                <Box sx={{ width: '100%', display: 'flex', alignItems: 'center', gap: 2 }}>
+                  {/* Title Area - Flexible width with truncation */}
+                  <Box sx={{ flex: 1, minWidth: 0, overflow: 'hidden' }}>
+                    <Typography
+                      variant="subtitle1"
+                      component="h2"
+                      noWrap={expandedArticle !== article.articleId}
+                      title={article.title}
+                      sx={{ fontWeight: 500 }}
+                    >
+                      {article.title || t('pages.article.untitled')}
+                    </Typography>
+                  </Box>
+
+                  {/* Meta Area - Fixed width on Desktop for alignment */}
                   <Box
                     sx={{
-                      width: 8,
-                      height: 8,
-                      borderRadius: '50%',
-                      mr: 0.8,
-                      bgcolor:
-                        (article.status === 'PUBLISHED' && 'success.main') ||
-                        (article.status === 'ARCHIVED' && 'error.main') ||
-                        (article.status === 'PRIVATE' && 'info.main') ||
-                        'text.disabled',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: 2,
+                      flexShrink: 0,
+                      width: { xs: 'auto', md: '420px' },
+                      justifyContent: 'flex-end'
                     }}
-                  />
-                  <Typography variant="caption" color="text.secondary">
-                    {getStatusLabel(article.status)}
-                  </Typography>
-                </Box>
-                <IconButton
-                  size="small"
-                  onClick={(e) => handleEditClick(e, article)}
-                  sx={{ mr: 1 }}
-                  color="primary"
-                  title={t('common.edit')}
-                >
-                  <EditIcon fontSize="small" />
-                </IconButton>
-                <IconButton
-                  size="small"
-                  onClick={(e) => handleDeleteClick(e, article)}
-                  sx={{ mr: 1 }}
-                  color="error"
-                >
-                  <DeleteIcon fontSize="small" />
-                </IconButton>
-                {article.publishedAt && (
-                  <Typography
-                    variant="body2"
-                    color="text.secondary"
-                    sx={{ ml: 2, mr: 1 }}
                   >
-                    {t('admin.blog.dateOfPublication')}: {formatDate(article.publishedAt)}
-                  </Typography>
-                )}
+                    {/* Status */}
+                    <Box sx={{ display: 'flex', alignItems: 'center', minWidth: 100, justifyContent: 'flex-end' }}>
+                      <Box
+                        sx={{
+                          width: 8,
+                          height: 8,
+                          borderRadius: '50%',
+                          mr: 1,
+                          bgcolor:
+                            (article.status === 'PUBLISHED' && 'success.main') ||
+                            (article.status === 'ARCHIVED' && 'error.main') ||
+                            (article.status === 'PRIVATE' && 'info.main') ||
+                            'text.disabled',
+                        }}
+                      />
+                      <Typography variant="caption" color="text.secondary" sx={{ display: { xs: 'none', sm: 'block' } }}>
+                        {getStatusLabel(article.status)}
+                      </Typography>
+                    </Box>
+
+                    {/* Date */}
+                    {article.publishedAt && (
+                      <Typography
+                        variant="caption"
+                        color="text.secondary"
+                        sx={{ whiteSpace: 'nowrap', width: 120, textAlign: 'right', display: { xs: 'none', sm: 'block' } }}
+                      >
+                        {formatDate(article.publishedAt)}
+                      </Typography>
+                    )}
+
+                    {/* Actions */}
+                    <Box sx={{ display: 'flex', gap: 1 }}>
+                      <IconButton
+                        size="small"
+                        onClick={(e) => handleEditClick(e, article)}
+                        color="primary"
+                        title={t('common.edit')}
+                      >
+                        <EditIcon fontSize="small" />
+                      </IconButton>
+                      <IconButton
+                        size="small"
+                        onClick={(e) => handleDeleteClick(e, article)}
+                        color="error"
+                      >
+                        <DeleteIcon fontSize="small" />
+                      </IconButton>
+                    </Box>
+                  </Box>
+                </Box>
               </AccordionSummary>
               <Divider />
               <AccordionDetails>
@@ -1206,6 +1238,8 @@ const AdminBlogPage = () => {
                 onChange={handleFieldChange('title')}
                 required
                 disabled={submitting}
+                inputProps={{ maxLength: 150 }}
+                helperText={`${t('common.symbols')} (${articleData.title?.length || 0}/150)`}
               />
             </Grid>
             <Grid item xs={12}>
@@ -1390,7 +1424,7 @@ const AdminBlogPage = () => {
                 value={articleData.excerpt}
                 onChange={handleFieldChange('excerpt')}
                 disabled={submitting}
-                helperText={`${t('admin.blog.excerptHelper')} (${articleData.excerpt?.length || 0}/250)`}
+                helperText={`${t('common.symbols')} (${articleData.excerpt?.length || 0}/250)`}
                 inputProps={{ maxLength: 250 }}
               />
             </Grid>
@@ -1651,6 +1685,8 @@ const AdminBlogPage = () => {
                 onChange={handleCreateFieldChange('title')}
                 required
                 disabled={creating}
+                inputProps={{ maxLength: 150 }}
+                helperText={`${t('common.symbols')} (${createArticleData.title?.length || 0}/150)`}
               />
             </Grid>
             <Grid item xs={12}>
@@ -1726,7 +1762,7 @@ const AdminBlogPage = () => {
                 value={createArticleData.excerpt}
                 onChange={handleCreateFieldChange('excerpt')}
                 disabled={creating}
-                helperText={`${t('admin.blog.excerptHelperCreate')} (${createArticleData.excerpt?.length || 0}/250)`}
+                helperText={`${t('common.symbols')} (${createArticleData.excerpt?.length || 0}/250)`}
                 inputProps={{ maxLength: 250 }}
               />
             </Grid>

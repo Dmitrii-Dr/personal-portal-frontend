@@ -405,8 +405,9 @@ const PastSessions = () => {
     if (!instantString) return 'N/A';
     try {
       if (userTimezone) {
-        // Convert UTC time to admin's timezone
-        return dayjs.utc(instantString).tz(userTimezone).format('MMM DD, YYYY HH:mm');
+        // Convert UTC time to admin's timezone using offset
+        // userTimezone is an offset string (e.g. "+03:00"), so we use utcOffset
+        return dayjs.utc(instantString).utcOffset(userTimezone).format('MMM DD, YYYY HH:mm');
       } else {
         // Fallback to browser timezone if admin timezone not loaded yet
         return dayjs(instantString).format('MMM DD, YYYY HH:mm');

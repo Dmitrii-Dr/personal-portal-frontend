@@ -948,26 +948,29 @@ const LandingPage = () => {
                 {sessionTypes.length > 3 && (
                   <IconButton
                     onClick={() => {
-                      setSessionTypesCarouselIndex((prev) => {
-                        if (prev === 0) {
-                          // Wrap to end
-                          return sessionTypes.length - 3;
-                        }
-                        return prev - 1;
-                      });
+                      setSessionTypesCarouselIndex((prev) => Math.max(0, prev - 1));
                     }}
+                    disabled={sessionTypesCarouselIndex === 0}
                     sx={{
                       position: 'absolute',
                       left: { xs: -10, md: -40 },
                       zIndex: 2,
                       bgcolor: 'white',
                       boxShadow: 2,
+                      width: 40,
+                      height: 40,
+                      padding: 1,
+                      borderRadius: '50%',
                       '&:hover': {
                         bgcolor: 'grey.100',
                       },
+                      '&.Mui-disabled': {
+                        bgcolor: 'grey.200',
+                        opacity: 0.5,
+                      },
                     }}
                   >
-                    <ArrowBackIosIcon />
+                    <ArrowBackIosIcon sx={{ ml: 0.5, fontSize: 20 }} />
                   </IconButton>
                 )}
 
@@ -1013,7 +1016,17 @@ const LandingPage = () => {
                                   mb: 1.5,
                                 }}
                               >
-                                <Typography variant="h5" component="h3" sx={{ fontSize: '1.25rem' }}>
+                                <Typography
+                                  variant="subtitle1"
+                                  component="h3"
+                                  gutterBottom
+                                  sx={{
+                                    fontWeight: 600,
+                                    lineHeight: 1.4,
+                                    mb: 1,
+                                    mr: 1 // Add margin right to separate from Chip if needed, though they are flex-between
+                                  }}
+                                >
                                   {sessionType.name}
                                 </Typography>
                                 <Chip
@@ -1023,24 +1036,7 @@ const LandingPage = () => {
                                   variant="outlined"
                                 />
                               </Box>
-                              {sessionType.description && (
-                                <Typography
-                                  variant="body2"
-                                  color="text.secondary"
-                                  sx={{
-                                    mb: 1.5,
-                                    flexGrow: 1,
-                                    display: '-webkit-box',
-                                    WebkitLineClamp: 3,
-                                    WebkitBoxOrient: 'vertical',
-                                    overflow: 'hidden',
-                                    textOverflow: 'ellipsis',
-                                    lineHeight: 1.5,
-                                  }}
-                                >
-                                  {sessionType.description}
-                                </Typography>
-                              )}
+
                               <Box sx={{ mb: 1, mt: 'auto' }}>
                                 {sessionType.prices && areAllPricesZero(sessionType.prices) ? (
                                   <Typography variant="h4" component="span" color="primary" sx={{ fontSize: '1.75rem' }}>
@@ -1094,26 +1090,29 @@ const LandingPage = () => {
                   <IconButton
                     onClick={() => {
                       const maxIndex = sessionTypes.length - 3;
-                      setSessionTypesCarouselIndex((prev) => {
-                        if (prev >= maxIndex) {
-                          // Wrap to beginning
-                          return 0;
-                        }
-                        return prev + 1;
-                      });
+                      setSessionTypesCarouselIndex((prev) => Math.min(maxIndex, prev + 1));
                     }}
+                    disabled={sessionTypesCarouselIndex >= sessionTypes.length - 3}
                     sx={{
                       position: 'absolute',
                       right: { xs: -10, md: -40 },
                       zIndex: 2,
                       bgcolor: 'white',
                       boxShadow: 2,
+                      width: 40,
+                      height: 40,
+                      padding: 1,
+                      borderRadius: '50%',
                       '&:hover': {
                         bgcolor: 'grey.100',
                       },
+                      '&.Mui-disabled': {
+                        bgcolor: 'grey.200',
+                        opacity: 0.5,
+                      },
                     }}
                   >
-                    <ArrowForwardIosIcon />
+                    <ArrowForwardIosIcon sx={{ fontSize: 20 }} />
                   </IconButton>
                 )}
               </Box>

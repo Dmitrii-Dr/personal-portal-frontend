@@ -2332,12 +2332,25 @@ const BookingPage = ({ sessionTypeId: propSessionTypeId, hideMyBookings = false 
         </Dialog>
 
         {/* Login Required Dialog */}
-        <Dialog open={loginRequiredDialogOpen} onClose={() => setLoginRequiredDialogOpen(false)} maxWidth="sm" fullWidth>
+        <Dialog
+          open={loginRequiredDialogOpen}
+          onClose={() => {
+            setLoginRequiredDialogOpen(false);
+            // Clear pending booking if user closes the dialog (cancels)
+            sessionStorage.removeItem(PENDING_BOOKING_KEY);
+          }}
+          maxWidth="sm"
+          fullWidth
+        >
           <DialogTitle sx={{ m: 0, p: 2, pr: 6 }}>
             {t('auth.loginRequired')}
             <IconButton
               aria-label="close"
-              onClick={() => setLoginRequiredDialogOpen(false)}
+              onClick={() => {
+                setLoginRequiredDialogOpen(false);
+                // Clear pending booking if user closes the dialog (cancels)
+                sessionStorage.removeItem(PENDING_BOOKING_KEY);
+              }}
               sx={{
                 position: 'absolute',
                 right: 8,
