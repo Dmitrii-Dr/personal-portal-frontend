@@ -221,7 +221,10 @@ const BookingsManagement = () => {
         try {
           // Parse UTC time and convert to user's timezone
           const bookingUtc = dayjs.utc(booking.startTimeInstant);
-          const bookingInTimezone = bookingUtc.tz(userTimezone);
+          const tz = normalizeTimezone();
+          const bookingInTimezone = tz
+            ? (isOffsetTimezone(tz) ? bookingUtc.utcOffset(tz) : bookingUtc.tz(tz))
+            : bookingUtc;
           const bookingDateStr = bookingInTimezone.format('YYYY-MM-DD');
 
           // Compare date strings (YYYY-MM-DD format) for accurate date-only comparison
@@ -297,6 +300,23 @@ const BookingsManagement = () => {
     }
   };
 
+  const normalizeTimezone = () => {
+    if (!userTimezone) return null;
+    if (typeof userTimezone === 'object') {
+      if (!userTimezone.gmtOffset) return null;
+      return userTimezone.gmtOffset === 'Z' ? '+00:00' : userTimezone.gmtOffset;
+    }
+    return userTimezone;
+  };
+
+  const isOffsetTimezone = (tz) => typeof tz === 'string' && /^([+-]\d{2}:\d{2}|Z)$/.test(tz);
+
+  const getNowInUserTimezone = () => {
+    const tz = normalizeTimezone();
+    if (!tz) return dayjs();
+    return isOffsetTimezone(tz) ? dayjs().utcOffset(tz) : dayjs().tz(tz);
+  };
+
   // Handle date selection from calendar
   const handleDateSelect = (date) => {
     if (!date) return;
@@ -358,14 +378,14 @@ const BookingsManagement = () => {
 
   // Handle predefined filter buttons
   const handleTodayFilter = () => {
-    const today = dayjs().startOf('day');
+    const today = getNowInUserTimezone().startOf('day');
     setStartDate(today);
     setEndDate(today);
     setCalendarAnchorEl(null);
   };
 
   const handleThisWeekFilter = () => {
-    const today = dayjs().startOf('day');
+    const today = getNowInUserTimezone().startOf('day');
     const startOfWeek = today.startOf('week'); // Monday
     const endOfWeek = today.endOf('week'); // Sunday
     setStartDate(startOfWeek);
@@ -374,7 +394,7 @@ const BookingsManagement = () => {
   };
 
   const handleThisMonthFilter = () => {
-    const today = dayjs().startOf('day');
+    const today = getNowInUserTimezone().startOf('day');
     const startOfMonth = today.startOf('month');
     const endOfMonth = today.endOf('month');
     setStartDate(startOfMonth);
@@ -386,7 +406,7 @@ const BookingsManagement = () => {
   const getActiveFilter = () => {
     if (!startDate || !endDate) return null;
 
-    const today = dayjs().startOf('day');
+    const today = getNowInUserTimezone().startOf('day');
     const startDay = dayjs(startDate).startOf('day');
     const endDay = dayjs(endDate).startOf('day');
 
