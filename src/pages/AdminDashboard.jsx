@@ -685,7 +685,10 @@ const PastSessions = () => {
         ) : (
           <>
             <Grid container spacing={2}>
-              {bookings.map((booking) => (
+              {bookings.map((booking) => {
+                const sessionTitle = booking.sessionName || 'N/A';
+                const sessionTitleDisplay = sessionTitle.length > 50 ? `${sessionTitle.slice(0, 50)}...` : sessionTitle;
+                return (
                 <Grid item xs={12} key={booking.id}>
                   <Card>
                     <CardContent>
@@ -717,40 +720,47 @@ const PastSessions = () => {
                             {t('admin.dashboard.sessionTypeLabel').replace(' *', '')}
                           </Typography>
                           <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
-                            {booking.sessionDurationMinutes && (
-                              <Chip
-                                label={`${booking.sessionDurationMinutes} min`}
-                                size="small"
-                                sx={{
-                                  height: 20,
-                                  fontSize: '0.65rem',
-                                  '& .MuiChip-label': { px: 0.75 }
-                                }}
-                              />
-                            )}
-                            <Typography variant="body1">
-                              {booking.sessionName || 'N/A'}
+                            <Typography
+                              variant="body1"
+                              noWrap
+                              title={sessionTitle}
+                              sx={{ minWidth: 0, flex: 1 }}
+                            >
+                              {sessionTitleDisplay}
                             </Typography>
-                            {getBookingPriceDisplay(booking.sessionPrices) && (
-                              <Chip
-                                label={getBookingPriceDisplay(booking.sessionPrices)}
-                                size="small"
-                                color="primary"
-                                variant="outlined"
-                                sx={{
-                                  height: 20,
-                                  fontSize: '0.65rem',
-                                  '& .MuiChip-label': { px: 0.75 }
-                                }}
-                              />
-                            )}
+                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, flexShrink: 0 }}>
+                              {booking.sessionDurationMinutes && (
+                                <Chip
+                                  label={`${booking.sessionDurationMinutes} min`}
+                                  size="small"
+                                  sx={{
+                                    height: 20,
+                                    fontSize: '0.65rem',
+                                    '& .MuiChip-label': { px: 0.75 }
+                                  }}
+                                />
+                              )}
+                              {getBookingPriceDisplay(booking.sessionPrices) && (
+                                <Chip
+                                  label={getBookingPriceDisplay(booking.sessionPrices)}
+                                  size="small"
+                                  color="primary"
+                                  variant="outlined"
+                                  sx={{
+                                    height: 20,
+                                    fontSize: '0.65rem',
+                                    '& .MuiChip-label': { px: 0.75 }
+                                  }}
+                                />
+                              )}
+                            </Box>
                           </Box>
                         </Grid>
                         <Grid item xs={12} sm={6}>
                           <Typography variant="body2" color="text.secondary">
                             {t('admin.dashboard.startTime')}
                           </Typography>
-                          <Typography variant="body1" gutterBottom>
+                          <Typography variant="body1" gutterBottom noWrap>
                             {formatDateTime(booking.startTimeInstant)}
                           </Typography>
                         </Grid>
@@ -774,7 +784,8 @@ const PastSessions = () => {
                     </CardContent>
                   </Card>
                 </Grid>
-              ))}
+              );
+              })}
             </Grid>
 
             {/* Pagination and Page Size Controls */}

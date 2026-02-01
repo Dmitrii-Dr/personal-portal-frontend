@@ -47,7 +47,6 @@ import { DateCalendar } from '@mui/x-date-pickers/DateCalendar';
 import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
 import { AdapterDayjs } from '@mui/x-date-pickers/AdapterDayjs';
 import EditIcon from '@mui/icons-material/Edit';
-import InfoIcon from '@mui/icons-material/Info';
 import AccessTimeIcon from '@mui/icons-material/AccessTime';
 import FilterAltIcon from '@mui/icons-material/FilterAlt';
 import ClearIcon from '@mui/icons-material/Clear';
@@ -57,6 +56,7 @@ import ArrowDownwardIcon from '@mui/icons-material/ArrowDownward';
 import KeyboardArrowDownIcon from '@mui/icons-material/KeyboardArrowDown';
 import KeyboardArrowUpIcon from '@mui/icons-material/KeyboardArrowUp';
 import WarningIcon from '@mui/icons-material/Warning';
+import InfoOutlinedIcon from '@mui/icons-material/InfoOutlined';
 
 const STATUS_COLORS = {
   PENDING_APPROVAL: 'warning',
@@ -1202,32 +1202,34 @@ const BookingsManagement = () => {
                   <WarningIcon sx={{ color: 'error.main', fontSize: '1.5rem' }} />
                 </Tooltip>
               )}
-              <Button
-                size="small"
-                variant="outlined"
-                startIcon={<InfoIcon />}
-                onClick={() => handleInfoClick(booking)}
-                sx={{ textTransform: 'none' }}
-              >
-                {t('common.info')}
-              </Button>
+              <Tooltip title={t('common.info')}>
+                <IconButton size="small" onClick={() => handleInfoClick(booking)}>
+                  <InfoOutlinedIcon fontSize="small" />
+                </IconButton>
+              </Tooltip>
             </Box>
             {canUpdate && (
-              <Button
-                size="small"
-                variant="outlined"
-                startIcon={<EditIcon />}
-                onClick={() => handleUpdateClick(booking)}
-                sx={{ textTransform: 'none' }}
-              >
-                {t('admin.bookingsManagement.update')}
-              </Button>
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                <Tooltip title={t('admin.bookingsManagement.update')}>
+                  <IconButton size="small" onClick={() => handleUpdateClick(booking)}>
+                    <EditIcon fontSize="small" />
+                  </IconButton>
+                </Tooltip>
+                <Tooltip title={t('admin.bookingsManagement.updateSessionDateTime')}>
+                  <IconButton size="small" onClick={() => handleRescheduleClick(booking)}>
+                    <AccessTimeIcon fontSize="small" />
+                  </IconButton>
+                </Tooltip>
+              </Box>
             )}
           </Box>
 
           {/* Client name */}
-          <Box sx={{ mb: 2 }}>
-            <Typography variant="h6">
+          <Box sx={{ mb: 2, display: 'flex', alignItems: 'baseline', gap: 1, flexWrap: 'wrap' }}>
+            <Typography variant="body2" color="text.secondary">
+              {t('admin.bookingsManagement.client')}
+            </Typography>
+            <Typography variant="subtitle1">
               {getClientName(booking)}
             </Typography>
           </Box>
@@ -1236,10 +1238,10 @@ const BookingsManagement = () => {
 
           <Grid container spacing={2}>
             <Grid item xs={12} sm={6}>
-              <Typography variant="body2" color="text.secondary">
-                {t('admin.bookingsManagement.sessionType')}
-              </Typography>
-              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, flexWrap: 'wrap' }}>
+                <Typography variant="body2" color="text.secondary">
+                  {t('admin.bookingsManagement.sessionType')}
+                </Typography>
                 {booking.sessionDurationMinutes && (
                   <Chip
                     label={`${booking.sessionDurationMinutes} min`}
@@ -1251,9 +1253,6 @@ const BookingsManagement = () => {
                     }}
                   />
                 )}
-                <Typography variant="body1">
-                  {booking.sessionName || 'N/A'}
-                </Typography>
                 {getBookingPriceDisplay(booking.sessionPrices) && (
                   <Chip
                     label={getBookingPriceDisplay(booking.sessionPrices)}
@@ -1268,26 +1267,26 @@ const BookingsManagement = () => {
                   />
                 )}
               </Box>
+              <Typography
+                variant="body2"
+                title={booking.sessionName || 'N/A'}
+                sx={{ mt: 0.5 }}
+              >
+                {(booking.sessionName || 'N/A').length > 100
+                  ? `${(booking.sessionName || 'N/A').slice(0, 100)}...`
+                  : (booking.sessionName || 'N/A')}
+              </Typography>
             </Grid>
             <Grid item xs={12} sm={6}>
-              <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 1 }}>
-                <Box sx={{ flex: 1 }}>
+              <Box sx={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'flex-start' }}>
+                <Box sx={{ textAlign: 'right' }}>
                   <Typography variant="body2" color="text.secondary">
                     {t('admin.bookingsManagement.startTime')}
                   </Typography>
-                  <Typography variant="body1">
+                  <Typography variant="body1" noWrap sx={{ mt: 0.5 }}>
                     {formatDateTime(booking.startTimeInstant)}
                   </Typography>
                 </Box>
-                <Button
-                  size="small"
-                  variant="outlined"
-                  startIcon={<AccessTimeIcon />}
-                  onClick={() => handleRescheduleClick(booking)}
-                  sx={{ textTransform: 'none', alignSelf: 'flex-end' }}
-                >
-                  {t('admin.bookingsManagement.update')}
-                </Button>
               </Box>
             </Grid>
           </Grid>
