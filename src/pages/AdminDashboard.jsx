@@ -456,6 +456,18 @@ const PastSessions = () => {
     return name || booking.clientEmail || 'Unknown';
   };
 
+  const formatDateTimeForDisplay = (date) => {
+    const locale = i18n.language === 'ru' ? 'ru' : 'en-gb';
+    if (locale === 'ru') {
+      const d = dayjs(date);
+      const day = d.format('D');
+      const monthGenitive = monthsGenitive[d.month()];
+      const year = d.format('YYYY');
+      return `${day} ${monthGenitive}, ${year}`;
+    }
+    return dayjs(date).locale(locale).format('MMM DD, YYYY');
+  };
+
   const handleInfoClick = (booking) => {
     setSelectedBookingInfo(booking);
     setInfoDialogOpen(true);
@@ -539,12 +551,12 @@ const PastSessions = () => {
                 {endDate && dayjs(startDate).format('YYYY-MM-DD') !== dayjs(endDate).format('YYYY-MM-DD') ? (
                   <>
                     {t('admin.dashboard.fromTo', {
-                      start: dayjs(startDate).format('MMM DD, YYYY'),
-                      end: dayjs(endDate).format('MMM DD, YYYY')
+                      start: formatDateTimeForDisplay(startDate),
+                      end: formatDateTimeForDisplay(endDate)
                     })}
                   </>
                 ) : (
-                  <>{t('admin.dashboard.date', { date: dayjs(startDate).format('MMM DD, YYYY') })}</>
+                  <>{t('admin.dashboard.date', { date: formatDateTimeForDisplay(startDate) })}</>
                 )}
               </Typography>
             )}

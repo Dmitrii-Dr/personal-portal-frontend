@@ -722,6 +722,18 @@ const BookingsManagement = () => {
     return dayjs(date).locale(locale).format('MMMM D, YYYY');
   };
 
+  const formatDateRangeLabel = (date) => {
+    const locale = i18n.language === 'ru' ? 'ru' : 'en-gb';
+    if (locale === 'ru') {
+      const d = dayjs(date);
+      const day = d.format('D');
+      const monthGenitive = monthsGenitive[d.month()];
+      const year = d.format('YYYY');
+      return `${day} ${monthGenitive}, ${year}`;
+    }
+    return dayjs(date).locale(locale).format('MMM DD, YYYY');
+  };
+
   // Handle reschedule button click
   const handleRescheduleClick = async (booking) => {
     setBookingToReschedule(booking);
@@ -1367,12 +1379,12 @@ const BookingsManagement = () => {
                 {endDate && dayjs(startDate).format('YYYY-MM-DD') !== dayjs(endDate).format('YYYY-MM-DD') ? (
                   <>
                     {t('admin.bookingsManagement.fromTo', {
-                      start: dayjs(startDate).format('MMM DD, YYYY'),
-                      end: dayjs(endDate).format('MMM DD, YYYY')
+                      start: formatDateRangeLabel(startDate),
+                      end: formatDateRangeLabel(endDate)
                     })}
                   </>
                 ) : (
-                  <>{t('admin.bookingsManagement.date', { date: dayjs(startDate).format('MMM DD, YYYY') })}</>
+                  <>{t('admin.bookingsManagement.date', { date: formatDateRangeLabel(startDate) })}</>
                 )}
               </Typography>
             )}
