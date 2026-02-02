@@ -468,38 +468,42 @@ const LandingPage = () => {
             : 'linear-gradient(135deg, #2C5F5F 0%, #1F4545 100%)',
         }}
       >
-        <Container maxWidth="md" sx={{ position: 'relative', zIndex: 1 }}>
-          <Typography
-            variant="h1"
-            component="h1"
-            gutterBottom
-            sx={{ fontSize: { xs: '2.5rem', md: '3.5rem' }, fontWeight: 700, mb: 3 }}
-          >
-            {welcomeLoading ? (
-              <CircularProgress size={40} sx={{ color: 'white' }} />
-            ) : welcomeError ? (
-              ''
-            ) : welcomeData?.welcomeMessage || ''}
-          </Typography>
-          <Button
-            variant="contained"
-            size="large"
-            onClick={() => scrollToSection(servicesRef)}
-            sx={{
-              px: 4,
-              py: 1.5,
-              fontSize: '1.1rem',
-              textTransform: 'none',
-              bgcolor: 'white',
-              color: '#2C5F5F',
-              fontWeight: 600,
-              '&:hover': {
-                bgcolor: 'grey.100',
-              },
-            }}
-          >
-            {t('landing.hero.bookSession')}
-          </Button>
+        <Container maxWidth={false} sx={{ position: 'relative', zIndex: 1, px: 0 }}>
+          <Box sx={{ width: { xs: '100%', md: '50vw' }, textAlign: 'left' }}>
+            <Typography
+              variant="h1"
+              component="h1"
+              gutterBottom
+              sx={{ fontSize: { xs: '2.5rem', md: '3.5rem' }, fontWeight: 700, mb: 3 }}
+            >
+              {welcomeLoading ? (
+                <CircularProgress size={40} sx={{ color: 'white' }} />
+              ) : welcomeError ? (
+                ''
+              ) : welcomeData?.welcomeMessage || ''}
+            </Typography>
+            <Box sx={{ display: 'flex', justifyContent: 'center', width: { xs: '100%', md: '50vw' } }}>
+              <Button
+                variant="contained"
+                size="large"
+                onClick={() => scrollToSection(servicesRef)}
+                sx={{
+                  px: 4,
+                  py: 1.5,
+                  fontSize: '1.1rem',
+                  textTransform: 'none',
+                  bgcolor: 'white',
+                  color: '#2C5F5F',
+                  fontWeight: 600,
+                  '&:hover': {
+                    bgcolor: 'grey.100',
+                  },
+                }}
+              >
+                {t('landing.hero.bookSession')}
+              </Button>
+            </Box>
+          </Box>
         </Container>
       </Box>
 
