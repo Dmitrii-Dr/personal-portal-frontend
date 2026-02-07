@@ -20,6 +20,7 @@ import AgreementPage from './pages/AgreementPage';
 import AdminRoute from './components/AdminRoute';
 import AdminRedirect from './components/AdminRedirect';
 import ErrorBoundary from './components/ErrorBoundary';
+import CookieNotification from './components/CookieNotification';
 import { ThemeProvider, createTheme } from '@mui/material/styles';
 import CssBaseline from '@mui/material/CssBaseline';
 import {
@@ -666,6 +667,7 @@ function App() {
       <CssBaseline />
       <ErrorBoundary>
         <Router>
+          <CookieNotification />
           <AdminRedirect>
             <AppLayout>
               <Routes>
