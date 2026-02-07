@@ -19,6 +19,8 @@ import {
   Snackbar,
   IconButton,
   Tooltip,
+  FormControlLabel,
+  Checkbox,
 } from '@mui/material';
 import EditIcon from '@mui/icons-material/Edit';
 import SaveIcon from '@mui/icons-material/Save';
@@ -39,6 +41,7 @@ const BookingSettings = () => {
     bookingCancelationInterval: 0,
     bookingUpdatingInterval: 0,
     defaultTimezone: 'UTC',
+    roundBookingSuggestions: false,
   });
   const [formErrors, setFormErrors] = useState({});
   const hasFetchedRef = useRef(false);
@@ -69,6 +72,7 @@ const BookingSettings = () => {
         bookingCancelationInterval: data.bookingCancelationInterval || 0,
         bookingUpdatingInterval: data.bookingUpdatingInterval || 0,
         defaultTimezone: extractTimezoneOffset(data.defaultTimezone) || '+00:00',
+        roundBookingSuggestions: data.roundBookingSuggestions || false,
       });
     } catch (err) {
       console.error('Error fetching booking settings:', err);
@@ -159,6 +163,7 @@ const BookingSettings = () => {
         bookingCancelationInterval: settings.bookingCancelationInterval || 0,
         bookingUpdatingInterval: settings.bookingUpdatingInterval || 0,
         defaultTimezone: extractTimezoneOffset(settings.defaultTimezone) || '+00:00',
+        roundBookingSuggestions: settings.roundBookingSuggestions || false,
       });
     }
   };
@@ -212,6 +217,7 @@ const BookingSettings = () => {
           bookingCancelationInterval: formData.bookingCancelationInterval,
           bookingUpdatingInterval: formData.bookingUpdatingInterval,
           defaultTimezoneId: findTimezoneIdByOffset(formData.defaultTimezone, timezones),
+          roundBookingSuggestions: formData.roundBookingSuggestions,
         }),
       });
 
@@ -343,6 +349,14 @@ const BookingSettings = () => {
               {extractTimezoneOffset(settings?.defaultTimezone) || 'N/A'}
             </Typography>
           </Grid>
+          <Grid item xs={12} md={6}>
+            <Typography variant="body2" color="text.secondary">
+              {t('admin.sessionConfiguration.bookingSettings.roundBookingSuggestions')}
+            </Typography>
+            <Typography variant="body1" gutterBottom>
+              {settings?.roundBookingSuggestions ? t('common.yes') : t('common.no')}
+            </Typography>
+          </Grid>
         </Grid>
       ) : (
         // Edit Mode
@@ -442,6 +456,20 @@ const BookingSettings = () => {
                 {t('admin.sessionConfiguration.bookingSettings.defaultTimezoneHelper')}
               </Typography>
             </FormControl>
+          </Grid>
+          <Grid item xs={12} md={6}>
+            <FormControlLabel
+              control={
+                <Checkbox
+                  checked={formData.roundBookingSuggestions}
+                  onChange={(e) => setFormData((prev) => ({ ...prev, roundBookingSuggestions: e.target.checked }))}
+                />
+              }
+              label={t('admin.sessionConfiguration.bookingSettings.roundBookingSuggestions')}
+            />
+            <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 0.5 }}>
+              {t('admin.sessionConfiguration.bookingSettings.roundBookingSuggestionsHelper')}
+            </Typography>
           </Grid>
           <Grid item xs={12}>
             <Box sx={{ display: 'flex', gap: 2, justifyContent: 'flex-end', mt: 2 }}>

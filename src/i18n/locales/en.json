@@ -639,6 +639,8 @@
         "bookingUpdatingIntervalLabel": "Booking Updating Interval (minutes)",
         "bookingUpdatingIntervalHelper": "Minimum time before booking start time when updates are allowed",
         "defaultTimezoneHelper": "Default timezone for availability rules (IANA timezone identifier). UTC offset is calculated automatically.",
+        "roundBookingSuggestions": "Round Booking Suggestions",
+        "roundBookingSuggestionsHelper": "When enabled, booking time suggestions will be rounded to the nearest 00,15,30,45 minutes",
         "timezoneChangedWarning": "Changing timezone requires all active availability rules to be archived first.",
         "updatedSuccessfully": "Booking settings updated successfully",
         "failedToLoad": "Failed to load booking settings. Please try again.",
