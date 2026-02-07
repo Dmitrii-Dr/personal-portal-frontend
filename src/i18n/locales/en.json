@@ -413,6 +413,7 @@
       "enterTime": "Enter time",
       "now": "Now",
       "clear": "Clear",
+      "createSlot": "Create Slot",
       "messageOptional": "Message (Optional)",
       "rescheduling": "Rescheduling...",
       "confirmReschedule": "Confirm Reschedule",

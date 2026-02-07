@@ -873,16 +873,25 @@ const BookingsManagement = () => {
     setHourInput(String(newTime.hour()).padStart(2, '0'));
     setMinuteInput(String(newTime.minute()).padStart(2, '0'));
     if (newTime && rescheduleSelectedDate) {
-      // Combine date from calendar with custom time
+      // Combine date from calendar with custom time in user's timezone
+      // Get user's timezone offset
+      const offset = userTimezone && typeof userTimezone === 'object'
+        ? (userTimezone.gmtOffset === 'Z' ? '+00:00' : userTimezone.gmtOffset)
+        : (userTimezone || '+00:00');
+
+      // Create datetime in user's timezone
       const combinedDateTime = rescheduleSelectedDate
         .hour(newTime.hour())
         .minute(newTime.minute())
         .second(0)
         .millisecond(0);
 
+      // Convert to UTC by treating the combined time as being in the user's timezone
+      const utcDateTime = dayjs(combinedDateTime.format('YYYY-MM-DD HH:mm:ss')).utcOffset(offset, true);
+
       // Create a slot-like object with the combined datetime
       const customSlot = {
-        startTimeInstant: combinedDateTime.toISOString(),
+        startTimeInstant: utcDateTime.toISOString(),
         startTime: `${String(newTime.hour()).padStart(2, '0')}:${String(newTime.minute()).padStart(2, '0')}`,
       };
       setRescheduleSelectedSlot(customSlot);
@@ -996,13 +1005,22 @@ const BookingsManagement = () => {
     if (rescheduleSelectedSlot && rescheduleSelectedSlot.startTimeInstant) {
       startTimeInstant = rescheduleSelectedSlot.startTimeInstant;
     } else if (customStartTime && rescheduleSelectedDate) {
-      // Combine date from calendar with custom time
+      // Combine date from calendar with custom time in user's timezone
+      // Get user's timezone offset
+      const offset = userTimezone && typeof userTimezone === 'object'
+        ? (userTimezone.gmtOffset === 'Z' ? '+00:00' : userTimezone.gmtOffset)
+        : (userTimezone || '+00:00');
+
+      // Create datetime in user's timezone
       const combinedDateTime = rescheduleSelectedDate
         .hour(customStartTime.hour())
         .minute(customStartTime.minute())
         .second(0)
         .millisecond(0);
-      startTimeInstant = combinedDateTime.toISOString();
+
+      // Convert to UTC by treating the combined time as being in the user's timezone
+      const utcDateTime = dayjs(combinedDateTime.format('YYYY-MM-DD HH:mm:ss')).utcOffset(offset, true);
+      startTimeInstant = utcDateTime.toISOString();
     } else {
       setRescheduleBookingError(t('admin.bookingsManagement.noSlotSelected'));
       return;
@@ -1864,7 +1882,6 @@ const BookingsManagement = () => {
                         value={rescheduleSelectedDate}
                         onChange={handleRescheduleDateChange}
                         sx={{ width: '100%' }}
-                        firstDayOfWeek={1}
                       />
                     </Box>
                   </Grid>
@@ -1874,6 +1891,24 @@ const BookingsManagement = () => {
                     <Typography variant="h6" gutterBottom>
                       {t('admin.bookingsManagement.availableTimes')} {formatDateForDisplay(rescheduleSelectedDate)}
                     </Typography>
+
+                    {/* Timezone info */}
+                    {userTimezone && (
+                      <Alert severity="info" sx={{ mb: 2 }}>
+                        {(() => {
+                          const offset = typeof userTimezone === 'object'
+                            ? (userTimezone.gmtOffset === 'Z' ? '+00:00' : userTimezone.gmtOffset)
+                            : userTimezone;
+                          const displayName = userTimezone.id
+                            ? t(`pages.profile.timezones.${userTimezone.id}`, { defaultValue: userTimezone.displayName || 'UTC' })
+                            : (userTimezone.displayName || 'UTC');
+                          return t('admin.dashboard.slotsTimezone', {
+                            timezone: displayName,
+                            offset: offset || '+00:00'
+                          });
+                        })()}
+                      </Alert>
+                    )}
 
                     {rescheduleSlotError && (
                       <Alert severity="error" sx={{ mb: 2 }}>
@@ -2086,7 +2121,7 @@ const BookingsManagement = () => {
                                 </Box>
 
                                 {/* Now and Clear buttons */}
-                                <Box sx={{ display: 'flex', justifyContent: 'space-between', gap: 1 }}>
+                                <Box sx={{ display: 'flex', justifyContent: 'space-between', gap: 1, mb: 1 }}>
                                   <Button
                                     size="small"
                                     onClick={handleSetNow}
@@ -2102,6 +2137,20 @@ const BookingsManagement = () => {
                                     {t('admin.bookingsManagement.clear')}
                                   </Button>
                                 </Box>
+                                {/* Create Slot button */}
+                                <Button
+                                  variant="contained"
+                                  fullWidth
+                                  disabled={!customStartTime}
+                                  onClick={() => {
+                                    if (customStartTime) {
+                                      setConfirmRescheduleDialogOpen(true);
+                                    }
+                                  }}
+                                  sx={{ textTransform: 'none' }}
+                                >
+                                  {t('admin.bookingsManagement.createSlot')}
+                                </Button>
                               </Box>
                             )}
                           </List>
@@ -2301,7 +2350,7 @@ const BookingsManagement = () => {
                             </Box>
 
                             {/* Now and Clear buttons */}
-                            <Box sx={{ display: 'flex', justifyContent: 'space-between', gap: 1 }}>
+                            <Box sx={{ display: 'flex', justifyContent: 'space-between', gap: 1, mb: 1 }}>
                               <Button
                                 size="small"
                                 onClick={handleSetNow}
@@ -2317,6 +2366,20 @@ const BookingsManagement = () => {
                                 {t('admin.bookingsManagement.clear')}
                               </Button>
                             </Box>
+                            {/* Create Slot button */}
+                            <Button
+                              variant="contained"
+                              fullWidth
+                              disabled={!customStartTime}
+                              onClick={() => {
+                                if (customStartTime) {
+                                  setConfirmRescheduleDialogOpen(true);
+                                }
+                              }}
+                              sx={{ textTransform: 'none' }}
+                            >
+                              {t('admin.bookingsManagement.createSlot')}
+                            </Button>
                           </Box>
                         )}
                       </>

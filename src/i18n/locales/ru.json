@@ -418,6 +418,7 @@
       "enterTime": "Введите время",
       "now": "Сейчас",
       "clear": "Очистить",
+      "createSlot": "Создать слот",
       "messageOptional": "Сообщение (необязательно)",
       "rescheduling": "Перенос...",
       "confirmReschedule": "Подтвердить перенос",
