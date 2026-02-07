@@ -475,7 +475,7 @@ const BookingsManagement = () => {
     const controller = new AbortController();
 
     const fetchSlots = async () => {
-      if (!rescheduleSessionTypeId || !rescheduleSelectedDate || !userTimezone) {
+      if (!bookingToReschedule?.id || !rescheduleSelectedDate || !userTimezone) {
         return;
       }
 
@@ -498,8 +498,8 @@ const BookingsManagement = () => {
         const dateString = formatDateForAPI(rescheduleSelectedDate);
         const timezone = userTimezone || Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC';
 
-        // Check cache first
-        const cachedData = getCachedSlots(rescheduleSessionTypeId, dateString, timezone);
+        // Check cache first (using booking ID as part of cache key)
+        const cachedData = getCachedSlots(bookingToReschedule.id, dateString, timezone);
         if (cachedData) {
           if (!isMounted) return;
           if (cachedData.slots && Array.isArray(cachedData.slots)) {
@@ -513,9 +513,8 @@ const BookingsManagement = () => {
           return;
         }
 
-        const response = await apiClient.get('/api/v1/public/booking/available/slot', {
+        const response = await apiClient.get(`/api/v1/booking/${bookingToReschedule.id}/available/slot`, {
           params: {
-            sessionTypeId: rescheduleSessionTypeId,
             suggestedDate: dateString,
             timezoneId: userTimezone?.id,
           },
@@ -527,12 +526,12 @@ const BookingsManagement = () => {
 
         if (response.data && response.data.slots && Array.isArray(response.data.slots)) {
           setRescheduleAvailableSlots(response.data.slots);
-          // Cache the response data
-          setCachedSlots(rescheduleSessionTypeId, dateString, timezone, response.data);
+          // Cache the response data (using booking ID as cache key)
+          setCachedSlots(bookingToReschedule.id, dateString, timezone, response.data);
         } else {
           setRescheduleAvailableSlots([]);
           // Cache empty result too
-          setCachedSlots(rescheduleSessionTypeId, dateString, timezone, { slots: [] });
+          setCachedSlots(bookingToReschedule.id, dateString, timezone, { slots: [] });
         }
       } catch (err) {
         // Don't set error if request was aborted
@@ -570,7 +569,7 @@ const BookingsManagement = () => {
       isMounted = false;
       controller.abort();
     };
-  }, [rescheduleSessionTypeId, rescheduleSelectedDate, userTimezone]);
+  }, [bookingToReschedule?.id, rescheduleSelectedDate, userTimezone]);
 
   // Effect to handle scroll indicator initial state when slots are loaded
   useEffect(() => {
@@ -746,36 +745,13 @@ const BookingsManagement = () => {
     setRescheduleSessionTypeId(null);
     setRescheduleDialogOpen(true);
 
-    // Fetch active session types and match by name to find the session type ID
-    try {
-      const response = await apiClient.get('/api/v1/public/session/type', {
-        timeout: 10000,
-      });
-      if (response.data && Array.isArray(response.data)) {
-        // Match booking session name to find the session type
-        const matchedSessionType = response.data.find(
-          st => st.name === booking.sessionName
-        );
-        if (matchedSessionType) {
-          const sessionTypeId = matchedSessionType.id || matchedSessionType.sessionTypeId;
-          setRescheduleSessionTypeId(sessionTypeId);
-          // Fetch slots for the matched session type
-          fetchRescheduleSlots(dayjs(), sessionTypeId);
-        } else {
-          setRescheduleSlotError(t('admin.bookingsManagement.sessionTypeNotAvailable', { sessionName: booking.sessionName }));
-        }
-      } else {
-        setRescheduleSlotError(t('admin.bookingsManagement.failedToLoadSessionTypes'));
-      }
-    } catch (err) {
-      console.error('Error fetching session types for reschedule:', err);
-      setRescheduleSlotError(t('admin.bookingsManagement.failedToLoadSessionTypesRetry'));
-    }
+    // Fetch slots for the booking using the booking-specific endpoint
+    // The useEffect will handle the actual fetching once bookingToReschedule is set
   };
 
   // Fetch available slots for reschedule
-  const fetchRescheduleSlots = async (date, sessionTypeId) => {
-    if (!sessionTypeId) {
+  const fetchRescheduleSlots = async (date, bookingId) => {
+    if (!bookingId) {
       setRescheduleLoadingSlots(false);
       setRescheduleAvailableSlots([]);
       setRescheduleSlotError(t('admin.bookingsManagement.sessionTypeNotFound'));
@@ -789,8 +765,8 @@ const BookingsManagement = () => {
 
       const timezone = userTimezone || Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC';
 
-      // Check cache first
-      const cachedData = getCachedSlots(sessionTypeId, dateString, timezone);
+      // Check cache first (using booking ID as cache key)
+      const cachedData = getCachedSlots(bookingId, dateString, timezone);
       if (cachedData) {
         if (cachedData.slots && Array.isArray(cachedData.slots)) {
           setRescheduleAvailableSlots(cachedData.slots);
@@ -801,9 +777,8 @@ const BookingsManagement = () => {
         return;
       }
 
-      const response = await apiClient.get('/api/v1/public/booking/available/slot', {
+      const response = await apiClient.get(`/api/v1/booking/${bookingId}/available/slot`, {
         params: {
-          sessionTypeId,
           suggestedDate: dateString,
           timezoneId: userTimezone?.id,
         },
@@ -812,12 +787,12 @@ const BookingsManagement = () => {
 
       if (response.data && response.data.slots && Array.isArray(response.data.slots)) {
         setRescheduleAvailableSlots(response.data.slots);
-        // Cache the response data
-        setCachedSlots(sessionTypeId, dateString, timezone, response.data);
+        // Cache the response data (using booking ID as cache key)
+        setCachedSlots(bookingId, dateString, timezone, response.data);
       } else {
         setRescheduleAvailableSlots([]);
         // Cache empty result too
-        setCachedSlots(sessionTypeId, dateString, timezone, { slots: [] });
+        setCachedSlots(bookingId, dateString, timezone, { slots: [] });
       }
     } catch (err) {
       console.error('Error fetching available slots for reschedule:', err);
@@ -1060,13 +1035,14 @@ const BookingsManagement = () => {
       }
 
       // Success - close dialog and refresh bookings
+      setConfirmRescheduleDialogOpen(false);
       handleRescheduleDialogClose();
       setSuccessMessage(t('admin.bookingsManagement.rescheduleSuccess'));
       // Invalidate cache for the date that was rescheduled to refresh slots
       const dateString = formatDateForAPI(rescheduleSelectedDate);
       const timezone = userTimezone || Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC';
-      if (rescheduleSessionTypeId) {
-        invalidateCache(rescheduleSessionTypeId, dateString, timezone);
+      if (bookingToReschedule?.id) {
+        invalidateCache(bookingToReschedule.id, dateString, timezone);
       }
       fetchBookings();
     } catch (err) {
@@ -1080,8 +1056,8 @@ const BookingsManagement = () => {
         // If reschedule failed (e.g., slot was already booked), invalidate cache to refresh
         const dateString = formatDateForAPI(rescheduleSelectedDate);
         const timezone = userTimezone || Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC';
-        if (rescheduleSessionTypeId) {
-          invalidateCache(rescheduleSessionTypeId, dateString, timezone);
+        if (bookingToReschedule?.id) {
+          invalidateCache(bookingToReschedule.id, dateString, timezone);
         }
       } else if (err.request) {
         errorMessage = t('admin.bookingsManagement.unableToReachServer');

@@ -641,6 +641,24 @@ const BookingPage = ({ sessionTypeId: propSessionTypeId, hideMyBookings = false 
     }
   }, [availableSlots]);
 
+  // Fetch slots when update dialog opens or date changes
+  useEffect(() => {
+    if (!bookingToUpdate?.id || !updateSelectedDate || !userTimezone) {
+      return;
+    }
+
+    // Don't fetch slots for past dates
+    const isPastDate = updateSelectedDate.isBefore(dayjs(), 'day');
+    if (isPastDate) {
+      setUpdateAvailableSlots([]);
+      setUpdateSlotError(null);
+      return;
+    }
+
+    fetchUpdateSlots(updateSelectedDate, bookingToUpdate.id);
+  }, [bookingToUpdate?.id, updateSelectedDate, userTimezone]);
+
+
   // Handle date selection
   const handleDateChange = (newDate) => {
     setSelectedDate(newDate);
@@ -694,39 +712,16 @@ const BookingPage = ({ sessionTypeId: propSessionTypeId, hideMyBookings = false 
     setUpdateSessionTypeId(null);
     setUpdateDialogOpen(true);
 
-    // Fetch active session types and match by name to find the session type ID
-    try {
-      const response = await apiClient.get('/api/v1/public/session/type', {
-        timeout: 10000,
-      });
-      if (response.data && Array.isArray(response.data)) {
-        // Match booking session name to find the session type
-        const matchedSessionType = response.data.find(
-          st => st.name === booking.sessionName
-        );
-        if (matchedSessionType) {
-          const sessionTypeId = matchedSessionType.id || matchedSessionType.sessionTypeId;
-          setUpdateSessionTypeId(sessionTypeId);
-          // Fetch slots for the matched session type
-          fetchUpdateSlots(dayjs(), sessionTypeId);
-        } else {
-          setUpdateSlotError(t('pages.booking.sessionTypeNotFound'));
-        }
-      } else {
-        setUpdateSlotError(t('pages.booking.failedToLoadSessionTypes'));
-      }
-    } catch (err) {
-      console.error('Error fetching session types for update:', err);
-      setUpdateSlotError(t('pages.booking.failedToLoadSessionTypesRetry'));
-    }
+    // Fetch slots for the booking using the booking-specific endpoint
+    // Slots will be fetched by useEffect when bookingToUpdate is set
   };
 
-  // Fetch available slots for update (similar to fetchAvailableSlots but for specific session type)
-  const fetchUpdateSlots = async (date, sessionTypeId) => {
-    if (!sessionTypeId) {
+  // Fetch available slots for update using booking-specific endpoint
+  const fetchUpdateSlots = async (date, bookingId) => {
+    if (!bookingId) {
       setUpdateLoadingSlots(false);
       setUpdateAvailableSlots([]);
-      setUpdateSlotError('Session type not found');
+      setUpdateSlotError('Booking not found');
       return;
     }
 
@@ -741,8 +736,8 @@ const BookingPage = ({ sessionTypeId: propSessionTypeId, hideMyBookings = false 
         timezone = userTimezone;
       }
 
-      // Check cache first
-      const cachedData = getCachedSlots(sessionTypeId, dateString, timezone);
+      // Check cache first (using booking ID as cache key)
+      const cachedData = getCachedSlots(bookingId, dateString, timezone);
       if (cachedData) {
         // Handle BookingSuggestionsDto response
         if (cachedData.slots && Array.isArray(cachedData.slots)) {
@@ -767,9 +762,8 @@ const BookingPage = ({ sessionTypeId: propSessionTypeId, hideMyBookings = false 
         return;
       }
 
-      const response = await apiClient.get('/api/v1/public/booking/available/slot', {
+      const response = await apiClient.get(`/api/v1/booking/${bookingId}/available/slot`, {
         params: {
-          sessionTypeId,
           suggestedDate: dateString,
           timezoneId: timezoneId,
         },
@@ -779,12 +773,12 @@ const BookingPage = ({ sessionTypeId: propSessionTypeId, hideMyBookings = false 
       // Handle BookingSuggestionsDto response
       if (response.data && response.data.slots && Array.isArray(response.data.slots)) {
         setUpdateAvailableSlots(response.data.slots);
-        // Cache the response data
-        setCachedSlots(sessionTypeId, dateString, timezone, response.data);
+        // Cache the response data (using booking ID as cache key)
+        setCachedSlots(bookingId, dateString, timezone, response.data);
       } else {
         setUpdateAvailableSlots([]);
         // Cache empty result too
-        setCachedSlots(sessionTypeId, dateString, timezone, { slots: [] });
+        setCachedSlots(bookingId, dateString, timezone, { slots: [] });
       }
     } catch (err) {
       console.error('Error fetching available slots for update:', err);
