@@ -433,26 +433,50 @@ const AppLayout = ({ children }) => {
         }}
       >
         <Toolbar sx={{ minHeight: { xs: 56, sm: 64 }, position: 'relative' }}>
-          {/* Home Icon - Top Left */}
+          {/* Home Button - Top Left */}
           {!isAdminRoute && (
-            <Tooltip title={t('navigation.home')} arrow>
-              <IconButton
-                onClick={isLandingPage ? () => scrollToSection('hero') : () => navigate('/')}
+            isLandingPage ? (
+              <Tooltip title={t('navigation.home')} arrow>
+                <IconButton
+                  onClick={() => scrollToSection('hero')}
+                  color="inherit"
+                  size="medium"
+                  aria-label="home"
+                  sx={{
+                    mr: { xs: 1, sm: 2 },
+                    transition: 'all 0.2s ease-in-out',
+                    '&:hover': {
+                      bgcolor: 'rgba(255, 255, 255, 0.1)',
+                      transform: 'scale(1.1)',
+                    },
+                  }}
+                >
+                  <HomeIcon />
+                </IconButton>
+              </Tooltip>
+            ) : (
+              <Button
+                onClick={() => navigate('/')}
                 color="inherit"
-                size="medium"
-                aria-label="home"
+                startIcon={<HomeIcon />}
                 sx={{
                   mr: { xs: 1, sm: 2 },
+                  textTransform: 'none',
+                  fontWeight: 500,
+                  fontSize: { xs: '0.875rem', sm: '0.9375rem' },
+                  px: { xs: 1, sm: 1.5 },
+                  py: 1,
+                  borderRadius: 1,
                   transition: 'all 0.2s ease-in-out',
                   '&:hover': {
                     bgcolor: 'rgba(255, 255, 255, 0.1)',
-                    transform: 'scale(1.1)',
+                    transform: 'translateY(-1px)',
                   },
                 }}
               >
-                <HomeIcon />
-              </IconButton>
-            </Tooltip>
+                {t('navigation.home')}
+              </Button>
+            )
           )}
 
           {/* Navigation Links */}

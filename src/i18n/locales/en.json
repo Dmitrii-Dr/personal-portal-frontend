@@ -30,7 +30,7 @@
     "symbols": "Symbols"
   },
   "navigation": {
-    "home": "Home",
+    "home": "Main",
     "about": "About me",
     "services": "Services",
     "blog": "Blog",
@@ -851,6 +851,11 @@
       "title": "SERVICES & PRICING",
       "description": "Choose the service package that best fits your needs",
       "currency": "Currency",
+      "currencies": {
+        "USD": "USD",
+        "Tenge": "Tenge",
+        "Rubles": "Rubles"
+      },
       "bookNow": "Book Now",
       "learnMore": "Learn More"
     },

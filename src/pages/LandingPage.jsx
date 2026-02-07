@@ -906,7 +906,7 @@ const LandingPage = () => {
                     }}
                     selected={selectedCurrency === 'Rubles'}
                   >
-                    ₽ Rubles
+                    ₽ {t('landing.services.currencies.Rubles')}
                   </MenuItem>
                   <MenuItem
                     onClick={() => {
@@ -915,7 +915,7 @@ const LandingPage = () => {
                     }}
                     selected={selectedCurrency === 'Tenge'}
                   >
-                    ₸ Tenge
+                    ₸ {t('landing.services.currencies.Tenge')}
                   </MenuItem>
                   <MenuItem
                     onClick={() => {
@@ -924,7 +924,7 @@ const LandingPage = () => {
                     }}
                     selected={selectedCurrency === 'USD'}
                   >
-                    $ USD
+                    $ {t('landing.services.currencies.USD')}
                   </MenuItem>
                 </Menu>
               </Box>
@@ -1881,25 +1881,7 @@ const LandingPage = () => {
             })}
           </Box>
 
-          {/* Copyright */}
-          <Box
-            sx={{
-              mt: 6,
-              pt: 4,
-              borderTop: '1px solid rgba(255, 255, 255, 0.1)',
-              textAlign: 'center',
-            }}
-          >
-            <Typography
-              variant="body2"
-              sx={{
-                opacity: 0.7,
-                fontSize: { xs: '0.75rem', md: '0.875rem' },
-              }}
-            >
-              © {new Date().getFullYear()} All rights reserved.
-            </Typography>
-          </Box>
+
         </Container>
       </Box>
     </Box>
