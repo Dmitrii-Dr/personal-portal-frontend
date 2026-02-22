@@ -18,6 +18,7 @@ import SessionsConfigurationPage from './pages/SessionsConfigurationPage';
 import ResetPasswordPage from './pages/ResetPasswordPage';
 import AgreementPage from './pages/AgreementPage';
 import AdminRoute from './components/AdminRoute';
+import PrivateRoute from './components/PrivateRoute';
 import AdminRedirect from './components/AdminRedirect';
 import ErrorBoundary from './components/ErrorBoundary';
 import CookieNotification from './components/CookieNotification';
@@ -41,7 +42,7 @@ import {
   CircularProgress,
 } from '@mui/material';
 import { Link } from 'react-router-dom';
-import { setToken, fetchWithAuth, hasAdminRole, getRolesFromToken } from './utils/api';
+import { setToken, fetchWithAuth, getRolesFromToken } from './utils/api';
 import { fetchTimezones } from './utils/timezoneService';
 import axios from 'axios';
 import dayjs from 'dayjs';
@@ -501,6 +502,7 @@ const LoginPage = () => {
     try {
       const response = await fetch('/api/v1/auth/login', {
         method: 'POST',
+        credentials: 'same-origin',
         headers: {
           'Content-Type': 'application/json',
         },
@@ -671,18 +673,23 @@ function App() {
           <AdminRedirect>
             <AppLayout>
               <Routes>
+                {/* Public routes — accessible to everyone */}
                 <Route path="/" element={<LandingPage />} />
                 <Route path="/blog" element={<BlogPage />} />
                 <Route path="/blog/:articleId" element={<ArticlePage />} />
-                <Route path="/booking" element={<BookingPage />} />
-                <Route path="/login" element={<LoginPage />} />
-                <Route path="/signup" element={<SignUpPage />} />
-                <Route path="/agreement/:slug" element={<AgreementPage />} />
-                <Route path="/reset-password" element={<ResetPasswordPage />} />
-                <Route path="/profile" element={<ProfilePage />} />
-                <Route path="/about-me" element={<AboutMePage />} />
+                {/* /admin is the admin login page — keep public */}
                 <Route path="/admin" element={<AdminPage />} />
-                {/* All /admin/* routes except /admin itself are protected by AdminRoute */}
+
+                {/* Private routes — anonymous users are redirected to / */}
+                <Route path="/booking" element={<PrivateRoute><BookingPage /></PrivateRoute>} />
+                <Route path="/login" element={<PrivateRoute><LoginPage /></PrivateRoute>} />
+                <Route path="/signup" element={<PrivateRoute><SignUpPage /></PrivateRoute>} />
+                <Route path="/agreement/:slug" element={<PrivateRoute><AgreementPage /></PrivateRoute>} />
+                <Route path="/reset-password" element={<PrivateRoute><ResetPasswordPage /></PrivateRoute>} />
+                <Route path="/profile" element={<PrivateRoute><ProfilePage /></PrivateRoute>} />
+                <Route path="/about-me" element={<PrivateRoute><AboutMePage /></PrivateRoute>} />
+
+                {/* Admin sub-routes — additionally guarded by AdminRoute (role check) */}
                 <Route
                   path="/admin/*"
                   element={
@@ -694,7 +701,6 @@ function App() {
                         <Route path="gallery" element={<AdminGalleryPage />} />
                         <Route path="profile" element={<AdminProfilePage />} />
                         <Route path="session/configuration" element={<SessionsConfigurationPage />} />
-                        {/* Add more admin routes here as needed */}
                       </Routes>
                     </AdminRoute>
                   }

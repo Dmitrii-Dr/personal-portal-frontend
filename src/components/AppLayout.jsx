@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { fetchWithAuth, getToken, removeToken, decodeToken, isTokenExpired, fetchUserProfile, clearUserProfileCache } from '../utils/api';
+import { fetchWithAuth, getToken, removeToken, decodeToken, fetchUserProfile, clearUserProfileCache, logoutApi, hasSessionHint, refreshAccessToken } from '../utils/api';
 import {
   AppBar,
   Toolbar,
@@ -79,41 +79,27 @@ const AppLayout = ({ children }) => {
   }, []);
 
   // Fetch user profile
-  const lastFetchedTokenRef = useRef(null);
   const isFetchingRef = useRef(false);
   const loadUserProfile = useCallback(async () => {
-    const token = getToken();
-    if (!token) {
-      setUserProfile(null);
-      lastFetchedTokenRef.current = null;
-      isFetchingRef.current = false;
-      clearUserProfileCache();
-      return;
-    }
+    // Profile loading only makes sense when a token is available.
+    // Token restoration is handled separately by refreshAccessToken().
+    if (!getToken()) return;
 
-    // Avoid refetching if we've already fetched for this token or if already fetching
-    if (lastFetchedTokenRef.current === token || isFetchingRef.current) {
-      return;
-    }
+    if (isFetchingRef.current) return; // prevent concurrent fetches
 
     isFetchingRef.current = true;
     setProfileLoading(true);
     try {
       const data = await fetchUserProfile();
-      if (!isFetchingRef.current) return; // Component unmounted or another fetch started
+      if (!isFetchingRef.current) return; // unmounted
 
-      setUserProfile(data);
-      lastFetchedTokenRef.current = token;
-      // Dispatch event so other components can reuse this data
       if (data) {
+        setUserProfile(data);
+        setHasToken(true);
         window.dispatchEvent(new CustomEvent('user-profile-loaded', { detail: data }));
       }
     } catch (error) {
       console.error('Error fetching user profile:', error);
-      if (isFetchingRef.current) {
-        setUserProfile(null);
-        lastFetchedTokenRef.current = null;
-      }
     } finally {
       setProfileLoading(false);
       isFetchingRef.current = false;
@@ -180,68 +166,73 @@ const AppLayout = ({ children }) => {
     };
   }, [userProfile]);
 
-  // Check token on mount and listen for storage changes
-  useEffect(() => {
-    const checkToken = () => {
-      const token = getToken();
-      const tokenExists = !!token;
+  // Forced local-only logout — used when the server already ended the session
+  // (e.g. /refresh returned 401/403). No API call; just wipe everything and redirect.
+  const forceLogout = useCallback(() => {
+    removeToken();
+    clearUserProfileCache();
+    setHasToken(false);
+    setUserProfile(null);
+    isFetchingRef.current = false;
+    navigate('/');
+  }, [navigate]);
 
-      // Check if token is expired
-      if (tokenExists && isTokenExpired(token)) {
-        // Token expired, log out user
-        handleLogout();
+  // User-initiated logout — calls the server to revoke the refresh cookie.
+  const handleLogout = useCallback(async () => {
+    await logoutApi(); // POST /api/v1/auth/logout + X-XSRF-TOKEN header
+    forceLogout();
+  }, [forceLogout]);
+
+  // On mount: attempt a silent refresh to restore session after page reload.
+  // Access token lives only in memory, so it is lost on every reload.
+  useEffect(() => {
+    const bootstrap = async () => {
+      // Anonymous user — no session, nothing to do.
+      if (!getToken() && !hasSessionHint()) return;
+
+      // Same-tab navigation — token already in memory.
+      if (getToken()) {
+        setHasToken(true);
+        loadUserProfile();
         return;
       }
 
-      setHasToken(tokenExists);
-      if (tokenExists) {
+      // Page reload — call /refresh to restore the access token.
+      // If /refresh returns 401/403, it dispatches 'token-expired' →
+      // forceLogout() → navigate('/').
+      const token = await refreshAccessToken();
+      if (token) {
+        setHasToken(true);
         loadUserProfile();
-      } else {
-        setUserProfile(null);
+        // Notify all components (e.g. BookingPage) that auth state changed so
+        // they can update their own hasToken and re-fetch their data.
+        window.dispatchEvent(new Event('auth-changed'));
       }
     };
 
-    // Check initially
-    // fetchUserProfile has guards to prevent duplicate calls (isFetchingRef and lastFetchedTokenRef)
-    checkToken();
+    bootstrap();
 
-    // Listen for storage changes (e.g., when login happens in another tab)
-    const handleStorageChange = (e) => {
-      if (e.key === 'auth_token' || e.key === null) {
-        checkToken();
-      }
-    };
-
-    // Listen for custom event when login happens in same tab
+    // Listen for custom event when login happens in the same tab
     const handleLogin = () => {
-      checkToken();
+      const token = getToken();
+      setHasToken(!!token);
+      if (token) loadUserProfile();
     };
 
-    // Listen for token expiration event
+    // Listen for token expiration / refresh failure — clears local state and
+    // sends user to landing page WITHOUT calling the server (session already dead).
     const handleTokenExpired = () => {
-      handleLogout();
+      forceLogout();
     };
 
-    // Check when window regains focus (user might have logged in in another tab)
-    window.addEventListener('storage', handleStorageChange);
     window.addEventListener('auth-changed', handleLogin);
     window.addEventListener('token-expired', handleTokenExpired);
 
     return () => {
-      window.removeEventListener('storage', handleStorageChange);
       window.removeEventListener('auth-changed', handleLogin);
       window.removeEventListener('token-expired', handleTokenExpired);
     };
-  }, [loadUserProfile]);
-
-  const handleLogout = () => {
-    removeToken();
-    setHasToken(false);
-    setUserProfile(null);
-    // Dispatch custom event to notify other components of auth change
-    window.dispatchEvent(new Event('auth-changed'));
-    navigate('/');
-  };
+  }, [forceLogout, loadUserProfile]);
 
   const handleAboutMeOpen = () => {
     setAboutMeOpen(true);
@@ -381,20 +372,7 @@ const AppLayout = ({ children }) => {
     }
   }, [location.pathname, navigate, isAdminRoute]);
 
-  // Periodic token expiration check
-  useEffect(() => {
-    // Check token expiration every 5 minutes
-    const checkInterval = setInterval(() => {
-      const token = getToken();
-      if (token && isTokenExpired(token)) {
-        handleLogout();
-      }
-    }, 300000); // Check every 5 minutes (300000 ms)
 
-    return () => {
-      clearInterval(checkInterval);
-    };
-  }, []);
 
   // Fetch about me data when dialog opens
   useEffect(() => {

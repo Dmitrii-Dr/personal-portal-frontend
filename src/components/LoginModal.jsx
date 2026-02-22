@@ -92,6 +92,7 @@ const LoginModal = ({ open, onClose, onSwitchToSignUp }) => {
     try {
       const response = await fetch('/api/v1/auth/login', {
         method: 'POST',
+        credentials: 'same-origin',
         headers: {
           'Content-Type': 'application/json',
         },
