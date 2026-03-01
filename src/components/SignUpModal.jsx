@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
+import { Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { setToken } from '../utils/api';
 import {
   Dialog,
   DialogTitle,
@@ -23,7 +22,6 @@ import ErrorOutlineIcon from '@mui/icons-material/ErrorOutline';
 
 const SignUpModal = ({ open, onClose, onSwitchToLogin }) => {
   const { t } = useTranslation();
-  const navigate = useNavigate();
   const [agreements, setAgreements] = useState({});
   const [agreementsLoading, setAgreementsLoading] = useState(false);
   const [agreementsError, setAgreementsError] = useState('');
@@ -287,67 +285,12 @@ const SignUpModal = ({ open, onClose, onSwitchToLogin }) => {
         );
       }
 
-      // Check if signup response includes a token
-      const responseData = await response.json().catch(() => ({}));
-      const signupToken = responseData.token || responseData.accessToken;
-
-      // Save token if available
-      if (signupToken) {
-        setToken(signupToken);
-        // Dispatch custom event to notify AppLayout of auth change
-        window.dispatchEvent(new Event('auth-changed'));
-      }
-
-      // After successful signup, detect timezone and send user settings
-      try {
-        let timezoneId = 16; // Default timezone ID
-
-        // Check if there's a pending booking with a selected timezone
-        const pendingBookingStr = sessionStorage.getItem('pending_booking');
-        if (pendingBookingStr) {
-          try {
-            const pendingBooking = JSON.parse(pendingBookingStr);
-            if (pendingBooking.timezoneId) {
-              timezoneId = pendingBooking.timezoneId;
-            }
-          } catch (e) {
-            console.warn('Failed to parse pending booking:', e);
-          }
-        }
-
-        const language = 'ru';
-
-        // Prepare settings request
-        const settingsOptions = {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            timezoneId: timezoneId,
-            language: language.substring(0, 10), // Ensure max 10 characters
-          }),
-        };
-
-        // Add token to headers if available from signup response
-        if (signupToken) {
-          settingsOptions.headers.Authorization = `Bearer ${signupToken}`;
-        }
-
-        // Send user settings request
-        const settingsResponse = await fetch('/api/v1/user/setting', settingsOptions);
-
-        if (!settingsResponse.ok) {
-          console.warn('Failed to save user settings:', settingsResponse.status);
-        }
-      } catch (settingsError) {
-        console.warn('Error saving user settings:', settingsError);
-      }
-
+      // /registry returns 201 with no body — no token, no auto-login.
+      // The backend sends a 6-digit verification code to the user's email.
       setSuccess(true);
-      // Close modal after 2 seconds
+
+      // After 2 seconds close this modal and open the login modal
       setTimeout(() => {
-        // Reset form data before closing to prevent autocomplete issues
         const resetData = {
           firstName: '',
           lastName: '',
@@ -356,14 +299,11 @@ const SignUpModal = ({ open, onClose, onSwitchToLogin }) => {
           password: '',
           confirmPassword: '',
         };
-
-        // Reset agreement fields
         if (Array.isArray(agreements)) {
           agreements.forEach(agreement => {
             resetData[`agreed_${agreement.id}`] = false;
           });
         }
-
         setFormData(resetData);
         setErrors({
           firstName: '',
@@ -375,15 +315,9 @@ const SignUpModal = ({ open, onClose, onSwitchToLogin }) => {
         });
         setSubmitError('');
         setSuccess(false);
-
         onClose();
-        // If token is available, user is logged in, redirect to booking
-        if (signupToken) {
-          navigate('/booking');
-        } else if (onSwitchToLogin) {
-          setTimeout(() => {
-            onSwitchToLogin();
-          }, 300);
+        if (onSwitchToLogin) {
+          setTimeout(() => onSwitchToLogin(), 300);
         }
       }, 2000);
     } catch (error) {

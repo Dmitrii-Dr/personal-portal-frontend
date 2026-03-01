@@ -16,6 +16,7 @@ import AdminGalleryPage from './pages/AdminGalleryPage';
 import AboutMePage from './pages/AboutMePage';
 import SessionsConfigurationPage from './pages/SessionsConfigurationPage';
 import ResetPasswordPage from './pages/ResetPasswordPage';
+import AccountVerificationPage from './pages/AccountVerificationPage';
 import AgreementPage from './pages/AgreementPage';
 import AdminRoute from './components/AdminRoute';
 import PrivateRoute from './components/PrivateRoute';
@@ -522,7 +523,7 @@ const LoginPage = () => {
 
       const data = await response.json();
 
-      // Save token to sessionStorage
+      // Save token
       if (data.token) {
         setToken(data.token);
         // Dispatch custom event to notify AppLayout of auth change
@@ -531,22 +532,16 @@ const LoginPage = () => {
         // Check if user has admin role - check both response roles and token
         const responseRoles = data.roles || [];
         const tokenRoles = getRolesFromToken(data.token);
-        const allRoles = [...new Set([...responseRoles, ...tokenRoles])]; // Combine and deduplicate
+        const allRoles = [...new Set([...responseRoles, ...tokenRoles])];
         const isAdmin = allRoles.includes('ROLE_ADMIN') || allRoles.includes('ADMIN_ROLE');
 
-        console.log('Response roles:', responseRoles);
-        console.log('Token roles:', tokenRoles);
-        console.log('All roles:', allRoles);
-        console.log('Is admin?', isAdmin);
-
         if (isAdmin) {
-          // Admin user - redirect to admin dashboard
-          console.log('Redirecting to /admin/dashboard');
+          // Admin user - go to dashboard directly (admins are always verified)
           navigate('/admin/dashboard');
         } else {
-          // Regular user - redirect to return path or home page
-          console.log('Redirecting to', returnTo);
-          navigate(returnTo);
+          // Regular user - go through account verification check
+          // AccountVerificationPage will forward to returnTo if already verified
+          navigate('/verify-account', { state: { email: data.email || formData.email.trim(), returnTo } });
         }
       } else {
         throw new Error('No token received from server');
@@ -656,7 +651,10 @@ const AccountPage = () => (
   </div>
 );
 
-function App() {
+// AppInner must live inside <Router> so it can use useNavigate.
+function AppInner() {
+  const navigate = useNavigate();
+
   // Preload timezones when app starts to ensure they're available globally
   useEffect(() => {
     fetchTimezones().catch(err => {
@@ -664,50 +662,71 @@ function App() {
     });
   }, []);
 
+  // Redirect to verification page whenever any API call returns PEC-412
+  useEffect(() => {
+    const handler = (e) => {
+      navigate('/verify-account', {
+        replace: true,
+        state: { email: e?.detail?.email || '', returnTo: '/' },
+      });
+    };
+    window.addEventListener('account-not-verified', handler);
+    return () => window.removeEventListener('account-not-verified', handler);
+  }, [navigate]);
+
+  return (
+    <>
+      <CookieNotification />
+      <AdminRedirect>
+        <AppLayout>
+          <Routes>
+            {/* Public routes — accessible to everyone */}
+            <Route path="/" element={<LandingPage />} />
+            <Route path="/blog" element={<BlogPage />} />
+            <Route path="/blog/:articleId" element={<ArticlePage />} />
+            {/* /admin is the admin login page — keep public */}
+            <Route path="/admin" element={<AdminPage />} />
+
+            {/* Private routes — anonymous users are redirected to / */}
+            <Route path="/booking" element={<PrivateRoute><BookingPage /></PrivateRoute>} />
+            <Route path="/login" element={<PrivateRoute><LoginPage /></PrivateRoute>} />
+            <Route path="/signup" element={<PrivateRoute><SignUpPage /></PrivateRoute>} />
+            <Route path="/agreement/:slug" element={<PrivateRoute><AgreementPage /></PrivateRoute>} />
+            <Route path="/reset-password" element={<PrivateRoute><ResetPasswordPage /></PrivateRoute>} />
+            <Route path="/verify-account" element={<PrivateRoute><AccountVerificationPage /></PrivateRoute>} />
+            <Route path="/profile" element={<PrivateRoute><ProfilePage /></PrivateRoute>} />
+            <Route path="/about-me" element={<PrivateRoute><AboutMePage /></PrivateRoute>} />
+
+            {/* Admin sub-routes — additionally guarded by AdminRoute (role check) */}
+            <Route
+              path="/admin/*"
+              element={
+                <AdminRoute>
+                  <Routes>
+                    <Route path="dashboard" element={<AdminDashboard />} />
+                    <Route path="home" element={<AdminHomePage />} />
+                    <Route path="blog" element={<AdminBlogPage />} />
+                    <Route path="gallery" element={<AdminGalleryPage />} />
+                    <Route path="profile" element={<AdminProfilePage />} />
+                    <Route path="session/configuration" element={<SessionsConfigurationPage />} />
+                  </Routes>
+                </AdminRoute>
+              }
+            />
+          </Routes>
+        </AppLayout>
+      </AdminRedirect>
+    </>
+  );
+}
+
+function App() {
   return (
     <ThemeProvider theme={theme}>
       <CssBaseline />
       <ErrorBoundary>
         <Router>
-          <CookieNotification />
-          <AdminRedirect>
-            <AppLayout>
-              <Routes>
-                {/* Public routes — accessible to everyone */}
-                <Route path="/" element={<LandingPage />} />
-                <Route path="/blog" element={<BlogPage />} />
-                <Route path="/blog/:articleId" element={<ArticlePage />} />
-                {/* /admin is the admin login page — keep public */}
-                <Route path="/admin" element={<AdminPage />} />
-
-                {/* Private routes — anonymous users are redirected to / */}
-                <Route path="/booking" element={<PrivateRoute><BookingPage /></PrivateRoute>} />
-                <Route path="/login" element={<PrivateRoute><LoginPage /></PrivateRoute>} />
-                <Route path="/signup" element={<PrivateRoute><SignUpPage /></PrivateRoute>} />
-                <Route path="/agreement/:slug" element={<PrivateRoute><AgreementPage /></PrivateRoute>} />
-                <Route path="/reset-password" element={<PrivateRoute><ResetPasswordPage /></PrivateRoute>} />
-                <Route path="/profile" element={<PrivateRoute><ProfilePage /></PrivateRoute>} />
-                <Route path="/about-me" element={<PrivateRoute><AboutMePage /></PrivateRoute>} />
-
-                {/* Admin sub-routes — additionally guarded by AdminRoute (role check) */}
-                <Route
-                  path="/admin/*"
-                  element={
-                    <AdminRoute>
-                      <Routes>
-                        <Route path="dashboard" element={<AdminDashboard />} />
-                        <Route path="home" element={<AdminHomePage />} />
-                        <Route path="blog" element={<AdminBlogPage />} />
-                        <Route path="gallery" element={<AdminGalleryPage />} />
-                        <Route path="profile" element={<AdminProfilePage />} />
-                        <Route path="session/configuration" element={<SessionsConfigurationPage />} />
-                      </Routes>
-                    </AdminRoute>
-                  }
-                />
-              </Routes>
-            </AppLayout>
-          </AdminRedirect>
+          <AppInner />
         </Router>
       </ErrorBoundary>
     </ThemeProvider>

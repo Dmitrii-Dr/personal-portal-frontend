@@ -112,7 +112,7 @@ const LoginModal = ({ open, onClose, onSwitchToSignUp }) => {
 
       const data = await response.json();
 
-      // Save token to sessionStorage
+      // Save token
       if (data.token) {
         setToken(data.token);
         // Dispatch custom event to notify AppLayout of auth change
@@ -128,11 +128,26 @@ const LoginModal = ({ open, onClose, onSwitchToSignUp }) => {
         onClose();
 
         if (isAdmin) {
-          // Admin user - redirect to admin dashboard
+          // Admin user - redirect to admin dashboard (always verified)
           navigate('/admin/dashboard');
         } else {
-          // Regular user - redirect to booking page
-          navigate('/booking');
+          // Regular user — check verification status from profile
+          const email = data.email || formData.email.trim();
+          try {
+            const profileRes = await fetch('/api/v1/user/profile', {
+              credentials: 'same-origin',
+              headers: { Authorization: `Bearer ${data.token}` },
+            });
+            const profile = profileRes.ok ? await profileRes.json() : null;
+            if (profile?.isVerified === false) {
+              navigate('/verify-account', { state: { email, returnTo: '/booking' } });
+            } else {
+              navigate('/booking');
+            }
+          } catch {
+            // On network error fall through to verify-account to be safe
+            navigate('/verify-account', { state: { email, returnTo: '/booking' } });
+          }
         }
       } else {
         throw new Error('No token received from server');

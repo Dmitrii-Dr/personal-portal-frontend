@@ -90,7 +90,17 @@
     "loadingAgreements": "Loading agreements...",
     "noAgreementsAvailable": "No agreements available",
     "agreementRequired": "You must agree to this agreement",
-    "loginRequired": "One More Step to Book"
+    "loginRequired": "One More Step to Book",
+    "verifyAccount": "Verify Your Account",
+    "verifyAccountDescription": "Enter the 6-digit code we sent to your email.",
+    "verificationCode": "Verification Code",
+    "verificationCodeRequired": "Verification code is required",
+    "verificationCodeInvalid": "Code must be exactly 6 digits",
+    "verifying": "Verifying...",
+    "verifyAndContinue": "Verify & Continue",
+    "accountVerified": "Account verified! Redirecting...",
+    "verificationFailed": "Verification failed. Please try again.",
+    "noEmailProvided": "No email found. Please log in again."
   },
   "userMenu": {
     "myProfile": "My Profile",

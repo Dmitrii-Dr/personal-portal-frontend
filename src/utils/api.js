@@ -195,11 +195,24 @@ apiClient.interceptors.request.use(
   (error) => Promise.reject(error)
 );
 
-// Response interceptor — auto-refresh on 401
+// Response interceptor — auto-refresh on 401, PEC-412 redirect on 403
 apiClient.interceptors.response.use(
   (response) => response,
   async (error) => {
     const originalRequest = error.config;
+
+    // Account not verified — redirect to verification page from anywhere
+    if (error.response?.status === 403) {
+      try {
+        const body = error.response?.data;
+        if (body?.code === 'PEC-412' && window.location.pathname !== '/verify-account') {
+          window.dispatchEvent(new Event('account-not-verified'));
+          return Promise.reject(error);
+        }
+      } catch (_) {
+        // ignore parse errors
+      }
+    }
 
     if (
       error.response?.status === 401 &&

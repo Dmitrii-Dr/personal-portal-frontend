@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { fetchWithAuth, setToken } from '../utils/api';
+
 import {
   Box,
   Typography,
@@ -170,77 +170,13 @@ const SignUpPage = () => {
         );
       }
 
-      // Check if signup response includes a token
-      const responseData = await response.json().catch(() => ({}));
-      const signupToken = responseData.token || responseData.accessToken;
-
-      // Save token if available
-      if (signupToken) {
-        setToken(signupToken);
-        // Dispatch custom event to notify AppLayout of auth change
-        window.dispatchEvent(new Event('auth-changed'));
-      }
-
-      // After successful signup, detect timezone and send user settings
-      try {
-        let timezoneId = 16; // Default timezone ID
-
-        // Check if there's a pending booking with a selected timezone
-        const pendingBookingStr = sessionStorage.getItem('pending_booking');
-        if (pendingBookingStr) {
-          try {
-            const pendingBooking = JSON.parse(pendingBookingStr);
-            if (pendingBooking.timezoneId) {
-              timezoneId = pendingBooking.timezoneId;
-            }
-          } catch (e) {
-            console.warn('Failed to parse pending booking:', e);
-          }
-        }
-
-        const language = 'ru';
-
-        // Prepare settings request
-        const settingsOptions = {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            timezoneId: timezoneId,
-            language: language.substring(0, 10), // Ensure max 10 characters
-          }),
-        };
-
-        // Add token to headers if available from signup response
-        if (signupToken) {
-          settingsOptions.headers.Authorization = `Bearer ${signupToken}`;
-        }
-
-        // Send user settings request
-        const settingsResponse = await fetch('/api/v1/user/setting', settingsOptions);
-
-        if (!settingsResponse.ok) {
-          // Log error but don't fail signup if settings fail
-          console.warn('Failed to save user settings:', settingsResponse.status);
-        }
-      } catch (settingsError) {
-        // Log error but don't fail signup if settings fail
-        console.warn('Error saving user settings:', settingsError);
-      }
-
+      // /registry returns 201 with no body — the backend sends a 6-digit
+      // verification code to the user's email. Redirect to login so the user
+      // can authenticate and then verify their account.
       setSuccess(true);
-      // Get return path from location state
       const returnTo = location.state?.returnTo || '/booking';
-      // Redirect to login page (or returnTo if token is available) after 2 seconds
       setTimeout(() => {
-        if (signupToken) {
-          // If token is available, redirect to returnTo
-          navigate(returnTo);
-        } else {
-          // Otherwise redirect to login with returnTo state
-          navigate('/login', { state: { returnTo } });
-        }
+        navigate('/login', { state: { returnTo, email: formData.email.trim() } });
       }, 2000);
     } catch (error) {
       console.error('Error signing up:', error);

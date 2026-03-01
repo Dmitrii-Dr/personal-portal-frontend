@@ -96,7 +96,17 @@
     "informedConsent": "Информированным добровольным согласием на психологическую помощь",
     "agreePersonalRequired": "Вы должны согласиться с обработкой персональных данных",
     "agreePsyRequired": "Вы должны согласиться с информированным добровольным согласием",
-    "loginRequired": "Ещё один шаг до записи"
+    "loginRequired": "Ещё один шаг до записи",
+    "verifyAccount": "Подтвердите аккаунт",
+    "verifyAccountDescription": "Введите 6-значный код, отправленный на вашу почту.",
+    "verificationCode": "Код подтверждения",
+    "verificationCodeRequired": "Код подтверждения обязателен",
+    "verificationCodeInvalid": "Код должен содержать ровно 6 цифр",
+    "verifying": "Проверка...",
+    "verifyAndContinue": "Подтвердить и продолжить",
+    "accountVerified": "Аккаунт подтверждён! Перенаправление...",
+    "verificationFailed": "Ошибка верификации. Пожалуйста, попробуйте снова.",
+    "noEmailProvided": "Email не найден. Пожалуйста, войдите снова."
   },
   "userMenu": {
     "myProfile": "Профиль",

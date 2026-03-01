@@ -85,6 +85,10 @@ const AppLayout = ({ children }) => {
     // Token restoration is handled separately by refreshAccessToken().
     if (!getToken()) return;
 
+    // Don't load profile on the verification page — the account is unverified
+    // and /profile will return 403 PEC-412, causing a redirect loop.
+    if (window.location.pathname === '/verify-account') return;
+
     if (isFetchingRef.current) return; // prevent concurrent fetches
 
     isFetchingRef.current = true;
