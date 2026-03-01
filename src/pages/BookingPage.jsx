@@ -1136,7 +1136,20 @@ const BookingPage = ({ sessionTypeId: propSessionTypeId, hideMyBookings = false 
       }
     } catch (err) {
       console.error('Error completing pending booking:', err);
-      // Remove pending booking to prevent infinite retries
+
+      // If the account is not yet verified (PEC-412 / 403), keep the pending booking
+      // so it is retried once the user completes verification and auth-changed fires again.
+      const isUnverified =
+        err.response?.status === 403 &&
+        err.response?.data?.code === 'PEC-412';
+
+      if (isUnverified) {
+        // Reset the attempted flag so completePendingBooking runs again after verification
+        pendingBookingAttempted.current = false;
+        return;
+      }
+
+      // Remove pending booking on any other error to prevent infinite retries
       sessionStorage.removeItem(PENDING_BOOKING_KEY);
       // Show error to user for 400/500 errors
       if (err.response && (err.response.status === 400 || err.response.status >= 500)) {

@@ -2,6 +2,8 @@ import i18n from 'i18next';
 import { initReactI18next } from 'react-i18next';
 import enTranslations from './locales/en.json';
 import ruTranslations from './locales/ru.json';
+import enErrors from './locales/errors.en.json';
+import ruErrors from './locales/errors.ru.json';
 
 // Get saved language from localStorage or default to Russian
 const getStoredLanguage = () => {
@@ -22,13 +24,17 @@ i18n
     resources: {
       en: {
         translation: enTranslations,
+        errors: enErrors,
       },
       ru: {
         translation: ruTranslations,
+        errors: ruErrors,
       },
     },
     lng: getStoredLanguage(),
     fallbackLng: 'ru',
+    ns: ['translation', 'errors'],
+    defaultNS: 'translation',
     interpolation: {
       escapeValue: false, // React already escapes values
     },

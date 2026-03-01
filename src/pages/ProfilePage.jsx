@@ -1,4 +1,5 @@
 import React, { useEffect, useState, useMemo } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { fetchWithAuth, fetchUserProfile, clearUserProfileCache, fetchUserSettings, clearUserSettingsCache, getToken } from '../utils/api';
 import { fetchTimezones, sortTimezonesByOffset, getOffsetFromTimezone, extractTimezoneOffset, findTimezoneIdByOffset } from '../utils/timezoneService';
@@ -28,6 +29,7 @@ import EditIcon from '@mui/icons-material/Edit';
 
 const ProfilePage = ({ isAdminProfile = false }) => {
   const { t } = useTranslation();
+  const navigate = useNavigate();
   const [profile, setProfile] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -194,6 +196,11 @@ const ProfilePage = ({ isAdminProfile = false }) => {
         if (!isMounted) return;
 
         if (data) {
+          // Redirect unverified users to the verification page
+          if (data.isVerified === false) {
+            navigate('/verify-account', { replace: true });
+            return;
+          }
           setProfile(data);
           setFirstName(data?.firstName || '');
           setLastName(data?.lastName || '');

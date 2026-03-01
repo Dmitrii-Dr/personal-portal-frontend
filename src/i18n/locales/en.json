@@ -100,7 +100,10 @@
     "verifyAndContinue": "Verify & Continue",
     "accountVerified": "Account verified! Redirecting...",
     "verificationFailed": "Verification failed. Please try again.",
-    "noEmailProvided": "No email found. Please log in again."
+    "noEmailProvided": "No email found. Please log in again.",
+    "resendCode": "Send code again",
+    "resendCodeIn": "Send again in {{seconds}}s",
+    "codeSentAgain": "A new verification code has been sent to your email."
   },
   "userMenu": {
     "myProfile": "My Profile",

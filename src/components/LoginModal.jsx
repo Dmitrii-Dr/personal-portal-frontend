@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { setToken, getRolesFromToken } from '../utils/api';
+import { getApiErrorMessage } from '../utils/apiErrors';
 import {
   Dialog,
   DialogTitle,
@@ -12,8 +13,10 @@ import {
   Alert,
   CircularProgress,
   Box,
+  IconButton,
   Link as MuiLink,
 } from '@mui/material';
+import CloseIcon from '@mui/icons-material/Close';
 
 const LoginModal = ({ open, onClose, onSwitchToSignUp }) => {
   const { t } = useTranslation();
@@ -105,8 +108,7 @@ const LoginModal = ({ open, onClose, onSwitchToSignUp }) => {
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({}));
         throw new Error(
-          errorData.message ||
-          `Login failed: ${response.status} ${response.statusText}`
+          getApiErrorMessage(errorData.code, errorData.message || t('auth.loginFailed'))
         );
       }
 
@@ -206,8 +208,7 @@ const LoginModal = ({ open, onClose, onSwitchToSignUp }) => {
       } else {
         const errorData = await response.json().catch(() => ({}));
         throw new Error(
-          errorData.message ||
-          `Failed to send password reset email: ${response.status} ${response.statusText}`
+          getApiErrorMessage(errorData.code, errorData.message || t('auth.loginFailed'))
         );
       }
     } catch (error) {
@@ -227,7 +228,14 @@ const LoginModal = ({ open, onClose, onSwitchToSignUp }) => {
 
   return (
     <Dialog open={open} onClose={handleClose} maxWidth="sm" fullWidth>
-      <DialogTitle>{showForgotPassword ? t('auth.forgotPasswordTitle') : t('auth.login')}</DialogTitle>
+      <DialogTitle sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', pr: 1 }}>
+        {showForgotPassword ? t('auth.forgotPasswordTitle') : t('auth.login')}
+        {showForgotPassword && (
+          <IconButton size="small" onClick={handleBackToLogin} aria-label="close">
+            <CloseIcon fontSize="small" />
+          </IconButton>
+        )}
+      </DialogTitle>
       <DialogContent>
         {showForgotPassword ? (
           <>
@@ -272,7 +280,7 @@ const LoginModal = ({ open, onClose, onSwitchToSignUp }) => {
                 fullWidth
                 variant="contained"
                 color="primary"
-                sx={{ mt: 3, mb: 2 }}
+                sx={{ mt: 3, mb: 2, textTransform: 'none' }}
                 disabled={forgotPasswordLoading || forgotPasswordSuccess}
               >
                 {forgotPasswordLoading ? (
@@ -284,17 +292,6 @@ const LoginModal = ({ open, onClose, onSwitchToSignUp }) => {
                   t('auth.sendResetLink')
                 )}
               </Button>
-
-              <Box sx={{ textAlign: 'center' }}>
-                <MuiLink
-                  component="button"
-                  type="button"
-                  onClick={handleBackToLogin}
-                  sx={{ textDecoration: 'none', cursor: 'pointer' }}
-                >
-                  {t('auth.backToLogin')}
-                </MuiLink>
-              </Box>
             </Box>
           </>
         ) : (

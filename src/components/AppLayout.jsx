@@ -66,6 +66,8 @@ const AppLayout = ({ children }) => {
   const isAgreementPage = location.pathname.startsWith('/agreement');
   // Check if we're on the About Me page where navigation buttons should be hidden
   const isAboutMePage = location.pathname === '/about-me';
+  // Check if we're on the verify-account page where navigation buttons should be hidden
+  const isVerifyAccountPage = location.pathname === '/verify-account';
 
   // Handle scroll to change header background
   useEffect(() => {
@@ -109,6 +111,21 @@ const AppLayout = ({ children }) => {
       isFetchingRef.current = false;
     }
   }, []);
+
+  // Handle account-verified event: optimistically flip isVerified in the cached
+  // userProfile so the user menu is correct immediately, then schedule a full
+  // profile reload once the user has navigated away from /verify-account.
+  useEffect(() => {
+    const handleAccountVerified = () => {
+      // Optimistic update — mark the cached profile as verified so the
+      // user menu stops redirecting to /verify-account.
+      setUserProfile((prev) => prev ? { ...prev, isVerified: true } : prev);
+      // Full reload after navigation completes (user will be on /booking by then).
+      setTimeout(() => loadUserProfile(), 2000);
+    };
+    window.addEventListener('account-verified', handleAccountVerified);
+    return () => window.removeEventListener('account-verified', handleAccountVerified);
+  }, [loadUserProfile]);
 
   // Get display name from user profile
   const getUserDisplayName = () => {
@@ -316,10 +333,8 @@ const AppLayout = ({ children }) => {
 
   const handleSignUpClose = () => {
     setSignUpModalOpen(false);
-    // If user closes signup modal without logging in (no token), clear pending booking
-    if (!getToken()) {
-      sessionStorage.removeItem('pending_booking');
-    }
+    // Don't clear pending_booking here — user may have just registered and
+    // will proceed to login + verification. BookingPage clears it after submission.
   };
 
   const handleSwitchToLogin = () => {
@@ -581,7 +596,7 @@ const AppLayout = ({ children }) => {
               )}
 
               {/* Public Navigation Links */}
-              {!isAdminRoute && !isUserPage && !isBlogPage && !isAgreementPage && !isAboutMePage && (
+              {!isAdminRoute && !isUserPage && !isBlogPage && !isAgreementPage && !isAboutMePage && !isVerifyAccountPage && (
                 <>
                   {/* Public Links - Scroll to section on landing page, navigate otherwise */}
                   {isLandingPage ? (
@@ -870,13 +885,33 @@ const AppLayout = ({ children }) => {
                     horizontal: 'right',
                   }}
                 >
-                  <MenuItem onClick={() => handleUserMenuClick('/profile')}>
+                  <MenuItem
+                    onClick={() => {
+                      if (userProfile?.isVerified === false) {
+                        handleUserMenuClose();
+                        navigate('/verify-account');
+                      } else {
+                        handleUserMenuClick('/profile');
+                      }
+                    }}
+                    disabled={isVerifyAccountPage}
+                  >
                     <ListItemIcon>
                       <PersonIcon fontSize="small" />
                     </ListItemIcon>
                     <ListItemText>{t('userMenu.myProfile')}</ListItemText>
                   </MenuItem>
-                  <MenuItem onClick={() => handleUserMenuClick('/booking')}>
+                  <MenuItem
+                    onClick={() => {
+                      if (userProfile?.isVerified === false) {
+                        handleUserMenuClose();
+                        navigate('/verify-account');
+                      } else {
+                        handleUserMenuClick('/booking');
+                      }
+                    }}
+                    disabled={isVerifyAccountPage}
+                  >
                     <ListItemIcon>
                       <BookOnlineIcon fontSize="small" />
                     </ListItemIcon>
