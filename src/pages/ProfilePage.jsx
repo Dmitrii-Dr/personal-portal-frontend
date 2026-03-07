@@ -1,7 +1,8 @@
-import React, { useEffect, useState, useMemo } from 'react';
+import React, { useEffect, useState, useMemo, useRef, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { fetchWithAuth, fetchUserProfile, clearUserProfileCache, fetchUserSettings, clearUserSettingsCache, getToken } from '../utils/api';
+import { SELECTABLE_AVATARS, DEFAULT_AVATAR_ID, getSelectedAvatar, setSelectedAvatar as storeSetSelectedAvatar } from '../utils/avatarStore';
 import { fetchTimezones, sortTimezonesByOffset, getOffsetFromTimezone, extractTimezoneOffset, findTimezoneIdByOffset } from '../utils/timezoneService';
 import {
   Box,
@@ -24,8 +25,12 @@ import {
   FormControlLabel,
   CardHeader,
   Snackbar,
+  Avatar,
+  Tooltip,
 } from '@mui/material';
 import EditIcon from '@mui/icons-material/Edit';
+import ChevronLeftIcon from '@mui/icons-material/ChevronLeft';
+import ChevronRightIcon from '@mui/icons-material/ChevronRight';
 
 const ProfilePage = ({ isAdminProfile = false }) => {
   const { t } = useTranslation();
@@ -45,6 +50,61 @@ const ProfilePage = ({ isAdminProfile = false }) => {
   const [editingFirstName, setEditingFirstName] = useState(false);
   const [editingLastName, setEditingLastName] = useState(false);
   const [editingPhoneNumber, setEditingPhoneNumber] = useState(false);
+
+  // Avatar selection state
+  const [selectedAvatarId, setSelectedAvatarId] = useState(() => getSelectedAvatar()?.id ?? null);
+
+  // Keep in sync when another component updates the avatar
+  useEffect(() => {
+    const handleAvatarChanged = () => {
+      setSelectedAvatarId(getSelectedAvatar()?.id ?? null);
+    };
+    window.addEventListener('avatar-changed', handleAvatarChanged);
+    return () => window.removeEventListener('avatar-changed', handleAvatarChanged);
+  }, []);
+
+  const handleSelectAvatar = (id) => {
+    // Clicking the already-selected avatar resets to default (0)
+    storeSetSelectedAvatar(id === selectedAvatarId ? DEFAULT_AVATAR_ID : id);
+  };
+
+  // Avatar scroll carousel
+  const avatarScrollRef = useRef(null);
+  const [canScrollLeft, setCanScrollLeft] = useState(false);
+  const [canScrollRight, setCanScrollRight] = useState(true);
+
+  const updateScrollButtons = useCallback(() => {
+    const el = avatarScrollRef.current;
+    if (!el) return;
+    setCanScrollLeft(el.scrollLeft > 0);
+    setCanScrollRight(el.scrollLeft + el.clientWidth < el.scrollWidth - 1);
+  }, []);
+
+  useEffect(() => {
+    const el = avatarScrollRef.current;
+    if (!el) return;
+    updateScrollButtons();
+    el.addEventListener('scroll', updateScrollButtons);
+    // Convert vertical mouse-wheel to horizontal scroll so the page doesn't scroll
+    const handleWheel = (e) => {
+      if (e.deltaY !== 0) {
+        e.preventDefault();
+        el.scrollBy({ left: e.deltaY, behavior: 'auto' });
+      }
+    };
+    el.addEventListener('wheel', handleWheel, { passive: false });
+    return () => {
+      el.removeEventListener('scroll', updateScrollButtons);
+      el.removeEventListener('wheel', handleWheel);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [updateScrollButtons, loading]); // `loading` needed: card is in a conditional so ref is null until loading=false
+
+  const scrollAvatars = (direction) => {
+    const el = avatarScrollRef.current;
+    if (!el) return;
+    el.scrollBy({ left: direction * 300, behavior: 'smooth' });
+  };
 
   // Settings state
   const [settings, setSettings] = useState(null);
@@ -524,6 +584,116 @@ const ProfilePage = ({ isAdminProfile = false }) => {
               </Alert>
             )}
 
+
+            {/* Profile Picture Card */}
+            <Card sx={{ mb: 4 }}>
+              <CardHeader
+                title={t('pages.profile.profilePicture')}
+                titleTypographyProps={{ variant: 'h6' }}
+              />
+              <Divider />
+              <CardContent>
+                <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+                  {t('pages.profile.selectAvatar')}
+                </Typography>
+
+                {/* Scrollable avatar carousel */}
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                  {/* Left arrow */}
+                  <IconButton
+                    onClick={() => scrollAvatars(-1)}
+                    disabled={!canScrollLeft}
+                    size="small"
+                    sx={{ flexShrink: 0 }}
+                  >
+                    <ChevronLeftIcon />
+                  </IconButton>
+
+                  {/* Scroll track */}
+                  <Box
+                    ref={avatarScrollRef}
+                    sx={{
+                      display: 'flex',
+                      gap: 2,
+                      overflowX: 'auto',
+                      overflowY: 'hidden',
+                      flexGrow: 1,
+                      py: 1,
+                      scrollbarWidth: 'none',
+                      '&::-webkit-scrollbar': { display: 'none' },
+                    }}
+                  >
+                    {/* Default tile */}
+                    <Tooltip title="Default (no avatar)" arrow>
+                      <Box
+                        onClick={() => handleSelectAvatar(DEFAULT_AVATAR_ID)}
+                        sx={{
+                          cursor: 'pointer',
+                          borderRadius: '50%',
+                          p: '3px',
+                          flexShrink: 0,
+                          border: selectedAvatarId === DEFAULT_AVATAR_ID ? '3px solid' : '3px solid transparent',
+                          borderColor: selectedAvatarId === DEFAULT_AVATAR_ID ? 'primary.main' : 'transparent',
+                          transition: 'all 0.2s ease-in-out',
+                          '&:hover': {
+                            borderColor: selectedAvatarId === DEFAULT_AVATAR_ID ? 'primary.main' : 'primary.light',
+                            transform: 'scale(1.08)',
+                          },
+                          boxShadow: selectedAvatarId === DEFAULT_AVATAR_ID ? 3 : 0,
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          width: 78,
+                          height: 78,
+                          bgcolor: 'action.hover',
+                        }}
+                      >
+                        <Avatar sx={{ width: 72, height: 72, bgcolor: 'grey.300' }} />
+                      </Box>
+                    </Tooltip>
+
+                    {/* Avatars 1–N */}
+                    {SELECTABLE_AVATARS.map((avatar) => {
+                      const isSelected = selectedAvatarId === avatar.id;
+                      return (
+                        <Tooltip key={avatar.id} title={avatar.label} arrow>
+                          <Box
+                            onClick={() => handleSelectAvatar(avatar.id)}
+                            sx={{
+                              cursor: 'pointer',
+                              borderRadius: '50%',
+                              flexShrink: 0,
+                              p: '3px',
+                              border: isSelected ? '3px solid' : '3px solid transparent',
+                              borderColor: isSelected ? 'primary.main' : 'transparent',
+                              transition: 'all 0.2s ease-in-out',
+                              '&:hover': {
+                                borderColor: isSelected ? 'primary.main' : 'primary.light',
+                                transform: 'scale(1.08)',
+                              },
+                              boxShadow: isSelected ? 3 : 0,
+                            }}
+                          >
+                            <Avatar src={avatar.src} alt={avatar.label} sx={{ width: 72, height: 72 }} />
+                          </Box>
+                        </Tooltip>
+                      );
+                    })}
+                  </Box>
+
+                  {/* Right arrow */}
+                  <IconButton
+                    onClick={() => scrollAvatars(1)}
+                    disabled={!canScrollRight}
+                    size="small"
+                    sx={{ flexShrink: 0 }}
+                  >
+                    <ChevronRightIcon />
+                  </IconButton>
+                </Box>
+              </CardContent>
+
+            </Card>
 
             {/* Personal Information Card */}
             <Card sx={{ mb: 4 }}>

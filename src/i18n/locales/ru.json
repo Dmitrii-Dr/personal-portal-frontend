@@ -277,7 +277,9 @@
       "failedToLoadProfile": "Не удалось загрузить профиль",
       "failedToLoadSettings": "Не удалось загрузить настройки. Пожалуйста, попробуйте снова.",
       "failedToUpdateProfile": "Не удалось обновить профиль",
-      "failedToUpdateSettings": "Не удалось обновить настройки"
+      "failedToUpdateSettings": "Не удалось обновить настройки",
+      "profilePicture": "Аватар профиля",
+      "selectAvatar": "Выберите аватар для вашего профиля"
     },
     "blog": {
       "title": "Блог",

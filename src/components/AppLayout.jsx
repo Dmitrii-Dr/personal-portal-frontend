@@ -24,6 +24,7 @@ import {
   ListItemIcon,
   ListItemText,
   Divider,
+  Avatar,
 } from '@mui/material';
 import LogoutIcon from '@mui/icons-material/Logout';
 import AccountCircleIcon from '@mui/icons-material/AccountCircle';
@@ -34,6 +35,7 @@ import PersonIcon from '@mui/icons-material/Person';
 import LanguageIcon from '@mui/icons-material/Language';
 import LoginModal from './LoginModal';
 import SignUpModal from './SignUpModal';
+import { getSelectedAvatar } from '../utils/avatarStore';
 
 const AppLayout = ({ children }) => {
   const { t, i18n } = useTranslation();
@@ -53,6 +55,17 @@ const AppLayout = ({ children }) => {
   const userMenuOpen = Boolean(userMenuAnchorEl);
   const [languageMenuAnchorEl, setLanguageMenuAnchorEl] = useState(null);
   const languageMenuOpen = Boolean(languageMenuAnchorEl);
+
+  // Track selected profile avatar
+  const [selectedAvatar, setSelectedAvatar] = useState(() => getSelectedAvatar());
+
+  useEffect(() => {
+    const handleAvatarChanged = () => {
+      setSelectedAvatar(getSelectedAvatar());
+    };
+    window.addEventListener('avatar-changed', handleAvatarChanged);
+    return () => window.removeEventListener('avatar-changed', handleAvatarChanged);
+  }, []);
 
   // Check if current route is an admin route
   const isAdminRoute = location.pathname.startsWith('/admin');
@@ -833,7 +846,11 @@ const AppLayout = ({ children }) => {
                           },
                         }}
                       >
-                        <AccountCircleIcon sx={{ fontSize: 40 }} />
+                        {selectedAvatar ? (
+                          <Avatar src={selectedAvatar.src} alt={selectedAvatar.label} sx={{ width: 40, height: 40 }} />
+                        ) : (
+                          <AccountCircleIcon sx={{ fontSize: 40 }} />
+                        )}
                       </IconButton>
                       <Box
                         sx={{
@@ -967,7 +984,11 @@ const AppLayout = ({ children }) => {
                           },
                         }}
                       >
-                        <AccountCircleIcon sx={{ fontSize: 40 }} />
+                        {selectedAvatar ? (
+                          <Avatar src={selectedAvatar.src} alt={selectedAvatar.label} sx={{ width: 40, height: 40 }} />
+                        ) : (
+                          <AccountCircleIcon sx={{ fontSize: 40 }} />
+                        )}
                       </IconButton>
                       <Box
                         sx={{

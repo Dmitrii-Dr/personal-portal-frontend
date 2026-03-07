@@ -272,7 +272,9 @@
       "failedToLoadProfile": "Failed to load profile",
       "failedToLoadSettings": "Failed to load settings. Please try again.",
       "failedToUpdateProfile": "Failed to update profile",
-      "failedToUpdateSettings": "Failed to update settings"
+      "failedToUpdateSettings": "Failed to update settings",
+      "profilePicture": "Profile Picture",
+      "selectAvatar": "Choose an avatar for your profile"
     },
     "blog": {
       "title": "Blog",
