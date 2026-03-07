@@ -51,21 +51,38 @@ const ProfilePage = ({ isAdminProfile = false }) => {
   const [editingLastName, setEditingLastName] = useState(false);
   const [editingPhoneNumber, setEditingPhoneNumber] = useState(false);
 
-  // Avatar selection state
-  const [selectedAvatarId, setSelectedAvatarId] = useState(() => getSelectedAvatar()?.id ?? null);
+  // Avatar selection state – initialised from the profile API (avatarId field)
+  const [selectedAvatarId, setSelectedAvatarId] = useState(DEFAULT_AVATAR_ID);
+  // The value that was last saved/loaded from the server, used to detect unsaved changes
+  const [savedAvatarId, setSavedAvatarId] = useState(DEFAULT_AVATAR_ID);
 
-  // Keep in sync when another component updates the avatar
+  // Keep in sync when another component updates the store
   useEffect(() => {
     const handleAvatarChanged = () => {
-      setSelectedAvatarId(getSelectedAvatar()?.id ?? null);
+      setSelectedAvatarId(getSelectedAvatar()?.id ?? DEFAULT_AVATAR_ID);
     };
     window.addEventListener('avatar-changed', handleAvatarChanged);
     return () => window.removeEventListener('avatar-changed', handleAvatarChanged);
   }, []);
 
+  // When leaving the page without saving, revert the global store to the last
+  // saved value so the navbar avatar does NOT show unsaved picks.
+  const savedAvatarIdRef = React.useRef(savedAvatarId);
+  useEffect(() => { savedAvatarIdRef.current = savedAvatarId; }, [savedAvatarId]);
+  useEffect(() => {
+    return () => {
+      storeSetSelectedAvatar(savedAvatarIdRef.current);
+    };
+  }, []); // runs only on unmount
+
   const handleSelectAvatar = (id) => {
-    // Clicking the already-selected avatar resets to default (0)
-    storeSetSelectedAvatar(id === selectedAvatarId ? DEFAULT_AVATAR_ID : id);
+    // Toggle: clicking the already-selected avatar resets to default (0)
+    const next = id === selectedAvatarId ? DEFAULT_AVATAR_ID : id;
+    // Update local state AND the global store so the navbar previews the pick
+    // immediately. The unmount cleanup will revert the store to savedAvatarId
+    // if the user leaves without saving.
+    setSelectedAvatarId(next);
+    storeSetSelectedAvatar(next);
   };
 
   // Avatar scroll carousel
@@ -265,6 +282,10 @@ const ProfilePage = ({ isAdminProfile = false }) => {
           setFirstName(data?.firstName || '');
           setLastName(data?.lastName || '');
           setPhoneNumber(data?.phoneNumber || '');
+          // Seed avatar from profile
+          const profileAvatarId = data?.avatarId ?? DEFAULT_AVATAR_ID;
+          setSavedAvatarId(profileAvatarId);
+          storeSetSelectedAvatar(profileAvatarId);
         } else {
           setError(t('pages.profile.noProfileData'));
         }
@@ -366,7 +387,10 @@ const ProfilePage = ({ isAdminProfile = false }) => {
 
   // Check if there are any changes (memoized for reactivity)
   const hasChanges = useMemo(() => {
+    const avatarChanged = selectedAvatarId !== savedAvatarId;
+
     const profileChanged =
+      avatarChanged ||
       (firstName || '').trim() !== (profile?.firstName || '') ||
       (lastName || '').trim() !== (profile?.lastName || '') ||
       (phoneNumber || '').trim() !== (profile?.phoneNumber || '');
@@ -378,14 +402,17 @@ const ProfilePage = ({ isAdminProfile = false }) => {
       settingsFormData.emailNotificationEnabled !== (settings?.emailNotificationEnabled ?? true);
 
     return profileChanged || settingsChanged;
-  }, [firstName, lastName, phoneNumber, profile?.firstName, profile?.lastName, profile?.phoneNumber, settingsFormData.timezone, settingsFormData.language, settingsFormData.currency, settingsFormData.emailNotificationEnabled, settings?.timezone, settings?.language, settings?.currency, settings?.emailNotificationEnabled]);
+  }, [firstName, lastName, phoneNumber, profile?.firstName, profile?.lastName, profile?.phoneNumber, selectedAvatarId, savedAvatarId, settingsFormData.timezone, settingsFormData.language, settingsFormData.currency, settingsFormData.emailNotificationEnabled, settings?.timezone, settings?.language, settings?.currency, settings?.emailNotificationEnabled]);
 
   const handleSave = async () => {
     setSaveError('');
     setSaveSuccess('');
 
     // Track what needs to be saved
+    const avatarChanged = selectedAvatarId !== savedAvatarId;
+
     const profileChanged =
+      avatarChanged ||
       (firstName || '').trim() !== (profile?.firstName || '') ||
       (lastName || '').trim() !== (profile?.lastName || '') ||
       (phoneNumber || '').trim() !== (profile?.phoneNumber || '');
@@ -416,13 +443,14 @@ const ProfilePage = ({ isAdminProfile = false }) => {
 
     const errors = [];
 
-    // Save profile if changed
+    // Save profile if changed (includes avatar)
     if (profileChanged) {
       try {
         const body = {
           firstName: (firstName || '').trim(),
           lastName: (lastName || '').trim(),
           phoneNumber: (phoneNumber || '').trim(),
+          avatarId: selectedAvatarId,
         };
         const res = await fetchWithAuth('/api/v1/user/profile', {
           method: 'PUT',
@@ -442,8 +470,12 @@ const ProfilePage = ({ isAdminProfile = false }) => {
         } catch {
           // response might have no body
         }
-        const newProfile = updated || { ...(profile || {}), firstName: body.firstName, lastName: body.lastName, phoneNumber: body.phoneNumber };
+        const newProfile = updated || { ...(profile || {}), firstName: body.firstName, lastName: body.lastName, phoneNumber: body.phoneNumber, avatarId: body.avatarId };
         setProfile(newProfile);
+        // Update saved avatar baseline so hasChanges resets correctly
+        setSavedAvatarId(selectedAvatarId);
+        // Commit the avatar to the global store NOW (safe: user clicked Save)
+        storeSetSelectedAvatar(selectedAvatarId);
         // Clear cache so next fetch gets fresh data
         clearUserProfileCache();
         // Reset editing states to show pencil icons again
@@ -978,11 +1010,11 @@ const ProfilePage = ({ isAdminProfile = false }) => {
         </Grid>
       )}
 
-      {/* Success Snackbar */}
+      {/* Success Snackbar – auto-dismisses after 4 s; ignores clickaway */}
       <Snackbar
         open={!!saveSuccess}
-        autoHideDuration={3000}
-        onClose={() => setSaveSuccess('')}
+        autoHideDuration={4000}
+        onClose={(_, reason) => { if (reason !== 'clickaway') setSaveSuccess(''); }}
         anchorOrigin={{ vertical: 'top', horizontal: 'right' }}
         sx={{ mt: { xs: 8, sm: 9, md: 10 } }}
       >

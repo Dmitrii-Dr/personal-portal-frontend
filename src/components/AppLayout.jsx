@@ -35,7 +35,7 @@ import PersonIcon from '@mui/icons-material/Person';
 import LanguageIcon from '@mui/icons-material/Language';
 import LoginModal from './LoginModal';
 import SignUpModal from './SignUpModal';
-import { getSelectedAvatar } from '../utils/avatarStore';
+import { getSelectedAvatar, setSelectedAvatar as storeSetSelectedAvatar, DEFAULT_AVATAR_ID } from '../utils/avatarStore';
 
 const AppLayout = ({ children }) => {
   const { t, i18n } = useTranslation();
@@ -115,6 +115,9 @@ const AppLayout = ({ children }) => {
       if (data) {
         setUserProfile(data);
         setHasToken(true);
+        // Seed the avatar store so the navbar icon is correct on every page,
+        // not only after the user visits /profile.
+        storeSetSelectedAvatar(data.avatarId ?? DEFAULT_AVATAR_ID);
         window.dispatchEvent(new CustomEvent('user-profile-loaded', { detail: data }));
       }
     } catch (error) {
@@ -125,20 +128,36 @@ const AppLayout = ({ children }) => {
     }
   }, []);
 
+  // Tracks whether we should reload the user profile as soon as we navigate
+  // away from /verify-account (e.g. right after successful activation).
+  const pendingProfileReloadRef = useRef(false);
+
   // Handle account-verified event: optimistically flip isVerified in the cached
   // userProfile so the user menu is correct immediately, then schedule a full
-  // profile reload once the user has navigated away from /verify-account.
+  // profile reload for when the location changes away from /verify-account.
+  // (loadUserProfile has a guard that skips it on /verify-account, so we can't
+  // call it synchronously here — the navigation hasn't happened yet.)
   useEffect(() => {
     const handleAccountVerified = () => {
       // Optimistic update — mark the cached profile as verified so the
       // user menu stops redirecting to /verify-account.
       setUserProfile((prev) => prev ? { ...prev, isVerified: true } : prev);
-      // Full reload after navigation completes (user will be on /booking by then).
-      setTimeout(() => loadUserProfile(), 2000);
+      // Flag a reload to be executed once we leave /verify-account.
+      pendingProfileReloadRef.current = true;
     };
     window.addEventListener('account-verified', handleAccountVerified);
     return () => window.removeEventListener('account-verified', handleAccountVerified);
-  }, [loadUserProfile]);
+  }, []);
+
+  // When we navigate away from /verify-account and a reload was pending
+  // (set by the account-verified handler), trigger it now. This guarantees
+  // the profile cache holds isVerified: true before the user can reach /profile.
+  useEffect(() => {
+    if (location.pathname !== '/verify-account' && pendingProfileReloadRef.current) {
+      pendingProfileReloadRef.current = false;
+      loadUserProfile();
+    }
+  }, [location.pathname, loadUserProfile]);
 
   // Get display name from user profile
   const getUserDisplayName = () => {

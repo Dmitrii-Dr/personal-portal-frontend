@@ -34,6 +34,17 @@ const AccountVerificationPage = () => {
     const [resendSuccess, setResendSuccess] = useState(false);
     const checkedRef = useRef(false);
     const cooldownRef = useRef(null);
+    const navTimerRef = useRef(null);
+
+    // Cancel any pending navigation timer when the component unmounts.
+    // This prevents the 1500ms delayed navigate() from firing if the user
+    // has already navigated away (e.g. clicked "My Profile" right after
+    // the verification success screen appeared).
+    useEffect(() => {
+        return () => {
+            if (navTimerRef.current) clearTimeout(navTimerRef.current);
+        };
+    }, []);
 
     // On mount: fetch /user/profile to:
     // 1. Get the email (available even for unverified accounts)
@@ -150,7 +161,7 @@ const AccountVerificationPage = () => {
                 window.dispatchEvent(new Event('account-verified'));
 
                 setSuccess(true);
-                setTimeout(() => {
+                navTimerRef.current = setTimeout(() => {
                     navigate(returnTo, { replace: true });
                 }, 1500);
                 return;
