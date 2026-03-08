@@ -490,7 +490,7 @@ const AppLayout = ({ children }) => {
           transition: 'all 0.3s ease-in-out',
         }}
       >
-        <Toolbar sx={{ minHeight: { xs: 56, sm: 64 }, position: 'relative' }}>
+        <Toolbar sx={{ minHeight: { xs: 64, sm: 64 }, height: { xs: 64, sm: 64 }, position: 'relative' }}>
           {/* Mobile Hamburger Menu Icon (Aligned Left, Landing Page Only) */}
           {isMobile && isLandingPage && (
             <IconButton
@@ -1178,7 +1178,7 @@ const AppLayout = ({ children }) => {
                   },
                 }}
               >
-                <Box sx={{ height: { xs: 56, sm: 64 }, minHeight: { xs: 56, sm: 64 }, bgcolor: drawerTopColor, width: '100%' }} />
+                <Box sx={{ height: { xs: 64, sm: 64 }, minHeight: { xs: 64, sm: 64 }, bgcolor: drawerTopColor, width: '100%' }} />
                 <Divider />
                 <List onClick={() => setMobileOpen(false)} sx={{ bgcolor: 'transparent' }}>
                   {/* Landing Page Home Link - Scroll to hero */}
