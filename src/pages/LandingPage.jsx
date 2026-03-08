@@ -522,7 +522,7 @@ const LandingPage = () => {
             <Box
               sx={{
                 position: 'absolute',
-                bottom: '10%',
+                bottom: '25%',
                 left: 0,
                 right: 0,
                 display: 'flex',
@@ -538,12 +538,13 @@ const LandingPage = () => {
                   py: { xs: 1.2, sm: 1.8 },
                   fontSize: { xs: '0.9rem', sm: '1.1rem' },
                   textTransform: 'none',
-                  bgcolor: 'white',
-                  color: '#2C5F5F',
+                  bgcolor: heroButtonColour,
+                  color: heroButtonTextColour,
                   fontWeight: 600,
                   boxShadow: '0 4px 20px rgba(0,0,0,0.25)',
                   '&:hover': {
-                    bgcolor: 'grey.100',
+                    bgcolor: heroButtonColour,
+                    filter: 'brightness(0.95)',
                   },
                 }}
               >

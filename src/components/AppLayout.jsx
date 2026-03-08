@@ -25,6 +25,12 @@ import {
   ListItemText,
   Divider,
   Avatar,
+  useMediaQuery,
+  useTheme,
+  Drawer,
+  List,
+  ListItem,
+  ListItemButton,
 } from '@mui/material';
 import LogoutIcon from '@mui/icons-material/Logout';
 import AccountCircleIcon from '@mui/icons-material/AccountCircle';
@@ -33,6 +39,7 @@ import HomeIcon from '@mui/icons-material/Home';
 import BookOnlineIcon from '@mui/icons-material/BookOnline';
 import PersonIcon from '@mui/icons-material/Person';
 import LanguageIcon from '@mui/icons-material/Language';
+import MenuIcon from '@mui/icons-material/Menu';
 import LoginModal from './LoginModal';
 import SignUpModal from './SignUpModal';
 import { getSelectedAvatar, setSelectedAvatar as storeSetSelectedAvatar, DEFAULT_AVATAR_ID } from '../utils/avatarStore';
@@ -56,8 +63,30 @@ const AppLayout = ({ children }) => {
   const [languageMenuAnchorEl, setLanguageMenuAnchorEl] = useState(null);
   const languageMenuOpen = Boolean(languageMenuAnchorEl);
 
+  const theme = useTheme();
+  const isMobile = useMediaQuery(theme.breakpoints.down('md'));
+  const [mobileOpen, setMobileOpen] = useState(false);
+  const [drawerTopColor, setDrawerTopColor] = useState('#d6baab');
+
   // Track selected profile avatar
   const [selectedAvatar, setSelectedAvatar] = useState(() => getSelectedAvatar());
+
+  useEffect(() => {
+    const fetchWelcomeData = async () => {
+      try {
+        const response = await fetch('/api/v1/public/welcome');
+        if (response.ok) {
+          const data = await response.json();
+          if (data && data.extendedParameters && data.extendedParameters.welcomeLeftColourHex) {
+            setDrawerTopColor(data.extendedParameters.welcomeLeftColourHex);
+          }
+        }
+      } catch (error) {
+        console.error('Error fetching welcome data for drawer coloring:', error);
+      }
+    };
+    fetchWelcomeData();
+  }, []);
 
   useEffect(() => {
     const handleAvatarChanged = () => {
@@ -462,6 +491,19 @@ const AppLayout = ({ children }) => {
         }}
       >
         <Toolbar sx={{ minHeight: { xs: 56, sm: 64 }, position: 'relative' }}>
+          {/* Mobile Hamburger Menu Icon (Aligned Left, Landing Page Only) */}
+          {isMobile && isLandingPage && (
+            <IconButton
+              color="inherit"
+              aria-label="open drawer"
+              edge="start"
+              onClick={() => setMobileOpen(true)}
+              sx={{ mr: 2, display: { md: 'none' } }}
+            >
+              <MenuIcon />
+            </IconButton>
+          )}
+
           {/* Home Button - Top Left */}
           {!isAdminRoute && (
             isLandingPage ? (
@@ -472,6 +514,7 @@ const AppLayout = ({ children }) => {
                   size="medium"
                   aria-label="home"
                   sx={{
+                    display: { xs: 'none', md: 'inline-flex' },
                     mr: { xs: 1, sm: 2 },
                     transition: 'all 0.2s ease-in-out',
                     '&:hover': {
@@ -484,32 +527,50 @@ const AppLayout = ({ children }) => {
                 </IconButton>
               </Tooltip>
             ) : (
-              <Button
-                onClick={() => navigate('/')}
-                color="inherit"
-                startIcon={<HomeIcon />}
-                sx={{
-                  mr: { xs: 1, sm: 2 },
-                  textTransform: 'none',
-                  fontWeight: 500,
-                  fontSize: { xs: '0.875rem', sm: '0.9375rem' },
-                  px: { xs: 1, sm: 1.5 },
-                  py: 1,
-                  borderRadius: 1,
-                  transition: 'all 0.2s ease-in-out',
-                  '&:hover': {
-                    bgcolor: 'rgba(255, 255, 255, 0.1)',
-                    transform: 'translateY(-1px)',
-                  },
-                }}
-              >
-                {t('navigation.home')}
-              </Button>
+              <>
+                {/* Mobile Home Icon (Only on non-landing pages) */}
+                <IconButton
+                  onClick={() => navigate('/')}
+                  color="inherit"
+                  size="medium"
+                  aria-label="home"
+                  sx={{
+                    display: { xs: 'inline-flex', md: 'none' },
+                    mr: { xs: 1, sm: 2 },
+                  }}
+                >
+                  <HomeIcon />
+                </IconButton>
+
+                {/* Desktop Home Button (with text) */}
+                <Button
+                  onClick={() => navigate('/')}
+                  color="inherit"
+                  startIcon={<HomeIcon />}
+                  sx={{
+                    display: { xs: 'none', md: 'inline-flex' },
+                    mr: { xs: 1, sm: 2 },
+                    textTransform: 'none',
+                    fontWeight: 500,
+                    fontSize: { xs: '0.875rem', sm: '0.9375rem' },
+                    px: { xs: 1, sm: 1.5 },
+                    py: 1,
+                    borderRadius: 1,
+                    transition: 'all 0.2s ease-in-out',
+                    '&:hover': {
+                      bgcolor: 'rgba(255, 255, 255, 0.1)',
+                      transform: 'translateY(-1px)',
+                    },
+                  }}
+                >
+                  {t('navigation.home')}
+                </Button>
+              </>
             )
           )}
 
-          {/* Navigation Links */}
-          <Box sx={{ flexGrow: 1, display: 'flex', justifyContent: 'center' }}>
+          {/* Navigation Links (Desktop) */}
+          <Box sx={{ flexGrow: 1, display: { xs: 'none', md: 'flex' }, justifyContent: 'center' }}>
             <Stack
               direction="row"
               spacing={{ xs: 1, sm: 2, md: 3 }}
@@ -779,7 +840,7 @@ const AppLayout = ({ children }) => {
           </Box>
 
           {/* Right side: Language selector, User menu and Login button */}
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, ml: 'auto' }}>
             {/* Language Selector */}
             <Tooltip title={i18n.language === 'ru' ? 'Русский' : 'English'} arrow>
               <IconButton
@@ -1095,6 +1156,76 @@ const AppLayout = ({ children }) => {
                   <LoginIcon />
                 </IconButton>
               </Tooltip>
+            )}
+
+            {/* Mobile Drawer */}
+            {isMobile && isLandingPage && (
+              <Drawer
+                anchor="left"
+                open={mobileOpen}
+                onClose={() => setMobileOpen(false)}
+                ModalProps={{
+                  keepMounted: true, // Better open performance on mobile.
+                }}
+                sx={{
+                  display: { xs: 'block', md: 'none' },
+                  '& .MuiDrawer-paper': {
+                    boxSizing: 'border-box',
+                    width: 250,
+                    bgcolor: 'rgba(255, 255, 255, 0.75)',
+                    backdropFilter: 'blur(10px)',
+                    borderRight: '1px solid rgba(255, 255, 255, 0.2)'
+                  },
+                }}
+              >
+                <Box sx={{ height: { xs: 56, sm: 64 }, minHeight: { xs: 56, sm: 64 }, bgcolor: drawerTopColor, width: '100%' }} />
+                <Divider />
+                <List onClick={() => setMobileOpen(false)} sx={{ bgcolor: 'transparent' }}>
+                  {/* Landing Page Home Link - Scroll to hero */}
+                  {(isLandingPage && !isAdminRoute) && (
+                    <ListItem disablePadding>
+                      <ListItemButton onClick={() => scrollToSection('hero')}>
+                        <ListItemText primary={t('navigation.home')} />
+                      </ListItemButton>
+                    </ListItem>
+                  )}
+
+                  {/* Public Navigation Links */}
+                  {!isAdminRoute && !isUserPage && !isBlogPage && !isAgreementPage && !isAboutMePage && !isVerifyAccountPage && (
+                    <>
+                      {isLandingPage && (
+                        <>
+                          <ListItem disablePadding>
+                            <ListItemButton onClick={() => scrollToSection('about')}>
+                              <ListItemText primary={t('navigation.about')} />
+                            </ListItemButton>
+                          </ListItem>
+                          <ListItem disablePadding>
+                            <ListItemButton onClick={() => scrollToSection('services')}>
+                              <ListItemText primary={t('navigation.services')} />
+                            </ListItemButton>
+                          </ListItem>
+                          <ListItem disablePadding>
+                            <ListItemButton onClick={() => scrollToSection('blog')}>
+                              <ListItemText primary={t('navigation.blog')} />
+                            </ListItemButton>
+                          </ListItem>
+                          <ListItem disablePadding>
+                            <ListItemButton onClick={() => scrollToSection('testimonials')}>
+                              <ListItemText primary={t('navigation.testimonials')} />
+                            </ListItemButton>
+                          </ListItem>
+                          <ListItem disablePadding>
+                            <ListItemButton onClick={() => scrollToSection('contact')}>
+                              <ListItemText primary={t('navigation.contact')} />
+                            </ListItemButton>
+                          </ListItem>
+                        </>
+                      )}
+                    </>
+                  )}
+                </List>
+              </Drawer>
             )}
           </Box>
         </Toolbar>
