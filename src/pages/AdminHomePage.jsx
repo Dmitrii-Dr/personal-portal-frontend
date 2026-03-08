@@ -75,6 +75,12 @@ const AdminHomePage = () => {
   const [educationMediaId, setEducationMediaId] = useState(null);
   const [reviewMediaIds, setReviewMediaIds] = useState([]);
 
+  // Hero frame background colours (customisable, stored in extendedParameters)
+  const [welcomeLeftColour, setWelcomeLeftColour] = useState('#d6baab');
+  const [welcomeRightColour, setWelcomeRightColour] = useState('#7f7d72');
+  const [welcomeButtonColour, setWelcomeButtonColour] = useState('#ffffff');
+  const [welcomeButtonTextColour, setWelcomeButtonTextColour] = useState('#2C5F5F');
+
   // Image upload states
   const [uploadingWelcomeRightImage, setUploadingWelcomeRightImage] = useState(false);
   const [uploadingWelcomeLeftImage, setUploadingWelcomeLeftImage] = useState(false);
@@ -173,6 +179,13 @@ const AdminHomePage = () => {
         setEducationMediaId(data.educationMediaId || null);
         setReviewMediaIds(data.reviewMediaIds || []);
         setWelcomeArticleIds(data.welcomeArticleIds || []);
+
+        // Read hero frame colours from extendedParameters
+        const ep = data.extendedParameters || {};
+        setWelcomeLeftColour(ep.welcomeLeftColourHex || '#d6baab');
+        setWelcomeRightColour(ep.welcomeRightColourHex || '#7f7d72');
+        setWelcomeButtonColour(ep.welcomeBookSessionButtonColourHex || '#ffffff');
+        setWelcomeButtonTextColour(ep.welcomeBookSessionButtonTextColourHex || '#2C5F5F');
 
         // Load contact links if available
         if (data.contact && Array.isArray(data.contact)) {
@@ -783,6 +796,14 @@ const AdminHomePage = () => {
           reviewMediaIds: reviewMediaIds,
           welcomeArticleIds: welcomeArticleIds,
           contact: formatContactForBackend(),
+          // Merge colour keys into any existing extendedParameters — do NOT wipe other keys
+          extendedParameters: {
+            ...(welcomeData?.extendedParameters || {}),
+            welcomeLeftColourHex: welcomeLeftColour,
+            welcomeRightColourHex: welcomeRightColour,
+            welcomeBookSessionButtonColourHex: welcomeButtonColour,
+            welcomeBookSessionButtonTextColourHex: welcomeButtonTextColour,
+          },
         }),
       });
 
@@ -957,6 +978,136 @@ const AdminHomePage = () => {
               </Grid>
             ))}
           </Grid>
+
+          {/* ── Hero Frame Background Colours ── */}
+          <Box sx={{ mt: 3 }}>
+            <Paper
+              elevation={0}
+              sx={{
+                p: 2.5,
+                border: '1px solid',
+                borderColor: 'divider',
+                borderRadius: 2,
+              }}
+            >
+              <Typography variant="subtitle1" fontWeight={600} gutterBottom>
+                {t('admin.home.frameBackgroundColours', 'Frame Background Colours')}
+              </Typography>
+              <Typography variant="caption" color="text.secondary" display="block" sx={{ mb: 2 }}>
+                {t('admin.home.frameBackgroundColoursSubtitle', 'Shown when no photo is uploaded, and fills the sides beyond 1920 px on wide screens.')}
+              </Typography>
+              <Box sx={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
+                {/* Left colour */}
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+                  <Box
+                    component="input"
+                    type="color"
+                    value={welcomeLeftColour}
+                    onChange={(e) => setWelcomeLeftColour(e.target.value)}
+                    sx={{
+                      width: 48,
+                      height: 48,
+                      border: '1px solid',
+                      borderColor: 'divider',
+                      borderRadius: 1,
+                      cursor: 'pointer',
+                      p: 0.5,
+                      bgcolor: 'transparent',
+                    }}
+                  />
+                  <Box>
+                    <Typography variant="body2" fontWeight={500}>
+                      {t('admin.home.leftFrameColour', 'Left Frame')}
+                    </Typography>
+                    <Typography variant="caption" color="text.secondary">
+                      {welcomeLeftColour.toUpperCase()}
+                    </Typography>
+                  </Box>
+                </Box>
+                {/* Right colour */}
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+                  <Box
+                    component="input"
+                    type="color"
+                    value={welcomeRightColour}
+                    onChange={(e) => setWelcomeRightColour(e.target.value)}
+                    sx={{
+                      width: 48,
+                      height: 48,
+                      border: '1px solid',
+                      borderColor: 'divider',
+                      borderRadius: 1,
+                      cursor: 'pointer',
+                      p: 0.5,
+                      bgcolor: 'transparent',
+                    }}
+                  />
+                  <Box>
+                    <Typography variant="body2" fontWeight={500}>
+                      {t('admin.home.rightFrameColour', 'Right Frame')}
+                    </Typography>
+                    <Typography variant="caption" color="text.secondary">
+                      {welcomeRightColour.toUpperCase()}
+                    </Typography>
+                  </Box>
+                </Box>
+                {/* Button colour */}
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+                  <Box
+                    component="input"
+                    type="color"
+                    value={welcomeButtonColour}
+                    onChange={(e) => setWelcomeButtonColour(e.target.value)}
+                    sx={{
+                      width: 48,
+                      height: 48,
+                      border: '1px solid',
+                      borderColor: 'divider',
+                      borderRadius: 1,
+                      cursor: 'pointer',
+                      p: 0.5,
+                      bgcolor: 'transparent',
+                    }}
+                  />
+                  <Box>
+                    <Typography variant="body2" fontWeight={500}>
+                      {t('admin.home.bookSessionButtonColour', 'Book a Session Button')}
+                    </Typography>
+                    <Typography variant="caption" color="text.secondary">
+                      {welcomeButtonColour.toUpperCase()}
+                    </Typography>
+                  </Box>
+                </Box>
+                {/* Button text colour */}
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+                  <Box
+                    component="input"
+                    type="color"
+                    value={welcomeButtonTextColour}
+                    onChange={(e) => setWelcomeButtonTextColour(e.target.value)}
+                    sx={{
+                      width: 48,
+                      height: 48,
+                      border: '1px solid',
+                      borderColor: 'divider',
+                      borderRadius: 1,
+                      cursor: 'pointer',
+                      p: 0.5,
+                      bgcolor: 'transparent',
+                    }}
+                  />
+                  <Box>
+                    <Typography variant="body2" fontWeight={500}>
+                      {t('admin.home.bookSessionButtonTextColour', 'Button Text')}
+                    </Typography>
+                    <Typography variant="caption" color="text.secondary">
+                      {welcomeButtonTextColour.toUpperCase()}
+                    </Typography>
+                  </Box>
+                </Box>
+              </Box>
+            </Paper>
+          </Box>
         </Container>
       </Box>
 

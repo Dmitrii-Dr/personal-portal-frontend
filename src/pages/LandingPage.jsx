@@ -94,6 +94,12 @@ const LandingPage = () => {
   const [welcomeMobileImageUrl, setWelcomeMobileImageUrl] = useState(null);
   const [aboutImageUrl, setAboutImageUrl] = useState(null);
   const [educationImageUrl, setEducationImageUrl] = useState(null);
+
+  // Hero frame background colours read from extendedParameters (with hardcoded fallbacks)
+  const [heroLeftColour, setHeroLeftColour] = useState('#d6baab');
+  const [heroRightColour, setHeroRightColour] = useState('#7f7d72');
+  const [heroButtonColour, setHeroButtonColour] = useState('#ffffff');
+  const [heroButtonTextColour, setHeroButtonTextColour] = useState('#2C5F5F');
   const [reviewMediaIds, setReviewMediaIds] = useState([]);
   const [reviewImageUrls, setReviewImageUrls] = useState([]);
   const [loadingReviewImages, setLoadingReviewImages] = useState({});
@@ -184,6 +190,13 @@ const LandingPage = () => {
         if (data.aboutMessage) {
           setAboutMeData(data.aboutMessage);
         }
+
+        // Read hero frame colours from extendedParameters
+        const ep = data.extendedParameters || {};
+        setHeroLeftColour(ep.welcomeLeftColourHex || '#d6baab');
+        setHeroRightColour(ep.welcomeRightColourHex || '#7f7d72');
+        setHeroButtonColour(ep.welcomeBookSessionButtonColourHex || '#ffffff');
+        setHeroButtonTextColour(ep.welcomeBookSessionButtonTextColourHex || '#2C5F5F');
 
         // Load images if mediaIds exist
         if (data.welcomeRightMediaId) {
@@ -448,7 +461,7 @@ const LandingPage = () => {
   const heroMobileImage = welcomeMobileImageUrl || welcomeRightImageUrl;
 
   return (
-    <Box sx={{ bgcolor: '#7f7d72' }}>
+    <Box sx={{ bgcolor: heroRightColour }}>
       {/* Hero Section */}
       <Box
         ref={heroRef}
@@ -464,7 +477,7 @@ const LandingPage = () => {
           width: '100%',
           marginTop: 0,
           // Hard split: left half matches left frame, right half matches right frame
-          background: 'linear-gradient(to right, #d6baab 50%, #7f7d72 50%)',
+          background: `linear-gradient(to right, ${heroLeftColour} 50%, ${heroRightColour} 50%)`,
         }}
       >
         {/* ─── Mobile layout ─── */}
@@ -574,7 +587,7 @@ const LandingPage = () => {
                   alignItems: 'center',
                   justifyContent: 'center',
                   overflow: 'hidden',
-                  background: '#d6baab',
+                  background: heroLeftColour,
                 }}
               >
                 {/* Left frame background photo */}
@@ -602,14 +615,15 @@ const LandingPage = () => {
                     py: 'clamp(10px, 1.2vw, 36px)',
                     fontSize: 'clamp(0.85rem, 1.1vw + 0.2rem, 1.8rem)',
                     textTransform: 'none',
-                    bgcolor: 'white',
-                    color: '#2C5F5F',
+                    bgcolor: heroButtonColour,
+                    color: heroButtonTextColour,
                     fontWeight: 600,
                     boxShadow: '0 4px 24px rgba(0,0,0,0.20)',
                     zIndex: 3,
                     position: 'relative',
                     '&:hover': {
-                      bgcolor: 'grey.100',
+                      bgcolor: heroButtonColour,
+                      filter: 'brightness(0.95)',
                     },
                   }}
                 >
@@ -625,7 +639,7 @@ const LandingPage = () => {
                   height: '100%',
                   position: 'relative',
                   overflow: 'hidden',
-                  background: '#7f7d72',
+                  background: heroRightColour,
                 }}
               >
                 {welcomeRightImageUrl ? (

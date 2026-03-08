@@ -531,7 +531,13 @@
       "mobilePhotoSubtitle": "Shown on mobile devices (< 600 px).",
       "noPhotoUploaded": "No photo uploaded",
       "changeImage": "Change Photo",
-      "uploadImage": "Upload Photo"
+      "uploadImage": "Upload Photo",
+      "frameBackgroundColours": "Frame Background Colours",
+      "frameBackgroundColoursSubtitle": "Shown when no photo is uploaded, and fills the sides beyond 1920 px on wide screens.",
+      "leftFrameColour": "Left Frame",
+      "rightFrameColour": "Right Frame",
+      "bookSessionButtonColour": "Book a Session Button",
+      "bookSessionButtonTextColour": "Button Text"
     },
     "blog": {
       "title": "Blog Management",

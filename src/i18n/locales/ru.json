@@ -536,7 +536,13 @@
       "mobilePhotoSubtitle": "Отображается на мобильных устройствах (< 600 px).",
       "noPhotoUploaded": "Фото не загружено",
       "changeImage": "Изменить фото",
-      "uploadImage": "Загрузить фото"
+      "uploadImage": "Загрузить фото",
+      "frameBackgroundColours": "Цвета фона фреймов",
+      "frameBackgroundColoursSubtitle": "Отображается, когда фото не загружено, и заполняет боковые области за пределами 1920 px на широких экранах.",
+      "leftFrameColour": "Левый фрейм",
+      "rightFrameColour": "Правый фрейм",
+      "bookSessionButtonColour": "Кнопка 'Записаться'",
+      "bookSessionButtonTextColour": "Цвет текста кнопки"
     },
     "blog": {
       "title": "Управление блогом",
