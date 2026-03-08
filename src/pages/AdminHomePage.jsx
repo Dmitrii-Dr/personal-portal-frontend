@@ -56,7 +56,6 @@ const AdminHomePage = () => {
   const [saveSuccess, setSaveSuccess] = useState(false);
 
   // Welcome message state
-  const [welcomeMessage, setWelcomeMessage] = useState('');
   const [aboutMeContent, setAboutMeContent] = useState('');
   const [educationContent, setEducationContent] = useState('');
   const [reviewMessage, setReviewMessage] = useState('');
@@ -69,19 +68,25 @@ const AdminHomePage = () => {
   const [invalidArticleIdsError, setInvalidArticleIdsError] = useState(null);
 
   // Media IDs state
-  const [welcomeMediaId, setWelcomeMediaId] = useState(null);
+  const [welcomeRightMediaId, setWelcomeRightMediaId] = useState(null);
+  const [welcomeLeftMediaId, setWelcomeLeftMediaId] = useState(null);
+  const [welcomeMobileMediaId, setWelcomeMobileMediaId] = useState(null);
   const [aboutMediaId, setAboutMediaId] = useState(null);
   const [educationMediaId, setEducationMediaId] = useState(null);
   const [reviewMediaIds, setReviewMediaIds] = useState([]);
 
   // Image upload states
-  const [uploadingWelcomeImage, setUploadingWelcomeImage] = useState(false);
+  const [uploadingWelcomeRightImage, setUploadingWelcomeRightImage] = useState(false);
+  const [uploadingWelcomeLeftImage, setUploadingWelcomeLeftImage] = useState(false);
+  const [uploadingWelcomeMobileImage, setUploadingWelcomeMobileImage] = useState(false);
   const [uploadingAboutImage, setUploadingAboutImage] = useState(false);
   const [uploadingEducationImage, setUploadingEducationImage] = useState(false);
   const [uploadingReviewImage, setUploadingReviewImage] = useState(false);
 
   // Image preview URLs
-  const [welcomeImageUrl, setWelcomeImageUrl] = useState(null);
+  const [welcomeRightImageUrl, setWelcomeRightImageUrl] = useState(null);
+  const [welcomeLeftImageUrl, setWelcomeLeftImageUrl] = useState(null);
+  const [welcomeMobileImageUrl, setWelcomeMobileImageUrl] = useState(null);
   const [aboutImageUrl, setAboutImageUrl] = useState(null);
   const [educationImageUrl, setEducationImageUrl] = useState(null);
   const [reviewImageUrls, setReviewImageUrls] = useState([]);
@@ -158,11 +163,12 @@ const AdminHomePage = () => {
         }
         const data = await response.json();
         setWelcomeData(data);
-        setWelcomeMessage(data.welcomeMessage || '');
         setAboutMeContent(data.aboutMessage || '');
         setEducationContent(data.educationMessage || '');
         setReviewMessage(data.reviewMessage || '');
-        setWelcomeMediaId(data.welcomeMediaId || null);
+        setWelcomeRightMediaId(data.welcomeRightMediaId || null);
+        setWelcomeLeftMediaId(data.welcomeLeftMediaId || null);
+        setWelcomeMobileMediaId(data.welcomeMobileMediaId || null);
         setAboutMediaId(data.aboutMediaId || null);
         setEducationMediaId(data.educationMediaId || null);
         setReviewMediaIds(data.reviewMediaIds || []);
@@ -178,9 +184,19 @@ const AdminHomePage = () => {
         }
 
         // Load images if mediaIds exist
-        if (data.welcomeMediaId) {
-          loadImage(data.welcomeMediaId, 'welcome').catch(err => {
-            console.error('Error loading welcome image:', err);
+        if (data.welcomeRightMediaId) {
+          loadImage(data.welcomeRightMediaId, 'welcome-right').catch(err => {
+            console.error('Error loading welcome right image:', err);
+          });
+        }
+        if (data.welcomeLeftMediaId) {
+          loadImage(data.welcomeLeftMediaId, 'welcome-left').catch(err => {
+            console.error('Error loading welcome left image:', err);
+          });
+        }
+        if (data.welcomeMobileMediaId) {
+          loadImage(data.welcomeMobileMediaId, 'welcome-mobile').catch(err => {
+            console.error('Error loading welcome mobile image:', err);
           });
         }
         if (data.aboutMediaId) {
@@ -282,8 +298,12 @@ const AdminHomePage = () => {
     try {
       const objectUrl = await loadImageWithCache(mediaId);
 
-      if (type === 'welcome') {
-        setWelcomeImageUrl(objectUrl);
+      if (type === 'welcome-right') {
+        setWelcomeRightImageUrl(objectUrl);
+      } else if (type === 'welcome-left') {
+        setWelcomeLeftImageUrl(objectUrl);
+      } else if (type === 'welcome-mobile') {
+        setWelcomeMobileImageUrl(objectUrl);
       } else if (type === 'about') {
         setAboutImageUrl(objectUrl);
       } else if (type === 'education') {
@@ -324,8 +344,12 @@ const AdminHomePage = () => {
     }
 
     // Set uploading state
-    if (type === 'welcome') {
-      setUploadingWelcomeImage(true);
+    if (type === 'welcome-right') {
+      setUploadingWelcomeRightImage(true);
+    } else if (type === 'welcome-left') {
+      setUploadingWelcomeLeftImage(true);
+    } else if (type === 'welcome-mobile') {
+      setUploadingWelcomeMobileImage(true);
     } else if (type === 'about') {
       setUploadingAboutImage(true);
     } else if (type === 'education') {
@@ -352,8 +376,12 @@ const AdminHomePage = () => {
       const mediaId = uploadResponse.data.mediaId;
 
       // Update state immediately
-      if (type === 'welcome') {
-        setWelcomeMediaId(mediaId);
+      if (type === 'welcome-right') {
+        setWelcomeRightMediaId(mediaId);
+      } else if (type === 'welcome-left') {
+        setWelcomeLeftMediaId(mediaId);
+      } else if (type === 'welcome-mobile') {
+        setWelcomeMobileMediaId(mediaId);
       } else if (type === 'about') {
         setAboutMediaId(mediaId);
       } else if (type === 'education') {
@@ -369,11 +397,12 @@ const AdminHomePage = () => {
 
         // Immediately update via PUT request
         const updatePayload = {
-          welcomeMessage: welcomeMessage,
           aboutMessage: aboutMeContent,
           educationMessage: educationContent,
           reviewMessage: reviewMessage,
-          welcomeMediaId: welcomeMediaId,
+          welcomeRightMediaId: welcomeRightMediaId,
+          welcomeLeftMediaId: welcomeLeftMediaId,
+          welcomeMobileMediaId: welcomeMobileMediaId,
           aboutMediaId: aboutMediaId,
           educationMediaId: educationMediaId,
           reviewMediaIds: newReviewMediaIds,
@@ -398,11 +427,12 @@ const AdminHomePage = () => {
 
       // Immediately update the corresponding mediaId via PUT request (for non-review types)
       const updatePayload = {
-        welcomeMessage: welcomeMessage,
         aboutMessage: aboutMeContent,
         educationMessage: educationContent,
         reviewMessage: reviewMessage,
-        welcomeMediaId: type === 'welcome' ? mediaId : welcomeMediaId,
+        welcomeRightMediaId: type === 'welcome-right' ? mediaId : welcomeRightMediaId,
+        welcomeLeftMediaId: type === 'welcome-left' ? mediaId : welcomeLeftMediaId,
+        welcomeMobileMediaId: type === 'welcome-mobile' ? mediaId : welcomeMobileMediaId,
         aboutMediaId: type === 'about' ? mediaId : aboutMediaId,
         educationMediaId: type === 'education' ? mediaId : educationMediaId,
         reviewMediaIds: reviewMediaIds,
@@ -428,8 +458,12 @@ const AdminHomePage = () => {
       console.error(`Error uploading image for ${type}:`, err);
       setError(err.message || `Failed to upload image for ${type}`);
     } finally {
-      if (type === 'welcome') {
-        setUploadingWelcomeImage(false);
+      if (type === 'welcome-right') {
+        setUploadingWelcomeRightImage(false);
+      } else if (type === 'welcome-left') {
+        setUploadingWelcomeLeftImage(false);
+      } else if (type === 'welcome-mobile') {
+        setUploadingWelcomeMobileImage(false);
       } else if (type === 'about') {
         setUploadingAboutImage(false);
       } else if (type === 'education') {
@@ -451,11 +485,12 @@ const AdminHomePage = () => {
 
       // Update via PUT request
       const updatePayload = {
-        welcomeMessage: welcomeMessage,
         aboutMessage: aboutMeContent,
         educationMessage: educationContent,
         reviewMessage: reviewMessage,
-        welcomeMediaId: welcomeMediaId,
+        welcomeRightMediaId: welcomeRightMediaId,
+        welcomeLeftMediaId: welcomeLeftMediaId,
+        welcomeMobileMediaId: welcomeMobileMediaId,
         aboutMediaId: aboutMediaId,
         educationMediaId: educationMediaId,
         reviewMediaIds: newReviewMediaIds,
@@ -578,11 +613,12 @@ const AdminHomePage = () => {
 
       // Update via PUT request
       const updatePayload = {
-        welcomeMessage: welcomeMessage,
         aboutMessage: aboutMeContent,
         educationMessage: educationContent,
         reviewMessage: reviewMessage,
-        welcomeMediaId: welcomeMediaId,
+        welcomeRightMediaId: welcomeRightMediaId,
+        welcomeLeftMediaId: welcomeLeftMediaId,
+        welcomeMobileMediaId: welcomeMobileMediaId,
         aboutMediaId: aboutMediaId,
         educationMediaId: educationMediaId,
         reviewMediaIds: newReviewMediaIds,
@@ -736,11 +772,12 @@ const AdminHomePage = () => {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          welcomeMessage: welcomeMessage,
           aboutMessage: aboutMeContent,
           educationMessage: educationContent,
           reviewMessage: reviewMessage,
-          welcomeMediaId: welcomeMediaId,
+          welcomeRightMediaId: welcomeRightMediaId,
+          welcomeLeftMediaId: welcomeLeftMediaId,
+          welcomeMobileMediaId: welcomeMobileMediaId,
           aboutMediaId: aboutMediaId,
           educationMediaId: educationMediaId,
           reviewMediaIds: reviewMediaIds,
@@ -781,116 +818,148 @@ const AdminHomePage = () => {
         </Typography>
       </Box>
 
-      {/* Hero Section */}
+
+      {/* Hero Photos Section */}
       <Box
         component="section"
         sx={{
-          minHeight: '60vh',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          position: 'relative',
-          color: 'white',
-          textAlign: 'center',
-          py: 8,
-          overflow: 'hidden',
-          width: '100%',
-          '&::before': welcomeImageUrl ? {
-            content: '""',
-            position: 'absolute',
-            top: 0,
-            left: 0,
-            right: 0,
-            bottom: 0,
-            width: '100%',
-            height: '100%',
-            backgroundImage: `url(${welcomeImageUrl})`,
-            backgroundSize: 'cover',
-            backgroundPosition: 'center center',
-            backgroundRepeat: 'no-repeat',
-            zIndex: 0,
-          } : {},
-          '&::after': welcomeImageUrl ? {
-            content: '""',
-            position: 'absolute',
-            top: 0,
-            left: 0,
-            right: 0,
-            bottom: 0,
-            width: '100%',
-            height: '100%',
-            background: 'linear-gradient(135deg, rgba(44, 95, 95, 0.3) 0%, rgba(31, 69, 69, 0.4) 100%)',
-            zIndex: 0,
-          } : {},
-          background: welcomeImageUrl
-            ? 'transparent'
-            : 'linear-gradient(135deg, #2C5F5F 0%, #1F4545 100%)',
+          py: { xs: 4, md: 6 },
+          bgcolor: 'background.paper',
+          borderBottom: 1,
+          borderColor: 'divider',
         }}
       >
-        <Container maxWidth="md" sx={{ position: 'relative', zIndex: 1 }}>
-          {/* Image Upload Button */}
-          <Box sx={{ mb: 4, position: 'relative' }}>
-            <input
-              accept="image/*"
-              style={{ display: 'none' }}
-              id="welcome-image-upload"
-              type="file"
-              onChange={(e) => {
-                const file = e.target.files?.[0];
-                if (file) {
-                  handleImageUpload(file, 'welcome');
-                }
-                e.target.value = '';
-              }}
-            />
-            <label htmlFor="welcome-image-upload">
-              <Button
-                variant="contained"
-                component="span"
-                startIcon={uploadingWelcomeImage ? <CircularProgress size={20} sx={{ color: 'white' }} /> : <CloudUploadIcon />}
-                disabled={uploadingWelcomeImage}
-                sx={{
-                  textTransform: 'none',
-                  bgcolor: 'rgba(255, 255, 255, 0.2)',
-                  '&:hover': { bgcolor: 'rgba(255, 255, 255, 0.3)' },
-                }}
-              >
-                {uploadingWelcomeImage ? t('admin.home.uploading') : welcomeImageUrl ? t('admin.home.changeImage') : t('admin.home.uploadImage')}
-              </Button>
-            </label>
+        <Container maxWidth="lg">
+          <Box sx={{ mb: 4 }}>
+            <Typography variant="h5" component="h2" fontWeight={600} gutterBottom>
+              {t('admin.home.heroPhotos', 'Hero Photos')}
+            </Typography>
+            <Typography variant="body2" color="text.secondary">
+              {t('admin.home.heroPhotosSubtitle')}
+            </Typography>
           </Box>
 
-          {/* Editable Welcome Message */}
-          <TextField
-            fullWidth
-            multiline
-            rows={3}
-            value={welcomeMessage}
-            onChange={(e) => setWelcomeMessage(e.target.value)}
-            placeholder={t('admin.home.welcomeMessage')}
-            sx={{
-              mb: 3,
-              '& .MuiInputBase-input': {
-                color: 'white',
-                fontSize: { xs: '2rem', md: '3rem' },
-                fontWeight: 700,
-                textAlign: 'center',
+          <Grid container spacing={3}>
+            {[
+              {
+                id: 'welcome-left',
+                inputId: 'upload-welcome-left',
+                title: t('admin.home.leftFrameTitle', 'Left Frame — Custom Photo'),
+                imageUrl: welcomeLeftImageUrl,
+                uploading: uploadingWelcomeLeftImage,
               },
-              '& .MuiOutlinedInput-root': {
-                '& fieldset': {
-                  borderColor: 'rgba(255, 255, 255, 0.3)',
-                },
-                '&:hover fieldset': {
-                  borderColor: 'rgba(255, 255, 255, 0.5)',
-                },
-                '&.Mui-focused fieldset': {
-                  borderColor: 'white',
-                },
+              {
+                id: 'welcome-right',
+                inputId: 'upload-welcome-right',
+                title: t('admin.home.rightFrameTitle', 'Right Frame — Personal Photo'),
+                imageUrl: welcomeRightImageUrl,
+                uploading: uploadingWelcomeRightImage,
               },
-            }}
-          />
+              {
+                id: 'welcome-mobile',
+                inputId: 'upload-welcome-mobile',
+                title: t('admin.home.mobilePhotoTitle', 'Mobile Photo'),
+                imageUrl: welcomeMobileImageUrl,
+                uploading: uploadingWelcomeMobileImage,
+              },
+            ].map((card) => (
+              <Grid item xs={12} sm={6} md={4} key={card.id}>
+                <Paper
+                  elevation={0}
+                  sx={{
+                    p: 2.5,
+                    border: '1px solid',
+                    borderColor: 'divider',
+                    borderRadius: 2,
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: 2,
+                    height: '100%',
+                  }}
+                >
+                  {/* Card header */}
+                  <Box>
+                    <Typography variant="subtitle1" fontWeight={600}>
+                      {card.title}
+                    </Typography>
+                  </Box>
+
+                  {/* Thumbnail */}
+                  <Box
+                    sx={{
+                      width: '100%',
+                      aspectRatio: '4 / 3',
+                      borderRadius: 1.5,
+                      overflow: 'hidden',
+                      border: '2px dashed',
+                      borderColor: card.imageUrl ? 'transparent' : 'grey.300',
+                      bgcolor: card.imageUrl ? 'transparent' : 'grey.50',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      position: 'relative',
+                    }}
+                  >
+                    {card.imageUrl ? (
+                      <Box
+                        component="img"
+                        src={card.imageUrl}
+                        alt={card.title}
+                        sx={{
+                          width: '100%',
+                          height: '100%',
+                          objectFit: 'cover',
+                          objectPosition: 'center top',
+                          display: 'block',
+                        }}
+                      />
+                    ) : (
+                      <Box sx={{ textAlign: 'center', color: 'text.disabled', p: 2 }}>
+                        <CloudUploadIcon sx={{ fontSize: 40, mb: 0.5, opacity: 0.4 }} />
+                        <Typography variant="caption" display="block">
+                          {t('admin.home.noPhotoUploaded', 'No photo uploaded')}
+                        </Typography>
+                      </Box>
+                    )}
+                  </Box>
+
+                  {/* Upload button */}
+                  <Box>
+                    <input
+                      accept="image/*"
+                      style={{ display: 'none' }}
+                      id={card.inputId}
+                      type="file"
+                      onChange={(e) => {
+                        const file = e.target.files?.[0];
+                        if (file) handleImageUpload(file, card.id);
+                        e.target.value = '';
+                      }}
+                    />
+                    <label htmlFor={card.inputId} style={{ display: 'block' }}>
+                      <Button
+                        variant="outlined"
+                        component="span"
+                        fullWidth
+                        startIcon={card.uploading ? <CircularProgress size={18} /> : <CloudUploadIcon />}
+                        disabled={card.uploading}
+                        sx={{ textTransform: 'none' }}
+                      >
+                        {card.uploading
+                          ? t('admin.home.uploading')
+                          : card.imageUrl
+                            ? t('admin.home.changeImage', 'Change Photo')
+                            : t('admin.home.uploadImage', 'Upload Photo')}
+                      </Button>
+                    </label>
+                  </Box>
+                </Paper>
+              </Grid>
+            ))}
+          </Grid>
         </Container>
       </Box>
+
 
       {/* About Me Section */}
       <Box

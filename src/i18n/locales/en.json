@@ -470,6 +470,8 @@
       "uploading": "Uploading...",
       "changeImage": "Change Image",
       "uploadImage": "Upload Image",
+      "changeMobileImage": "Change Mobile Image",
+      "uploadMobileImage": "Upload Mobile Image",
       "welcomeMessage": "Welcome Message",
       "change": "Change",
       "myEducation": "MY EDUCATION",
@@ -518,7 +520,18 @@
       "selectImageFromGallery": "Select Image from Gallery",
       "noImagesFound": "No images found in the gallery. Upload images to see them here.",
       "untitled": "Untitled",
-      "close": "Close"
+      "close": "Close",
+      "heroPhotos": "Hero Photos",
+      "heroPhotosSubtitle": "Manage landing page hero images. Left & Right frames: portrait 1:1–3:4, min 1200×1600 px. Mobile: portrait 9:16, min 900×1600 px.",
+      "rightFrameTitle": "Right Frame — Personal Photo",
+      "rightFrameSubtitle": "Shown on the right side of the hero (desktop).",
+      "leftFrameTitle": "Left Frame — Custom Photo",
+      "leftFrameSubtitle": "Shown on the left side of the hero (desktop), behind the Book a Session button.",
+      "mobilePhotoTitle": "Mobile Photo",
+      "mobilePhotoSubtitle": "Shown on mobile devices (< 600 px).",
+      "noPhotoUploaded": "No photo uploaded",
+      "changeImage": "Change Photo",
+      "uploadImage": "Upload Photo"
     },
     "blog": {
       "title": "Blog Management",

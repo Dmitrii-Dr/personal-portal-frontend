@@ -74,6 +74,7 @@ const LandingPage = () => {
   const navigate = useNavigate();
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down('md'));
+  const isMobileImage = useMediaQuery(theme.breakpoints.down('md'));
   const heroRef = useRef(null);
   const aboutRef = useRef(null);
   const servicesRef = useRef(null);
@@ -88,7 +89,9 @@ const LandingPage = () => {
   const [welcomeError, setWelcomeError] = useState(null);
 
   // Image URLs state
-  const [welcomeImageUrl, setWelcomeImageUrl] = useState(null);
+  const [welcomeRightImageUrl, setWelcomeRightImageUrl] = useState(null);
+  const [welcomeLeftImageUrl, setWelcomeLeftImageUrl] = useState(null);
+  const [welcomeMobileImageUrl, setWelcomeMobileImageUrl] = useState(null);
   const [aboutImageUrl, setAboutImageUrl] = useState(null);
   const [educationImageUrl, setEducationImageUrl] = useState(null);
   const [reviewMediaIds, setReviewMediaIds] = useState([]);
@@ -141,8 +144,12 @@ const LandingPage = () => {
     try {
       const objectUrl = await loadImageWithCache(mediaId);
 
-      if (type === 'welcome') {
-        setWelcomeImageUrl(objectUrl);
+      if (type === 'welcome-right') {
+        setWelcomeRightImageUrl(objectUrl);
+      } else if (type === 'welcome-left') {
+        setWelcomeLeftImageUrl(objectUrl);
+      } else if (type === 'welcome-mobile') {
+        setWelcomeMobileImageUrl(objectUrl);
       } else if (type === 'about') {
         setAboutImageUrl(objectUrl);
       } else if (type === 'education') {
@@ -179,9 +186,19 @@ const LandingPage = () => {
         }
 
         // Load images if mediaIds exist
-        if (data.welcomeMediaId) {
-          loadImage(data.welcomeMediaId, 'welcome').catch(err => {
-            console.error('Error loading welcome image:', err);
+        if (data.welcomeRightMediaId) {
+          loadImage(data.welcomeRightMediaId, 'welcome-right').catch(err => {
+            console.error('Error loading welcome right image:', err);
+          });
+        }
+        if (data.welcomeLeftMediaId) {
+          loadImage(data.welcomeLeftMediaId, 'welcome-left').catch(err => {
+            console.error('Error loading welcome left image:', err);
+          });
+        }
+        if (data.welcomeMobileMediaId) {
+          loadImage(data.welcomeMobileMediaId, 'welcome-mobile').catch(err => {
+            console.error('Error loading welcome mobile image:', err);
           });
         }
         if (data.aboutMediaId) {
@@ -427,62 +444,91 @@ const LandingPage = () => {
     }
   };
 
+  // Mobile image: prefer welcomeMobileImageUrl, fallback to welcomeRightImageUrl
+  const heroMobileImage = welcomeMobileImageUrl || welcomeRightImageUrl;
+
   return (
-    <Box sx={{ bgcolor: '#2C5F5F' }}>
+    <Box sx={{ bgcolor: '#7f7d72' }}>
       {/* Hero Section */}
       <Box
         ref={heroRef}
         id="hero"
         component="section"
         sx={{
+          paddingTop: '64px',
           minHeight: '100vh',
           display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
+          alignItems: 'stretch',
           position: 'relative',
-          color: 'white',
-          textAlign: 'center',
-          pt: { xs: '80px', sm: '90px', md: '100px' },
-          pb: 8,
           overflow: 'hidden',
           width: '100%',
           marginTop: 0,
-          '&::before': welcomeImageUrl ? {
-            content: '""',
-            position: 'absolute',
-            top: 0,
-            left: 0,
-            right: 0,
-            bottom: 0,
-            width: '100%',
-            height: '100%',
-            backgroundImage: `url(${welcomeImageUrl})`,
-            backgroundSize: 'cover',
-            backgroundPosition: 'center center',
-            backgroundRepeat: 'no-repeat',
-            zIndex: 0,
-          } : {},
-          '&::after': {},
-          background: welcomeImageUrl
-            ? 'transparent'
-            : 'linear-gradient(135deg, #2C5F5F 0%, #1F4545 100%)',
+          // Hard split: left half matches left frame, right half matches right frame
+          background: 'linear-gradient(to right, #d6baab 50%, #7f7d72 50%)',
         }}
       >
-        <Container maxWidth={false} sx={{ position: 'relative', zIndex: 1, px: 0 }}>
-          <Box sx={{ width: { xs: '100%', md: '50vw' }, textAlign: 'left' }}>
-            <Box sx={{ display: 'flex', justifyContent: 'center', width: { xs: '100%', md: '50vw' } }}>
+        {/* ─── Mobile layout ─── */}
+        {isMobileImage ? (
+          <Box
+            sx={{
+              width: '100%',
+              height: 'calc(100vh - 64px)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              position: 'relative',
+              overflow: 'hidden',
+            }}
+          >
+            {/* Mobile photo – fills the frame, ratio preserved by cover */}
+            {heroMobileImage ? (
+              <Box
+                component="img"
+                src={heroMobileImage}
+                alt="Hero"
+                sx={{
+                  position: 'absolute',
+                  inset: 0,
+                  width: '100%',
+                  height: '100%',
+                  objectFit: 'cover',
+                  objectPosition: 'center top',
+                  zIndex: 1,
+                }}
+              />
+            ) : (
+              <Box
+                sx={{
+                  position: 'absolute',
+                  inset: 0,
+                  background: 'linear-gradient(135deg, #2C5F5F 0%, #1F4545 100%)',
+                }}
+              />
+            )}
+            {/* Book a Session button – centered */}
+            <Box
+              sx={{
+                position: 'absolute',
+                bottom: '10%',
+                left: 0,
+                right: 0,
+                display: 'flex',
+                justifyContent: 'center',
+                zIndex: 3,
+              }}
+            >
               <Button
                 variant="contained"
-                size="large"
                 onClick={() => scrollToSection(servicesRef)}
                 sx={{
-                  px: 4,
-                  py: 1.5,
-                  fontSize: '1.1rem',
+                  px: { xs: 3, sm: 5 },
+                  py: { xs: 1.2, sm: 1.8 },
+                  fontSize: { xs: '0.9rem', sm: '1.1rem' },
                   textTransform: 'none',
                   bgcolor: 'white',
                   color: '#2C5F5F',
                   fontWeight: 600,
+                  boxShadow: '0 4px 20px rgba(0,0,0,0.25)',
                   '&:hover': {
                     bgcolor: 'grey.100',
                   },
@@ -492,7 +538,125 @@ const LandingPage = () => {
               </Button>
             </Box>
           </Box>
-        </Container>
+        ) : (
+          /* ─── Desktop layout: two side-by-side frames ─── */
+          /* Outer box: full-width, teal bg fills sides beyond 1920px */
+          <Box
+            sx={{
+              width: '100%',
+              height: 'calc(100vh - 64px)',
+              display: 'flex',
+              flexDirection: 'row',
+              alignItems: 'stretch',
+              justifyContent: 'center',
+            }}
+          >
+            {/* Inner constrained container — stops growing at 1920px */}
+            <Box
+              sx={{
+                width: '100%',
+                maxWidth: '1920px',
+                height: '100%',
+                display: 'flex',
+                flexDirection: 'row',
+                alignItems: 'stretch',
+              }}
+            >
+              {/* LEFT FRAME – Book a Session button always centered; welcomeLeftImageUrl shown as bg when set */}
+
+              <Box
+                sx={{
+                  flex: '0 0 50%',
+                  width: '50%',
+                  height: '100%',
+                  position: 'relative',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  overflow: 'hidden',
+                  background: '#d6baab',
+                }}
+              >
+                {/* Left frame background photo */}
+                {welcomeLeftImageUrl && (
+                  <Box
+                    component="img"
+                    src={welcomeLeftImageUrl}
+                    alt="Left frame"
+                    sx={{
+                      position: 'absolute',
+                      inset: 0,
+                      width: '100%',
+                      height: '100%',
+                      objectFit: 'cover',
+                      objectPosition: 'center top',
+                      zIndex: 0,
+                    }}
+                  />
+                )}
+                <Button
+                  variant="contained"
+                  onClick={() => scrollToSection(servicesRef)}
+                  sx={{
+                    px: 'clamp(20px, 2.5vw, 72px)',
+                    py: 'clamp(10px, 1.2vw, 36px)',
+                    fontSize: 'clamp(0.85rem, 1.1vw + 0.2rem, 1.8rem)',
+                    textTransform: 'none',
+                    bgcolor: 'white',
+                    color: '#2C5F5F',
+                    fontWeight: 600,
+                    boxShadow: '0 4px 24px rgba(0,0,0,0.20)',
+                    zIndex: 3,
+                    position: 'relative',
+                    '&:hover': {
+                      bgcolor: 'grey.100',
+                    },
+                  }}
+                >
+                  {t('landing.hero.bookSession')}
+                </Button>
+              </Box>
+
+              {/* RIGHT FRAME – personal photo (welcomeRightMediaId) */}
+              <Box
+                sx={{
+                  flex: '0 0 50%',
+                  width: '50%',
+                  height: '100%',
+                  position: 'relative',
+                  overflow: 'hidden',
+                  background: '#7f7d72',
+                }}
+              >
+                {welcomeRightImageUrl ? (
+                  <Box
+                    component="img"
+                    src={welcomeRightImageUrl}
+                    alt="Hero"
+                    sx={{
+                      position: 'absolute',
+                      inset: 0,
+                      width: '100%',
+                      height: '100%',
+                      objectFit: 'cover',
+                      objectPosition: 'center top',
+                      zIndex: 1,
+                    }}
+                  />
+                ) : (
+                  /* Fallback gradient when no photo is set */
+                  <Box
+                    sx={{
+                      position: 'absolute',
+                      inset: 0,
+                      background: 'linear-gradient(145deg, #1F4545 0%, #2C5F5F 100%)',
+                    }}
+                  />
+                )}
+              </Box>
+            </Box>
+          </Box>
+        )}
       </Box>
 
       {/* About Section */}
