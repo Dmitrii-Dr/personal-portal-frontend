@@ -1521,7 +1521,7 @@ const BookingPage = ({ sessionTypeId: propSessionTypeId, hideMyBookings = false 
         {/* Show "My Bookings" section only if user is logged in and not in dialog/popup */}
         {hasToken && !hideMyBookings && (
           <>
-            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+            <Box sx={{ display: 'flex', flexDirection: { xs: 'column', sm: 'row' }, justifyContent: 'space-between', alignItems: { xs: 'flex-start', sm: 'center' }, gap: { xs: 2, sm: 0 }, mb: 2 }}>
               <Typography variant="h4" component="h1">
                 {t('pages.booking.myBookings')}
               </Typography>
@@ -1578,9 +1578,9 @@ const BookingPage = ({ sessionTypeId: propSessionTypeId, hideMyBookings = false 
                             }}
                           >
                             <CardContent>
-                              <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 1 }}>
+                              <Box sx={{ display: 'flex', flexDirection: { xs: 'column', sm: 'row' }, justifyContent: 'space-between', alignItems: { xs: 'flex-start', sm: 'center' }, gap: { xs: 1.5, sm: 0 }, mb: 1 }}>
                                 <Box>
-                                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 0.5 }}>
+                                  <Box sx={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 1, mb: 0.5 }}>
                                     <Typography variant="h6" component="h2">
                                       {booking.sessionName || t('pages.booking.session')}
                                     </Typography>
@@ -1628,7 +1628,7 @@ const BookingPage = ({ sessionTypeId: propSessionTypeId, hideMyBookings = false 
                               <Typography variant="caption" color="text.secondary" sx={{ display: 'block' }}>
                                 {t('pages.booking.created')} {formatInstant(booking.createdAt)}
                               </Typography>
-                              <Box sx={{ display: 'flex', justifyContent: 'flex-end', gap: 1, mt: 2 }}>
+                              <Box sx={{ display: 'flex', flexDirection: { xs: 'column', sm: 'row' }, justifyContent: 'flex-end', gap: 1, mt: 2, '& button': { width: { xs: '100%', sm: 'auto' } }, '& span': { width: { xs: '100%', sm: 'auto' }, display: { xs: 'block', sm: 'inline-block' } } }}>
                                 {booking.status?.toUpperCase() === 'CONFIRMED' ? (
                                   <>
                                     <Tooltip title={t('pages.booking.cancelTooltip')}>
@@ -1751,9 +1751,9 @@ const BookingPage = ({ sessionTypeId: propSessionTypeId, hideMyBookings = false 
                       pastBookings.map((booking) => (
                         <Card key={booking.id} sx={{ mb: 2 }}>
                           <CardContent>
-                            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 1 }}>
+                            <Box sx={{ display: 'flex', flexDirection: { xs: 'column', sm: 'row' }, justifyContent: 'space-between', alignItems: { xs: 'flex-start', sm: 'center' }, gap: { xs: 1.5, sm: 0 }, mb: 1 }}>
                               <Box>
-                                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 0.5 }}>
+                                <Box sx={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 1, mb: 0.5 }}>
                                   <Typography variant="h6" component="h2">
                                     {booking.sessionName || t('pages.booking.session')}
                                   </Typography>
@@ -2568,13 +2568,25 @@ const BookingPage = ({ sessionTypeId: propSessionTypeId, hideMyBookings = false 
               )}
             </DialogContentText>
           </DialogContent>
-          <DialogActions>
+          <DialogActions
+            sx={{
+              px: { xs: 2, sm: 3 },
+              pb: { xs: 2.5, sm: 2 },
+              flexDirection: { xs: 'column-reverse', sm: 'row' },
+              gap: { xs: 1.5, sm: 1 },
+              '& button': {
+                width: { xs: '100%', sm: 'auto' },
+                m: { xs: '0 !important', sm: '0 0 0 8px !important' }
+              }
+            }}
+          >
             <Button
               onClick={handleCancelDialogClose}
               variant="contained"
               color="primary"
               disabled={cancelling}
               sx={{ textTransform: 'none' }}
+              fullWidth={isSmallScreen}
             >
               {t('pages.booking.keepBooking')}
             </Button>
@@ -2584,6 +2596,7 @@ const BookingPage = ({ sessionTypeId: propSessionTypeId, hideMyBookings = false 
               color="error"
               disabled={cancelling}
               sx={{ textTransform: 'none' }}
+              fullWidth={isSmallScreen}
             >
               {cancelling ? (
                 <>
@@ -2865,7 +2878,7 @@ const BookingPage = ({ sessionTypeId: propSessionTypeId, hideMyBookings = false 
           </DialogTitle>
           <DialogContent>
             {updateSelectedSlot && bookingToUpdate && (
-              <Alert severity="info" sx={{ mb: 2, '& .MuiAlert-message': { whiteSpace: 'nowrap' } }}>
+              <Alert severity="info" sx={{ mb: 2 }}>
                 <Trans
                   i18nKey="pages.booking.dateTimeWillBeUpdated"
                   values={{
@@ -2878,8 +2891,9 @@ const BookingPage = ({ sessionTypeId: propSessionTypeId, hideMyBookings = false 
                 />
               </Alert>
             )}
-            <DialogContentText sx={{ mb: 2, whiteSpace: 'nowrap' }}>
-              {t('pages.booking.confirmUpdateMessage')}{' '}
+            <DialogContentText sx={{ mb: 2 }}>
+              {t('pages.booking.confirmUpdateMessage')}<text> </text>
+
               {updateSelectedSlot && (
                 i18nInstance.language === 'ru' ? (
                   <strong>

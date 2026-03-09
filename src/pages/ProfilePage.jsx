@@ -967,7 +967,7 @@ const ProfilePage = ({ isAdminProfile = false }) => {
 
                     {/* Next row: Email Notifications */}
                     <Grid item xs={12} md={6}>
-                      <Box sx={{ height: '100%', display: 'flex', alignItems: 'center' }}>
+                      <Box sx={{ display: 'flex', alignItems: 'center' }}>
                         <FormControlLabel
                           control={
                             <Switch
@@ -979,7 +979,7 @@ const ProfilePage = ({ isAdminProfile = false }) => {
                           label={t('pages.profile.emailNotifications')}
                         />
                       </Box>
-                      <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: -1 }}>
+                      <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 0.5, ml: 1 }}>
                         {t('pages.profile.emailNotificationDescription')}
                       </Typography>
                     </Grid>
@@ -988,13 +988,13 @@ const ProfilePage = ({ isAdminProfile = false }) => {
               </Card>
             ) : null}
 
-            <Box sx={{ display: 'flex', justifyContent: 'flex-end', mt: 4 }}>
+            <Box sx={{ display: 'flex', flexDirection: { xs: 'column', sm: 'row' }, justifyContent: 'flex-end', mt: 4 }}>
               <Button
                 variant="contained"
                 color="primary"
                 onClick={handleSave}
                 disabled={saving || savingSettings || !hasChanges}
-                sx={{ textTransform: 'none', px: 4, py: 1 }}
+                sx={{ textTransform: 'none', px: 4, py: { xs: 1.5, sm: 1 }, width: { xs: '100%', sm: 'auto' } }}
               >
                 {(saving || savingSettings) ? (
                   <>
