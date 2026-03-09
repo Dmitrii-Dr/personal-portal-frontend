@@ -682,6 +682,7 @@ function AppInner() {
             <Route path="/" element={<LandingPage />} />
             <Route path="/blog" element={<BlogPage />} />
             <Route path="/blog/:articleId" element={<ArticlePage />} />
+            <Route path="/about-me" element={<AboutMePage />} />
             {/* /admin is the admin login page — keep public */}
             <Route path="/admin" element={<AdminPage />} />
 
@@ -693,7 +694,6 @@ function AppInner() {
             <Route path="/reset-password" element={<PrivateRoute><ResetPasswordPage /></PrivateRoute>} />
             <Route path="/verify-account" element={<PrivateRoute><AccountVerificationPage /></PrivateRoute>} />
             <Route path="/profile" element={<PrivateRoute><ProfilePage /></PrivateRoute>} />
-            <Route path="/about-me" element={<PrivateRoute><AboutMePage /></PrivateRoute>} />
 
             {/* Admin sub-routes — additionally guarded by AdminRoute (role check) */}
             <Route
@@ -749,4 +749,3 @@ function App() {
 }
 
 export default App;
-

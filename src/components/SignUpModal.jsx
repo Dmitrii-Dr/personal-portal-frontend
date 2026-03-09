@@ -19,6 +19,7 @@ import {
   Tooltip,
   useMediaQuery,
   useTheme,
+  MenuItem,
 } from '@mui/material';
 import ErrorOutlineIcon from '@mui/icons-material/ErrorOutline';
 import CloseIcon from '@mui/icons-material/Close';
@@ -27,12 +28,58 @@ const SignUpModal = ({ open, onClose, onSwitchToLogin }) => {
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
   const { t } = useTranslation();
+  const countryCodes = [
+    { key: 'US:+1', code: '+1', label: 'US (+1)', flag: '🇺🇸' },
+    { key: 'CA:+1', code: '+1', label: 'CA (+1)', flag: '🇨🇦' },
+    { key: 'UK:+44', code: '+44', label: 'UK (+44)', flag: '🇬🇧' },
+    { key: 'DE:+49', code: '+49', label: 'DE (+49)', flag: '🇩🇪' },
+    { key: 'FR:+33', code: '+33', label: 'FR (+33)', flag: '🇫🇷' },
+    { key: 'ES:+34', code: '+34', label: 'ES (+34)', flag: '🇪🇸' },
+    { key: 'IT:+39', code: '+39', label: 'IT (+39)', flag: '🇮🇹' },
+    { key: 'NL:+31', code: '+31', label: 'NL (+31)', flag: '🇳🇱' },
+    { key: 'SE:+46', code: '+46', label: 'SE (+46)', flag: '🇸🇪' },
+    { key: 'NO:+47', code: '+47', label: 'NO (+47)', flag: '🇳🇴' },
+    { key: 'DK:+45', code: '+45', label: 'DK (+45)', flag: '🇩🇰' },
+    { key: 'FI:+358', code: '+358', label: 'FI (+358)', flag: '🇫🇮' },
+    { key: 'PL:+48', code: '+48', label: 'PL (+48)', flag: '🇵🇱' },
+    { key: 'UA:+380', code: '+380', label: 'UA (+380)', flag: '🇺🇦' },
+    { key: 'RU:+7', code: '+7', label: 'RU (+7)', flag: '🇷🇺' },
+    { key: 'KZ:+7', code: '+7', label: 'KZ (+7)', flag: '🇰🇿' },
+    { key: 'TR:+90', code: '+90', label: 'TR (+90)', flag: '🇹🇷' },
+    { key: 'IL:+972', code: '+972', label: 'IL (+972)', flag: '🇮🇱' },
+    { key: 'AE:+971', code: '+971', label: 'AE (+971)', flag: '🇦🇪' },
+    { key: 'SA:+966', code: '+966', label: 'SA (+966)', flag: '🇸🇦' },
+    { key: 'IN:+91', code: '+91', label: 'IN (+91)', flag: '🇮🇳' },
+    { key: 'PK:+92', code: '+92', label: 'PK (+92)', flag: '🇵🇰' },
+    { key: 'BD:+880', code: '+880', label: 'BD (+880)', flag: '🇧🇩' },
+    { key: 'CN:+86', code: '+86', label: 'CN (+86)', flag: '🇨🇳' },
+    { key: 'JP:+81', code: '+81', label: 'JP (+81)', flag: '🇯🇵' },
+    { key: 'KR:+82', code: '+82', label: 'KR (+82)', flag: '🇰🇷' },
+    { key: 'SG:+65', code: '+65', label: 'SG (+65)', flag: '🇸🇬' },
+    { key: 'MY:+60', code: '+60', label: 'MY (+60)', flag: '🇲🇾' },
+    { key: 'TH:+66', code: '+66', label: 'TH (+66)', flag: '🇹🇭' },
+    { key: 'VN:+84', code: '+84', label: 'VN (+84)', flag: '🇻🇳' },
+    { key: 'AU:+61', code: '+61', label: 'AU (+61)', flag: '🇦🇺' },
+    { key: 'NZ:+64', code: '+64', label: 'NZ (+64)', flag: '🇳🇿' },
+    { key: 'ZA:+27', code: '+27', label: 'ZA (+27)', flag: '🇿🇦' },
+    { key: 'BR:+55', code: '+55', label: 'BR (+55)', flag: '🇧🇷' },
+    { key: 'MX:+52', code: '+52', label: 'MX (+52)', flag: '🇲🇽' },
+    { key: 'AR:+54', code: '+54', label: 'AR (+54)', flag: '🇦🇷' },
+    { key: 'CL:+56', code: '+56', label: 'CL (+56)', flag: '🇨🇱' },
+  ];
+  const sortedCountryCodes = [...countryCodes].sort((a, b) => {
+    const aNum = parseInt(a.code.replace('+', ''), 10);
+    const bNum = parseInt(b.code.replace('+', ''), 10);
+    if (aNum !== bNum) return aNum - bNum;
+    return a.label.localeCompare(b.label);
+  });
   const [agreements, setAgreements] = useState({});
   const [agreementsLoading, setAgreementsLoading] = useState(false);
   const [agreementsError, setAgreementsError] = useState('');
   const [formData, setFormData] = useState({
     firstName: '',
     lastName: '',
+    countryCode: 'US:+1',
     phoneNumber: '',
     email: '',
     password: '',
@@ -99,9 +146,8 @@ const SignUpModal = ({ open, onClose, onSwitchToLogin }) => {
   };
 
   const validatePhoneNumber = (phoneNumber) => {
-    // International format: starts with + followed by digits only
-    const phoneRegex = /^\+?[0-9]+$/;
-    return phoneRegex.test(phoneNumber) && phoneNumber.replace(/[^0-9]/g, '').length >= 10;
+    // Strictly 10 digits (national number)
+    return /^\d{10}$/.test(phoneNumber);
   };
 
   // Check if all mandatory fields are filled
@@ -112,6 +158,7 @@ const SignUpModal = ({ open, onClose, onSwitchToLogin }) => {
     const hasEmail = formData.email.trim().length > 0;
     const hasPassword = formData.password.trim().length > 0;
     const hasConfirmPassword = formData.confirmPassword.trim().length > 0;
+    const hasValidPhoneNumber = hasPhoneNumber && validatePhoneNumber(formData.phoneNumber);
 
     // Check if all agreements are checked
     const allAgreementsChecked = Array.isArray(agreements) && agreements.every(agreement => {
@@ -119,33 +166,43 @@ const SignUpModal = ({ open, onClose, onSwitchToLogin }) => {
       return formData[fieldName] === true;
     });
 
-    return hasFirstName && hasLastName && hasPhoneNumber && hasEmail &&
+    return hasFirstName && hasLastName && hasValidPhoneNumber && hasEmail &&
       hasPassword && hasConfirmPassword && allAgreementsChecked;
   };
 
   const handleChange = (e) => {
     const { name, value } = e.target;
 
-    // For phone number, allow only digits and + symbol
+    // For phone number, allow only digits
     if (name === 'phoneNumber') {
-      const sanitizedValue = value.replace(/[^0-9+]/g, '');
+      const sanitizedValue = value.replace(/\D/g, '');
       setFormData((prev) => ({
         ...prev,
         [name]: sanitizedValue,
       }));
+      if (sanitizedValue.trim() && !validatePhoneNumber(sanitizedValue)) {
+        setErrors((prev) => ({
+          ...prev,
+          [name]: t('auth.phoneNumberInvalid'),
+        }));
+      } else if (errors[name]) {
+        setErrors((prev) => ({
+          ...prev,
+          [name]: '',
+        }));
+      }
     } else {
       setFormData((prev) => ({
         ...prev,
         [name]: value,
       }));
-    }
-
-    // Clear error when user starts typing
-    if (errors[name]) {
-      setErrors((prev) => ({
-        ...prev,
-        [name]: '',
-      }));
+      // Clear error when user starts typing
+      if (errors[name]) {
+        setErrors((prev) => ({
+          ...prev,
+          [name]: '',
+        }));
+      }
     }
     setSubmitError('');
   };
@@ -267,6 +324,9 @@ const SignUpModal = ({ open, onClose, onSwitchToLogin }) => {
         });
       }
 
+      const selectedCountry = countryCodes.find((c) => c.key === formData.countryCode);
+      const dialingCode = selectedCountry ? selectedCountry.code : '';
+
       const response = await fetch('/api/v1/auth/registry', {
         method: 'POST',
         headers: {
@@ -275,7 +335,7 @@ const SignUpModal = ({ open, onClose, onSwitchToLogin }) => {
         body: JSON.stringify({
           firstName: formData.firstName.trim(),
           lastName: formData.lastName.trim(),
-          phoneNumber: formData.phoneNumber.trim(),
+          phoneNumber: `${dialingCode}${formData.phoneNumber.trim()}`,
           email: formData.email.trim(),
           password: formData.password,
           signedAgreements: signedAgreements,
@@ -299,6 +359,7 @@ const SignUpModal = ({ open, onClose, onSwitchToLogin }) => {
         const resetData = {
           firstName: '',
           lastName: '',
+          countryCode: 'US:+1',
           phoneNumber: '',
           email: '',
           password: '',
@@ -339,6 +400,7 @@ const SignUpModal = ({ open, onClose, onSwitchToLogin }) => {
       const resetData = {
         firstName: '',
         lastName: '',
+        countryCode: 'US:+1',
         phoneNumber: '',
         email: '',
         password: '',
@@ -452,31 +514,73 @@ const SignUpModal = ({ open, onClose, onSwitchToLogin }) => {
             }}
           />
 
-          <TextField
-            fullWidth
-            id="phoneNumber"
-            name="phoneNumber"
-            label={t('auth.phoneNumber')}
-            type="tel"
-            value={formData.phoneNumber}
-            onChange={handleChange}
-            error={!!errors.phoneNumber}
-            margin="normal"
-            required
-            autoComplete="tel"
-            disabled={loading || success}
-            variant="outlined"
-            placeholder="+1234567890"
-            InputProps={{
-              endAdornment: errors.phoneNumber && (
-                <Tooltip title={errors.phoneNumber} arrow placement="top">
-                  <IconButton size="small" edge="end" color="error">
-                    <ErrorOutlineIcon />
-                  </IconButton>
-                </Tooltip>
-              ),
+          <Box
+            sx={{
+              display: 'flex',
+              gap: 2,
+              flexDirection: { xs: 'column', sm: 'row' },
+              mt: 2,
             }}
-          />
+          >
+            <TextField
+              select
+              fullWidth
+              id="countryCode"
+              name="countryCode"
+              label={t('auth.countryCode')}
+              value={formData.countryCode}
+              onChange={handleChange}
+              margin="normal"
+              required
+              disabled={loading || success}
+              variant="outlined"
+              sx={{ flex: { xs: '1 1 auto', sm: '0 0 200px' } }}
+              SelectProps={{
+                renderValue: (selected) => {
+                  const match = countryCodes.find((c) => c.key === selected);
+                  return match ? `${match.flag} ${match.label}` : selected;
+                },
+                MenuProps: {
+                  disablePortal: true,
+                  anchorOrigin: { vertical: 'bottom', horizontal: 'left' },
+                  transformOrigin: { vertical: 'top', horizontal: 'left' },
+                  PaperProps: { sx: { maxHeight: 320 } },
+                },
+              }}
+            >
+              {sortedCountryCodes.map((option) => (
+                <MenuItem key={option.key} value={option.key}>
+                  {option.flag} {option.label}
+                </MenuItem>
+              ))}
+            </TextField>
+            <TextField
+              fullWidth
+              id="phoneNumber"
+              name="phoneNumber"
+              label={t('auth.phoneNumber')}
+              type="tel"
+              value={formData.phoneNumber}
+              onChange={handleChange}
+              error={!!errors.phoneNumber}
+              margin="normal"
+              required
+              autoComplete="tel"
+              disabled={loading || success}
+              variant="outlined"
+              placeholder="5551234567"
+              inputProps={{ maxLength: 10 }}
+              InputProps={{
+                endAdornment: errors.phoneNumber && (
+                  <Tooltip title={errors.phoneNumber} arrow placement="top">
+                    <IconButton size="small" edge="end" color="error">
+                      <ErrorOutlineIcon />
+                    </IconButton>
+                  </Tooltip>
+                ),
+              }}
+            />
+          </Box>
 
           <TextField
             fullWidth
@@ -648,4 +752,3 @@ const SignUpModal = ({ open, onClose, onSwitchToLogin }) => {
 };
 
 export default SignUpModal;
-

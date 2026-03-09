@@ -960,6 +960,7 @@ const BookingPage = ({ sessionTypeId: propSessionTypeId, hideMyBookings = false 
 
       // Success - close dialog and refresh bookings and slots
       handleCancelDialogClose();
+      setSuccessMessage(t('pages.booking.bookingCanceled'));
       if (hasToken) {
         await fetchBookings(); // Refresh bookings list when user is logged in
         await fetchPastBookings(); // Refresh past sessions to show canceled booking
@@ -2572,11 +2573,11 @@ const BookingPage = ({ sessionTypeId: propSessionTypeId, hideMyBookings = false 
             sx={{
               px: { xs: 2, sm: 3 },
               pb: { xs: 2.5, sm: 2 },
-              flexDirection: { xs: 'column-reverse', sm: 'row' },
-              gap: { xs: 1.5, sm: 1 },
+              flexDirection: 'column-reverse',
+              gap: 1.5,
               '& button': {
-                width: { xs: '100%', sm: 'auto' },
-                m: { xs: '0 !important', sm: '0 0 0 8px !important' }
+                width: '100%',
+                m: '0 !important'
               }
             }}
           >
@@ -2586,7 +2587,7 @@ const BookingPage = ({ sessionTypeId: propSessionTypeId, hideMyBookings = false 
               color="primary"
               disabled={cancelling}
               sx={{ textTransform: 'none' }}
-              fullWidth={isSmallScreen}
+              fullWidth
             >
               {t('pages.booking.keepBooking')}
             </Button>
@@ -2596,7 +2597,7 @@ const BookingPage = ({ sessionTypeId: propSessionTypeId, hideMyBookings = false 
               color="error"
               disabled={cancelling}
               sx={{ textTransform: 'none' }}
-              fullWidth={isSmallScreen}
+              fullWidth
             >
               {cancelling ? (
                 <>
