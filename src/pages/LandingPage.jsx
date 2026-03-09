@@ -28,8 +28,6 @@ import {
   MenuItem,
   Menu,
   Tooltip,
-  useTheme,
-  useMediaQuery,
 } from '@mui/material';
 import CloseIcon from '@mui/icons-material/Close';
 import ArrowBackIosIcon from '@mui/icons-material/ArrowBackIos';
@@ -49,6 +47,7 @@ import axios from 'axios';
 import apiClient from '../utils/api';
 import BookingPageContent from './BookingPage';
 import { loadImageWithCache } from '../utils/imageCache';
+import { useResponsiveLayout } from '../utils/useResponsiveLayout';
 
 // Currency symbol mapping
 const getCurrencySymbol = (currency) => {
@@ -72,9 +71,9 @@ const areAllPricesZero = (prices) => {
 const LandingPage = () => {
   const { t } = useTranslation();
   const navigate = useNavigate();
-  const theme = useTheme();
-  const isMobile = useMediaQuery(theme.breakpoints.down('md'));
-  const isMobileImage = useMediaQuery(theme.breakpoints.down('md'));
+  const { isMobileLayout } = useResponsiveLayout();
+  const isMobile = isMobileLayout;
+  const isMobileImage = isMobileLayout;
   const heroRef = useRef(null);
   const aboutRef = useRef(null);
   const servicesRef = useRef(null);
@@ -518,39 +517,6 @@ const LandingPage = () => {
                 }}
               />
             )}
-            {/* Book a Session button – centered */}
-            <Box
-              sx={{
-                position: 'absolute',
-                bottom: '25%',
-                left: 0,
-                right: 0,
-                display: 'flex',
-                justifyContent: 'center',
-                zIndex: 3,
-              }}
-            >
-              <Button
-                variant="contained"
-                onClick={() => scrollToSection(servicesRef)}
-                sx={{
-                  px: { xs: 3, sm: 5 },
-                  py: { xs: 1.2, sm: 1.8 },
-                  fontSize: { xs: '0.9rem', sm: '1.1rem' },
-                  textTransform: 'none',
-                  bgcolor: heroButtonColour,
-                  color: heroButtonTextColour,
-                  fontWeight: 600,
-                  boxShadow: '0 4px 20px rgba(0,0,0,0.25)',
-                  '&:hover': {
-                    bgcolor: heroButtonColour,
-                    filter: 'brightness(0.95)',
-                  },
-                }}
-              >
-                {t('landing.hero.bookSession')}
-              </Button>
-            </Box>
           </Box>
         ) : (
           /* ─── Desktop layout: two side-by-side frames ─── */
@@ -576,8 +542,7 @@ const LandingPage = () => {
                 alignItems: 'stretch',
               }}
             >
-              {/* LEFT FRAME – Book a Session button always centered; welcomeLeftImageUrl shown as bg when set */}
-
+              {/* LEFT FRAME – background image when set */}
               <Box
                 sx={{
                   flex: '0 0 50%',
@@ -608,28 +573,6 @@ const LandingPage = () => {
                     }}
                   />
                 )}
-                <Button
-                  variant="contained"
-                  onClick={() => scrollToSection(servicesRef)}
-                  sx={{
-                    px: 'clamp(20px, 2.5vw, 72px)',
-                    py: 'clamp(10px, 1.2vw, 36px)',
-                    fontSize: 'clamp(0.85rem, 1.1vw + 0.2rem, 1.8rem)',
-                    textTransform: 'none',
-                    bgcolor: heroButtonColour,
-                    color: heroButtonTextColour,
-                    fontWeight: 600,
-                    boxShadow: '0 4px 24px rgba(0,0,0,0.20)',
-                    zIndex: 3,
-                    position: 'relative',
-                    '&:hover': {
-                      bgcolor: heroButtonColour,
-                      filter: 'brightness(0.95)',
-                    },
-                  }}
-                >
-                  {t('landing.hero.bookSession')}
-                </Button>
               </Box>
 
               {/* RIGHT FRAME – personal photo (welcomeRightMediaId) */}
@@ -672,6 +615,35 @@ const LandingPage = () => {
             </Box>
           </Box>
         )}
+      </Box>
+
+      {/* Primary Book a Session CTA section, placed after hero images */}
+      <Box
+        sx={{
+          py: { xs: 4, sm: 5 },
+          px: 2,
+          display: 'flex',
+          justifyContent: 'center',
+          alignItems: 'center',
+          backgroundColor: 'background.default',
+        }}
+      >
+        <Button
+          variant="contained"
+          color="primary"
+          onClick={() => scrollToSection(servicesRef)}
+          sx={{
+            px: { xs: 4, sm: 6 },
+            py: { xs: 1.4, sm: 1.8 },
+            fontSize: { xs: '0.95rem', sm: '1.05rem' },
+            borderRadius: 999,
+            textTransform: 'none',
+            fontWeight: 600,
+            boxShadow: 4,
+          }}
+        >
+          {t('landing.hero.bookSession')}
+        </Button>
       </Box>
 
       {/* About Section */}

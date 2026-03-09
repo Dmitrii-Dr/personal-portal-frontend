@@ -25,12 +25,12 @@ import {
   ListItemText,
   Divider,
   Avatar,
-  useMediaQuery,
-  useTheme,
   Drawer,
   List,
   ListItem,
   ListItemButton,
+  useMediaQuery,
+  useTheme,
 } from '@mui/material';
 import LogoutIcon from '@mui/icons-material/Logout';
 import AccountCircleIcon from '@mui/icons-material/AccountCircle';
