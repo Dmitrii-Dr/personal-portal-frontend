@@ -986,7 +986,12 @@ const AppLayout = ({ children }) => {
                     onClick={() => {
                       if (userProfile?.isVerified === false) {
                         handleUserMenuClose();
-                        navigate('/verify-account');
+                        navigate('/verify-account', {
+                          state: {
+                            returnTo: '/profile',
+                            email: userProfile?.email || '',
+                          },
+                        });
                       } else {
                         handleUserMenuClick('/profile');
                       }

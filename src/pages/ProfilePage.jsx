@@ -273,9 +273,17 @@ const ProfilePage = ({ isAdminProfile = false }) => {
         if (!isMounted) return;
 
         if (data) {
-          // Redirect unverified users to the verification page
+          // Redirect unverified users to the verification page and ensure that,
+          // after successful verification, they are returned to the profile
+          // page instead of the default booking page.
           if (data.isVerified === false) {
-            navigate('/verify-account', { replace: true });
+            navigate('/verify-account', {
+              replace: true,
+              state: {
+                returnTo: '/profile',
+                email: data.email,
+              },
+            });
             return;
           }
           setProfile(data);

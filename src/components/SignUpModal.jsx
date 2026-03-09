@@ -17,10 +17,15 @@ import {
   Typography,
   IconButton,
   Tooltip,
+  useMediaQuery,
+  useTheme,
 } from '@mui/material';
 import ErrorOutlineIcon from '@mui/icons-material/ErrorOutline';
+import CloseIcon from '@mui/icons-material/Close';
 
 const SignUpModal = ({ open, onClose, onSwitchToLogin }) => {
+  const theme = useTheme();
+  const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
   const { t } = useTranslation();
   const [agreements, setAgreements] = useState({});
   const [agreementsLoading, setAgreementsLoading] = useState(false);
@@ -374,8 +379,13 @@ const SignUpModal = ({ open, onClose, onSwitchToLogin }) => {
   };
 
   return (
-    <Dialog open={open} onClose={handleClose} maxWidth="sm" fullWidth>
-      <DialogTitle>{t('auth.signUpTitle')}</DialogTitle>
+    <Dialog open={open} onClose={handleClose} maxWidth="sm" fullWidth fullScreen={isMobile}>
+      <DialogTitle sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', pr: 1 }}>
+        {t('auth.signUpTitle')}
+        <IconButton size="small" onClick={handleClose} aria-label="close">
+          <CloseIcon fontSize="small" />
+        </IconButton>
+      </DialogTitle>
       <DialogContent>
         {success && (
           <Alert severity="success" sx={{ mb: 2 }}>

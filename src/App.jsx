@@ -561,8 +561,8 @@ const LoginPage = () => {
         minHeight: '60vh',
       }}
     >
-      <Card sx={{ maxWidth: 500, width: '100%' }}>
-        <CardContent sx={{ p: 4 }}>
+      <Card sx={{ maxWidth: 500, width: '100%', mx: { xs: 2, sm: 0 }, boxShadow: { xs: 0, sm: 1 } }}>
+        <CardContent sx={{ p: { xs: 2, sm: 4 } }}>
           <Typography variant="h4" component="h1" gutterBottom align="center">
             Login
           </Typography>

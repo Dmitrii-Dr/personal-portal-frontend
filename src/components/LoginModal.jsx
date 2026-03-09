@@ -15,10 +15,14 @@ import {
   Box,
   IconButton,
   Link as MuiLink,
+  useMediaQuery,
+  useTheme,
 } from '@mui/material';
 import CloseIcon from '@mui/icons-material/Close';
 
 const LoginModal = ({ open, onClose, onSwitchToSignUp }) => {
+  const theme = useTheme();
+  const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
   const { t } = useTranslation();
   const navigate = useNavigate();
   const [showForgotPassword, setShowForgotPassword] = useState(false);
@@ -227,14 +231,12 @@ const LoginModal = ({ open, onClose, onSwitchToSignUp }) => {
   };
 
   return (
-    <Dialog open={open} onClose={handleClose} maxWidth="sm" fullWidth>
+    <Dialog open={open} onClose={handleClose} maxWidth="sm" fullWidth fullScreen={isMobile}>
       <DialogTitle sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', pr: 1 }}>
         {showForgotPassword ? t('auth.forgotPasswordTitle') : t('auth.login')}
-        {showForgotPassword && (
-          <IconButton size="small" onClick={handleBackToLogin} aria-label="close">
-            <CloseIcon fontSize="small" />
-          </IconButton>
-        )}
+        <IconButton size="small" onClick={handleClose} aria-label="close">
+          <CloseIcon fontSize="small" />
+        </IconButton>
       </DialogTitle>
       <DialogContent>
         {showForgotPassword ? (
@@ -292,6 +294,17 @@ const LoginModal = ({ open, onClose, onSwitchToSignUp }) => {
                   t('auth.sendResetLink')
                 )}
               </Button>
+
+              <Box sx={{ textAlign: 'center' }}>
+                <MuiLink
+                  component="button"
+                  type="button"
+                  onClick={handleBackToLogin}
+                  sx={{ textDecoration: 'none', cursor: 'pointer', fontSize: '0.875rem' }}
+                >
+                  {t('auth.backToLogin')}
+                </MuiLink>
+              </Box>
             </Box>
           </>
         ) : (
