@@ -485,7 +485,7 @@ const AppLayout = ({ children }) => {
         sx={{
           top: 0,
           zIndex: 1100,
-          bgcolor: isLandingPage && !scrolled ? 'transparent' : '#2C5F5F',
+          bgcolor: isLandingPage && !scrolled ? 'transparent' : 'primary.main',
           boxShadow: isLandingPage && !scrolled ? 'none' : 2,
           transition: 'all 0.3s ease-in-out',
         }}
