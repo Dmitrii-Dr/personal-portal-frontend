@@ -80,7 +80,6 @@ const AdminHomePage = () => {
   const [welcomeRightColour, setWelcomeRightColour] = useState('#7f7d72');
   const [welcomeButtonColour, setWelcomeButtonColour] = useState('#ffffff');
   const [welcomeButtonTextColour, setWelcomeButtonTextColour] = useState('#2C5F5F');
-  const [mainThemeColourHex, setMainThemeColourHex] = useState('#2C5F5F');
 
   // Image upload states
   const [uploadingWelcomeRightImage, setUploadingWelcomeRightImage] = useState(false);
@@ -187,7 +186,6 @@ const AdminHomePage = () => {
         setWelcomeRightColour(ep.welcomeRightColourHex || '#7f7d72');
         setWelcomeButtonColour(ep.welcomeBookSessionButtonColourHex || '#ffffff');
         setWelcomeButtonTextColour(ep.welcomeBookSessionButtonTextColourHex || '#2C5F5F');
-        setMainThemeColourHex(ep.mainThemeColourHex || '#2C5F5F');
 
         // Load contact links if available
         if (data.contact && Array.isArray(data.contact)) {
@@ -805,7 +803,6 @@ const AdminHomePage = () => {
             welcomeRightColourHex: welcomeRightColour,
             welcomeBookSessionButtonColourHex: welcomeButtonColour,
             welcomeBookSessionButtonTextColourHex: welcomeButtonTextColour,
-            mainThemeColourHex: mainThemeColourHex,
           },
         }),
       });
@@ -834,7 +831,7 @@ const AdminHomePage = () => {
   }
 
   return (
-    <Box sx={{ bgcolor: 'primary.main' }}>
+    <Box sx={{ bgcolor: '#2C5F5F' }}>
       {/* Header */}
       <Box sx={{ p: 2, bgcolor: 'background.paper', borderBottom: 1, borderColor: 'divider' }}>
         <Typography variant="h4" component="h1" gutterBottom>
@@ -1108,33 +1105,6 @@ const AdminHomePage = () => {
                     </Typography>
                   </Box>
                 </Box>
-                {/* Main Theme colour */}
-                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
-                  <Box
-                    component="input"
-                    type="color"
-                    value={mainThemeColourHex}
-                    onChange={(e) => setMainThemeColourHex(e.target.value)}
-                    sx={{
-                      width: 48,
-                      height: 48,
-                      border: '1px solid',
-                      borderColor: 'divider',
-                      borderRadius: 1,
-                      cursor: 'pointer',
-                      p: 0.5,
-                      bgcolor: 'transparent',
-                    }}
-                  />
-                  <Box>
-                    <Typography variant="body2" fontWeight={500}>
-                      {t('admin.home.mainThemeColour', 'Main Theme Colour (Portal)')}
-                    </Typography>
-                    <Typography variant="caption" color="text.secondary">
-                      {mainThemeColourHex.toUpperCase()}
-                    </Typography>
-                  </Box>
-                </Box>
               </Box>
             </Paper>
           </Box>
@@ -1232,7 +1202,7 @@ const AdminHomePage = () => {
                     sx={{
                       width: { xs: 200, sm: 300, md: 400 },
                       height: { xs: 200, sm: 300, md: 400 },
-                      bgcolor: 'primary.main',
+                      bgcolor: '#2C5F5F',
                       fontSize: { xs: '4rem', md: '6rem' },
                       fontWeight: 600,
                     }}
@@ -1322,7 +1292,7 @@ const AdminHomePage = () => {
                     sx={{
                       width: { xs: 150, sm: 200, md: 250 },
                       height: { xs: 150, sm: 200, md: 250 },
-                      bgcolor: 'primary.main',
+                      bgcolor: '#2C5F5F',
                       fontSize: { xs: '3rem', md: '4rem' },
                       fontWeight: 600,
                     }}
@@ -1725,7 +1695,7 @@ const AdminHomePage = () => {
         component="section"
         sx={{
           py: { xs: 6, md: 10 },
-          bgcolor: 'primary.dark',
+          bgcolor: '#1F4545',
           color: 'white',
         }}
       >
@@ -1886,7 +1856,7 @@ const AdminHomePage = () => {
                             minWidth: 'auto',
                             flex: 1,
                             bgcolor: 'white',
-                            color: 'primary.dark',
+                            color: '#1F4545',
                             '&:hover': {
                               bgcolor: 'rgba(255, 255, 255, 0.9)',
                             },
@@ -1922,7 +1892,7 @@ const AdminHomePage = () => {
                           width: '100%',
                           minWidth: 160,
                           bgcolor: 'white',
-                          color: 'primary.dark',
+                          color: '#1F4545',
                           '&:hover': {
                             bgcolor: 'rgba(255, 255, 255, 0.9)',
                           },

@@ -48,11 +48,13 @@ import { fetchTimezones } from './utils/timezoneService';
 import axios from 'axios';
 import dayjs from 'dayjs';
 
-const createAppTheme = (mainThemeColor) => createTheme({
+const theme = createTheme({
   palette: {
     mode: 'light',
     primary: {
-      main: mainThemeColor, // Dynamic main theme color (defaults to #2C5F5F)
+      main: '#2C5F5F', // Dark teal
+      light: '#3A7A7A',
+      dark: '#1F4545',
       contrastText: '#ffffff',
     },
     secondary: {
@@ -719,25 +721,8 @@ function AppInner() {
 }
 
 function App() {
-  const [appTheme, setAppTheme] = useState(() => createAppTheme('#2C5F5F'));
-
-  useEffect(() => {
-    // Fetch welcome data to see if we have a custom main theme color
-    fetch('/api/v1/public/welcome')
-      .then(res => res.json())
-      .then(data => {
-        const ep = data.extendedParameters || {};
-        if (ep.mainThemeColourHex) {
-          setAppTheme(createAppTheme(ep.mainThemeColourHex));
-        }
-      })
-      .catch(err => {
-        console.error('Error fetching dynamic theme color:', err);
-      });
-  }, []);
-
   return (
-    <ThemeProvider theme={appTheme}>
+    <ThemeProvider theme={theme}>
       <CssBaseline />
       <ErrorBoundary>
         <Router>

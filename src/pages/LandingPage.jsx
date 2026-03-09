@@ -514,7 +514,7 @@ const LandingPage = () => {
                 sx={{
                   position: 'absolute',
                   inset: 0,
-                  background: (theme) => `linear-gradient(135deg, ${theme.palette.primary.main} 0%, ${theme.palette.primary.dark} 100%)`,
+                  background: 'linear-gradient(135deg, #2C5F5F 0%, #1F4545 100%)',
                 }}
               />
             )}
@@ -664,7 +664,7 @@ const LandingPage = () => {
                     sx={{
                       position: 'absolute',
                       inset: 0,
-                      background: (theme) => `linear-gradient(145deg, ${theme.palette.primary.dark} 0%, ${theme.palette.primary.main} 100%)`,
+                      background: 'linear-gradient(145deg, #1F4545 0%, #2C5F5F 100%)',
                     }}
                   />
                 )}
@@ -840,7 +840,7 @@ const LandingPage = () => {
                     sx={{
                       width: { xs: 200, sm: 300, md: 400 },
                       height: { xs: 200, sm: 300, md: 400 },
-                      bgcolor: 'primary.main',
+                      bgcolor: '#2C5F5F',
                       fontSize: { xs: '4rem', md: '6rem' },
                       fontWeight: 600,
                     }}
@@ -899,7 +899,7 @@ const LandingPage = () => {
                     sx={{
                       width: { xs: 150, sm: 200, md: 250 },
                       height: { xs: 150, sm: 200, md: 250 },
-                      bgcolor: 'primary.main',
+                      bgcolor: '#2C5F5F',
                       fontSize: { xs: '3rem', md: '4rem' },
                       fontWeight: 600,
                     }}
@@ -1851,7 +1851,7 @@ const LandingPage = () => {
         component="footer"
         sx={{
           py: { xs: 6, md: 8 },
-          bgcolor: 'primary.dark',
+          bgcolor: '#1F4545',
           color: 'white',
           scrollMarginTop: '64px',
         }}
