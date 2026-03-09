@@ -1664,10 +1664,12 @@ const LandingPage = () => {
         }}
         maxWidth="lg"
         fullWidth
+        fullScreen={isMobile}
         PaperProps={{
           sx: {
-            borderRadius: 2,
-            maxHeight: '95vh',
+            borderRadius: isMobile ? 0 : 2,
+            maxHeight: isMobile ? 'none' : '95vh',
+            height: isMobile ? '100%' : undefined,
             display: 'flex',
             flexDirection: 'column',
           },

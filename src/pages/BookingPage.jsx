@@ -60,6 +60,8 @@ import {
   Tooltip,
   Snackbar,
   IconButton,
+  useMediaQuery,
+  useTheme,
 } from '@mui/material';
 import CloseIcon from '@mui/icons-material/Close';
 import { DateCalendar } from '@mui/x-date-pickers/DateCalendar';
@@ -71,6 +73,10 @@ import KeyboardArrowUpIcon from '@mui/icons-material/KeyboardArrowUp';
 
 const BookingPage = ({ sessionTypeId: propSessionTypeId, hideMyBookings = false }) => {
   const { t, i18n: i18nInstance } = useTranslation();
+  const theme = useTheme();
+  // Treat "mobile view" as widths below the md breakpoint so phones
+  // (including large ones) and small tablets get a full-screen dialog.
+  const isSmallScreen = useMediaQuery(theme.breakpoints.down('md'));
   const [selectedDate, setSelectedDate] = useState(dayjs());
   const [availableSlots, setAvailableSlots] = useState([]);
   const [loading, setLoading] = useState(false); // Don't fetch on mount, only when dialog opens
@@ -1852,17 +1858,24 @@ const BookingPage = ({ sessionTypeId: propSessionTypeId, hideMyBookings = false 
               </Box>
             )}
 
-            <Grid container spacing={3} sx={{ mt: propSessionTypeId ? 0 : 2 }}>
+            <Grid
+              container
+              spacing={isSmallScreen ? 2 : 3}
+              sx={{
+                mt: propSessionTypeId ? 0 : 2,
+                flexDirection: isSmallScreen ? 'column' : 'row',
+              }}
+            >
               {/* Left Column - Date Calendar */}
               <Grid item xs={12} md={6}>
                 <Box
                   sx={{
                     display: 'flex',
                     justifyContent: 'center',
-                    border: 1,
+                    border: isSmallScreen ? 0 : 1,
                     borderColor: 'divider',
                     borderRadius: 2,
-                    p: 2,
+                    p: isSmallScreen ? 0 : 2,
                     bgcolor: 'background.paper',
                   }}
                 >
@@ -1954,7 +1967,7 @@ const BookingPage = ({ sessionTypeId: propSessionTypeId, hideMyBookings = false 
                   <Box sx={{ position: 'relative' }}>
                     <Box
                       ref={slotsScrollRef}
-                      sx={{ maxHeight: '260px', overflowY: 'auto', pr: 1 }}
+                      sx={{ maxHeight: isSmallScreen ? '50vh' : '260px', overflowY: 'auto', pr: 1 }}
                       onScroll={(e) => {
                         const element = e.target;
                         const isAtTop = element.scrollTop === 0;
@@ -2054,6 +2067,17 @@ const BookingPage = ({ sessionTypeId: propSessionTypeId, hideMyBookings = false 
             onClose={handleNewBookingDialogClose}
             maxWidth="md"
             fullWidth
+            fullScreen={isSmallScreen}
+            PaperProps={{
+              sx: isSmallScreen
+                ? {
+                  m: 0,
+                  width: '100%',
+                  maxWidth: '100%',
+                  borderRadius: 0,
+                }
+                : {},
+            }}
           >
             <DialogTitle>
               {t('landing.booking.title')}
@@ -2070,7 +2094,13 @@ const BookingPage = ({ sessionTypeId: propSessionTypeId, hideMyBookings = false 
                 <CloseIcon />
               </IconButton>
             </DialogTitle>
-            <DialogContent sx={{ pb: 1, minHeight: '555px' }}>
+            <DialogContent
+              sx={{
+                pb: 1,
+                minHeight: isSmallScreen ? 'auto' : '555px',
+                px: isSmallScreen ? 2 : 3,
+              }}
+            >
               {/* Session Type Selection - only show if not provided as prop */}
               {!propSessionTypeId && (
                 <Box sx={{ mb: 3, mt: 2 }}>
@@ -2105,17 +2135,24 @@ const BookingPage = ({ sessionTypeId: propSessionTypeId, hideMyBookings = false 
                 </Box>
               )}
 
-              <Grid container spacing={3} sx={{ mt: propSessionTypeId ? 0 : 2 }}>
+              <Grid
+                container
+                spacing={isSmallScreen ? 2 : 3}
+                sx={{
+                  mt: propSessionTypeId ? 0 : 2,
+                  flexDirection: isSmallScreen ? 'column' : 'row',
+                }}
+              >
                 {/* Left Column - Date Calendar */}
                 <Grid item xs={12} md={6}>
                   <Box
                     sx={{
                       display: 'flex',
                       justifyContent: 'center',
-                      border: 1,
+                      border: isSmallScreen ? 0 : 1,
                       borderColor: 'divider',
                       borderRadius: 2,
-                      p: 2,
+                      p: isSmallScreen ? 0 : 2,
                       bgcolor: 'background.paper',
                     }}
                   >
@@ -2198,16 +2235,21 @@ const BookingPage = ({ sessionTypeId: propSessionTypeId, hideMyBookings = false 
                         display: 'flex',
                         justifyContent: 'center',
                         alignItems: 'center',
-                        minHeight: 200,
+                        minHeight: isSmallScreen ? 160 : 200,
                       }}
                     >
                       <CircularProgress />
                     </Box>
                   ) : availableSlots.length > 0 ? (
-                    <Box sx={{ position: 'relative' }}>
+                    <Box
+                      sx={{
+                        position: 'relative',
+                        maxHeight: isSmallScreen ? '50vh' : '260px',
+                      }}
+                    >
                       <Box
                         ref={newBookingSlotsScrollRef}
-                        sx={{ maxHeight: '260px', overflowY: 'auto', pr: 1 }}
+                        sx={{ maxHeight: isSmallScreen ? '50vh' : '260px', overflowY: 'auto', pr: 1 }}
                         onScroll={(e) => {
                           const element = e.target;
                           const isAtTop = element.scrollTop === 0;
@@ -2304,7 +2346,23 @@ const BookingPage = ({ sessionTypeId: propSessionTypeId, hideMyBookings = false 
         )}
 
         {/* Booking Confirmation Dialog */}
-        <Dialog open={openDialog} onClose={handleDialogClose} maxWidth="sm" fullWidth>
+        <Dialog
+          open={openDialog}
+          onClose={handleDialogClose}
+          maxWidth="sm"
+          fullWidth
+          fullScreen={isSmallScreen}
+          PaperProps={{
+            sx: isSmallScreen
+              ? {
+                m: 0,
+                width: '100%',
+                maxWidth: '100%',
+                borderRadius: 0,
+              }
+              : {},
+          }}
+        >
           <DialogTitle sx={{ m: 0, px: 3, pt: 2, pb: 1, pr: 6, textAlign: 'left' }}>
             {t('pages.booking.confirmBookingTitle')}
             <IconButton
@@ -2397,6 +2455,17 @@ const BookingPage = ({ sessionTypeId: propSessionTypeId, hideMyBookings = false 
           }}
           maxWidth="sm"
           fullWidth
+          fullScreen={isSmallScreen}
+          PaperProps={{
+            sx: isSmallScreen
+              ? {
+                m: 0,
+                width: '100%',
+                maxWidth: '100%',
+                borderRadius: 0,
+              }
+              : {},
+          }}
         >
           <DialogTitle sx={{ m: 0, p: 2, pr: 6 }}>
             {t('auth.loginRequired')}
@@ -2466,7 +2535,23 @@ const BookingPage = ({ sessionTypeId: propSessionTypeId, hideMyBookings = false 
         </Dialog>
 
         {/* Cancel Booking Confirmation Dialog */}
-        <Dialog open={cancelDialogOpen} onClose={handleCancelDialogClose}>
+        <Dialog
+          open={cancelDialogOpen}
+          onClose={handleCancelDialogClose}
+          maxWidth="sm"
+          fullWidth
+          fullScreen={isSmallScreen}
+          PaperProps={{
+            sx: isSmallScreen
+              ? {
+                m: 0,
+                width: '100%',
+                maxWidth: '100%',
+                borderRadius: 0,
+              }
+              : {},
+          }}
+        >
           <DialogTitle>{t('pages.booking.cancelBookingTitle')}</DialogTitle>
           <DialogContent>
             <DialogContentText>
@@ -2513,7 +2598,23 @@ const BookingPage = ({ sessionTypeId: propSessionTypeId, hideMyBookings = false 
         </Dialog>
 
         {/* Update Booking Dialog */}
-        <Dialog open={updateDialogOpen} onClose={handleUpdateDialogClose} maxWidth="md" fullWidth>
+        <Dialog
+          open={updateDialogOpen}
+          onClose={handleUpdateDialogClose}
+          maxWidth="md"
+          fullWidth
+          fullScreen={isSmallScreen}
+          PaperProps={{
+            sx: isSmallScreen
+              ? {
+                m: 0,
+                width: '100%',
+                maxWidth: '100%',
+                borderRadius: 0,
+              }
+              : {},
+          }}
+        >
           <DialogTitle sx={{ m: 0, p: 2, pr: 6 }}>
             {t('pages.booking.updateSessionDateTimeTitle')}
             <IconButton
@@ -2530,7 +2631,13 @@ const BookingPage = ({ sessionTypeId: propSessionTypeId, hideMyBookings = false 
               <CloseIcon />
             </IconButton>
           </DialogTitle>
-          <DialogContent sx={{ pb: 1, minHeight: '555px' }}>
+          <DialogContent
+            sx={{
+              pb: 1,
+              minHeight: isSmallScreen ? 'auto' : '555px',
+              px: isSmallScreen ? 2 : 3,
+            }}
+          >
             {bookingToUpdate && (
               <>
                 <Box sx={{ mb: 3, mt: 2 }}>
@@ -2545,17 +2652,24 @@ const BookingPage = ({ sessionTypeId: propSessionTypeId, hideMyBookings = false 
                   </Alert>
                 )}
 
-                <Grid container spacing={3} sx={{ mt: 2 }}>
+                <Grid
+                  container
+                  spacing={isSmallScreen ? 2 : 3}
+                  sx={{
+                    mt: 2,
+                    flexDirection: isSmallScreen ? 'column' : 'row',
+                  }}
+                >
                   {/* Left Column - Date Calendar */}
                   <Grid item xs={12} md={6}>
                     <Box
                       sx={{
                         display: 'flex',
                         justifyContent: 'center',
-                        border: 1,
+                        border: isSmallScreen ? 0 : 1,
                         borderColor: 'divider',
                         borderRadius: 2,
-                        p: 2,
+                        p: isSmallScreen ? 0 : 2,
                         bgcolor: 'background.paper',
                       }}
                     >
@@ -2612,10 +2726,10 @@ const BookingPage = ({ sessionTypeId: propSessionTypeId, hideMyBookings = false 
                         <CircularProgress />
                       </Box>
                     ) : updateAvailableSlots.length > 0 ? (
-                      <Box sx={{ position: 'relative' }}>
+                      <Box sx={{ position: 'relative', maxHeight: isSmallScreen ? '50vh' : '260px' }}>
                         <Box
                           ref={updateBookingSlotsScrollRef}
-                          sx={{ maxHeight: '260px', overflowY: 'auto', pr: 1 }}
+                          sx={{ maxHeight: isSmallScreen ? '50vh' : '260px', overflowY: 'auto', pr: 1 }}
                           onScroll={(e) => {
                             const element = e.target;
                             const isAtTop = element.scrollTop === 0;
@@ -2716,7 +2830,23 @@ const BookingPage = ({ sessionTypeId: propSessionTypeId, hideMyBookings = false 
         </Dialog>
 
         {/* Confirm Update Dialog */}
-        <Dialog open={confirmUpdateDialogOpen} onClose={handleConfirmUpdateDialogClose} maxWidth="md" fullWidth>
+        <Dialog
+          open={confirmUpdateDialogOpen}
+          onClose={handleConfirmUpdateDialogClose}
+          maxWidth="md"
+          fullWidth
+          fullScreen={isSmallScreen}
+          PaperProps={{
+            sx: isSmallScreen
+              ? {
+                m: 0,
+                width: '100%',
+                maxWidth: '100%',
+                borderRadius: 0,
+              }
+              : {},
+          }}
+        >
           <DialogTitle sx={{ m: 0, p: 2, pr: 6 }}>
             {t('pages.booking.confirmUpdateTitle')}
             <IconButton
