@@ -531,18 +531,18 @@ const LandingPage = () => {
               justifyContent: 'center',
             }}
           >
-            {/* Inner constrained container — stops growing at 1920px */}
+            {/* Inner constrained container — stops growing at 1600px */}
             <Box
               sx={{
                 width: '100%',
-                maxWidth: '1920px',
+                maxWidth: '1700px',
                 height: '100%',
                 display: 'flex',
                 flexDirection: 'row',
                 alignItems: 'stretch',
               }}
             >
-              {/* LEFT FRAME – background image when set */}
+              {/* LEFT FRAME – background image when set, with Book a Session button centered */}
               <Box
                 sx={{
                   flex: '0 0 50%',
@@ -573,6 +573,29 @@ const LandingPage = () => {
                     }}
                   />
                 )}
+                <Button
+                  variant="contained"
+                  onClick={() => scrollToSection(servicesRef)}
+                  sx={{
+                    px: 'clamp(30px, 3vw, 40px)',
+                    py: 'clamp(12px, 1.4vw, 18px)',
+                    fontSize: 'clamp(0.75rem, 1.1vw + 0.2rem, 1.4rem)',
+                    borderRadius: 999,
+                    textTransform: 'none',
+                    bgcolor: heroButtonColour,
+                    color: heroButtonTextColour,
+                    fontWeight: 600,
+                    boxShadow: 4,
+                    zIndex: 3,
+                    position: 'relative',
+                    '&:hover': {
+                      bgcolor: heroButtonColour,
+                      filter: 'brightness(0.95)',
+                    },
+                  }}
+                >
+                  {t('landing.hero.bookSession')}
+                </Button>
               </Box>
 
               {/* RIGHT FRAME – personal photo (welcomeRightMediaId) */}
@@ -617,34 +640,36 @@ const LandingPage = () => {
         )}
       </Box>
 
-      {/* Primary Book a Session CTA section, placed after hero images */}
-      <Box
-        sx={{
-          py: { xs: 4, sm: 5 },
-          px: 2,
-          display: 'flex',
-          justifyContent: 'center',
-          alignItems: 'center',
-          backgroundColor: 'background.default',
-        }}
-      >
-        <Button
-          variant="contained"
-          color="primary"
-          onClick={() => scrollToSection(servicesRef)}
+      {/* Primary Book a Session CTA section for mobile, placed after hero images */}
+      {isMobileImage && (
+        <Box
           sx={{
-            px: { xs: 4, sm: 6 },
-            py: { xs: 1.4, sm: 1.8 },
-            fontSize: { xs: '0.95rem', sm: '1.05rem' },
-            borderRadius: 999,
-            textTransform: 'none',
-            fontWeight: 600,
-            boxShadow: 4,
+            py: { xs: 3, sm: 3 },
+            px: 2,
+            display: 'flex',
+            justifyContent: 'center',
+            alignItems: 'center',
+            backgroundColor: 'background.default',
           }}
         >
-          {t('landing.hero.bookSession')}
-        </Button>
-      </Box>
+          <Button
+            variant="contained"
+            color="primary"
+            onClick={() => scrollToSection(servicesRef)}
+            sx={{
+              px: { xs: 4, sm: 6 },
+              py: { xs: 1.4, sm: 1.4 },
+              fontSize: { xs: '0.95rem', sm: '1.05rem' },
+              borderRadius: 999,
+              textTransform: 'none',
+              fontWeight: 600,
+              boxShadow: 4,
+            }}
+          >
+            {t('landing.hero.bookSession')}
+          </Button>
+        </Box>
+      )}
 
       {/* About Section */}
       <Box
@@ -652,7 +677,8 @@ const LandingPage = () => {
         id="about"
         component="section"
         sx={{
-          py: { xs: 6, md: 10 },
+          pt: { xs: 1.25, md: 1.25 },
+          pb: { xs: 6, md: 10 },
           bgcolor: 'background.paper',
           scrollMarginTop: '64px',
         }}
