@@ -14,6 +14,7 @@ import AdminProfilePage from './pages/AdminProfilePage';
 import AdminHomePage from './pages/AdminHomePage';
 import AdminGalleryPage from './pages/AdminGalleryPage';
 import AboutMePage from './pages/AboutMePage';
+import MaintenancePage from './pages/MaintenancePage';
 import SessionsConfigurationPage from './pages/SessionsConfigurationPage';
 import ResetPasswordPage from './pages/ResetPasswordPage';
 import AccountVerificationPage from './pages/AccountVerificationPage';
@@ -43,7 +44,7 @@ import {
   CircularProgress,
 } from '@mui/material';
 import { Link } from 'react-router-dom';
-import { setToken, fetchWithAuth, getRolesFromToken } from './utils/api';
+import { setToken, fetchWithAuth, getRolesFromToken, getPublicWelcome } from './utils/api';
 import { fetchTimezones } from './utils/timezoneService';
 import axios from 'axios';
 import dayjs from 'dayjs';
@@ -683,6 +684,7 @@ function AppInner() {
             <Route path="/blog" element={<BlogPage />} />
             <Route path="/blog/:articleId" element={<ArticlePage />} />
             <Route path="/about-me" element={<AboutMePage />} />
+            <Route path="/maintenance" element={<MaintenancePage />} />
             {/* /admin is the admin login page — keep public */}
             <Route path="/admin" element={<AdminPage />} />
 
@@ -723,8 +725,7 @@ function App() {
 
   useEffect(() => {
     // Fetch welcome data to see if we have a custom main theme color
-    fetch('/api/v1/public/welcome')
-      .then(res => res.json())
+    getPublicWelcome({ timeout: 10000 })
       .then(data => {
         const ep = data.extendedParameters || {};
         if (ep.mainThemeColourHex) {

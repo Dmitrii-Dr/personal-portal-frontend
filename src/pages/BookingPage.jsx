@@ -396,7 +396,7 @@ const BookingPage = ({ sessionTypeId: propSessionTypeId, hideMyBookings = false 
       setLoadingBookings(true);
       setBookingsError(null);
 
-      const response = await apiClient.get('/api/v1/session/booking/group', {
+      const response = await apiClient.get('/api/v1/user/session/booking/group', {
         params: {
           status: 'PENDING_APPROVAL,CONFIRMED',
         },
@@ -441,7 +441,7 @@ const BookingPage = ({ sessionTypeId: propSessionTypeId, hideMyBookings = false 
       if (signal) {
         requestConfig.signal = signal;
       }
-      const response = await apiClient.get('/api/v1/session/booking', requestConfig);
+      const response = await apiClient.get('/api/v1/user/session/booking', requestConfig);
       if (response.data && Array.isArray(response.data)) {
         setPastBookings(response.data);
       } else {
@@ -866,7 +866,7 @@ const BookingPage = ({ sessionTypeId: propSessionTypeId, hideMyBookings = false 
         clientMessage: updateClientMessage.trim() || null,
       };
 
-      const response = await apiClient.put(`/api/v1/session/booking/${bookingToUpdate.id}`, payload, {
+      const response = await apiClient.put(`/api/v1/user/session/booking/${bookingToUpdate.id}`, payload, {
         timeout: 10000,
       });
 
@@ -945,11 +945,11 @@ const BookingPage = ({ sessionTypeId: propSessionTypeId, hideMyBookings = false 
 
       // Use POST for PENDING_APPROVAL or PENDING status, DELETE for others
       if (status === 'PENDING_APPROVAL' || status === 'PENDING') {
-        response = await apiClient.post(`/api/v1/session/booking/${bookingToCancel.id}/cancel`, {}, {
+        response = await apiClient.post(`/api/v1/user/session/booking/${bookingToCancel.id}/cancel`, {}, {
           timeout: 10000,
         });
       } else {
-        response = await apiClient.delete(`/api/v1/session/booking/${bookingToCancel.id}`, {
+        response = await apiClient.delete(`/api/v1/user/session/booking/${bookingToCancel.id}`, {
           timeout: 10000,
         });
       }
@@ -1039,7 +1039,7 @@ const BookingPage = ({ sessionTypeId: propSessionTypeId, hideMyBookings = false 
         clientMessage: clientMessage.trim() || null,
       };
 
-      const response = await apiClient.post('/api/v1/session/booking', payload, {
+      const response = await apiClient.post('/api/v1/user/session/booking', payload, {
         timeout: 10000,
       });
 
@@ -1124,7 +1124,7 @@ const BookingPage = ({ sessionTypeId: propSessionTypeId, hideMyBookings = false 
         return;
       }
 
-      const response = await apiClient.post('/api/v1/session/booking', payload, {
+      const response = await apiClient.post('/api/v1/user/session/booking', payload, {
         timeout: 10000,
       });
 

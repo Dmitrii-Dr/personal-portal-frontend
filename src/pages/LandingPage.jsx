@@ -44,7 +44,7 @@ import FacebookIcon from '@mui/icons-material/Facebook';
 import YouTubeIcon from '@mui/icons-material/YouTube';
 import dayjs from 'dayjs';
 import axios from 'axios';
-import apiClient from '../utils/api';
+import apiClient, { getPublicWelcome } from '../utils/api';
 import BookingPageContent from './BookingPage';
 import { loadImageWithCache } from '../utils/imageCache';
 import { useResponsiveLayout } from '../utils/useResponsiveLayout';
@@ -86,6 +86,7 @@ const LandingPage = () => {
   const [welcomeData, setWelcomeData] = useState(null);
   const [welcomeLoading, setWelcomeLoading] = useState(true);
   const [welcomeError, setWelcomeError] = useState(null);
+  const [heroImagesReady, setHeroImagesReady] = useState(false);
 
   // Image URLs state
   const [welcomeRightImageUrl, setWelcomeRightImageUrl] = useState(null);
@@ -162,27 +163,21 @@ const LandingPage = () => {
       }
     } catch (err) {
       console.error(`Error loading image for ${type}:`, err);
+      throw err;
     }
   };
 
   // Fetch welcome data
   useEffect(() => {
     let isMounted = true;
-    const controller = new AbortController();
-
     const fetchWelcomeData = async () => {
       try {
         setWelcomeLoading(true);
         setWelcomeError(null);
 
-        const response = await apiClient.get('/api/v1/public/welcome', {
-          signal: controller.signal,
-          timeout: 10000,
-        });
+        const data = await getPublicWelcome({ timeout: 10000 });
 
         if (!isMounted) return;
-
-        const data = response.data;
 
         setWelcomeData(data);
         // Set about-me data from welcome response for backward compatibility
@@ -197,22 +192,27 @@ const LandingPage = () => {
         setHeroButtonColour(ep.welcomeBookSessionButtonColourHex || '#ffffff');
         setHeroButtonTextColour(ep.welcomeBookSessionButtonTextColourHex || '#2C5F5F');
 
-        // Load images if mediaIds exist
+        // Load hero images (block rendering until these are ready or error)
+        const heroLoaders = [];
         if (data.welcomeRightMediaId) {
-          loadImage(data.welcomeRightMediaId, 'welcome-right').catch(err => {
-            console.error('Error loading welcome right image:', err);
-          });
+          heroLoaders.push(loadImage(data.welcomeRightMediaId, 'welcome-right'));
         }
         if (data.welcomeLeftMediaId) {
-          loadImage(data.welcomeLeftMediaId, 'welcome-left').catch(err => {
-            console.error('Error loading welcome left image:', err);
-          });
+          heroLoaders.push(loadImage(data.welcomeLeftMediaId, 'welcome-left'));
         }
         if (data.welcomeMobileMediaId) {
-          loadImage(data.welcomeMobileMediaId, 'welcome-mobile').catch(err => {
-            console.error('Error loading welcome mobile image:', err);
-          });
+          heroLoaders.push(loadImage(data.welcomeMobileMediaId, 'welcome-mobile'));
         }
+
+        if (heroLoaders.length > 0) {
+          await Promise.allSettled(heroLoaders);
+          if (isMounted) {
+            setHeroImagesReady(true);
+          }
+        } else if (isMounted) {
+          setHeroImagesReady(true);
+        }
+
         if (data.aboutMediaId) {
           loadImage(data.aboutMediaId, 'about').catch(err => {
             console.error('Error loading about image:', err);
@@ -282,6 +282,9 @@ const LandingPage = () => {
           errorMessage = error.message;
         }
         setWelcomeError(errorMessage);
+        if (isMounted) {
+          setHeroImagesReady(true);
+        }
       } finally {
         if (isMounted) {
           setWelcomeLoading(false);
@@ -293,7 +296,6 @@ const LandingPage = () => {
 
     return () => {
       isMounted = false;
-      controller.abort();
     };
   }, []);
 
@@ -458,6 +460,12 @@ const LandingPage = () => {
 
   // Mobile image: prefer welcomeMobileImageUrl, fallback to welcomeRightImageUrl
   const heroMobileImage = welcomeMobileImageUrl || welcomeRightImageUrl;
+
+  const isPageReady = !welcomeLoading && heroImagesReady;
+
+  if (!isPageReady) {
+    return <Box sx={{ minHeight: '100vh', bgcolor: '#ffffff' }} />;
+  }
 
   return (
     <Box sx={{ bgcolor: heroRightColour }}>

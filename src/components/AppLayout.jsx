@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { fetchWithAuth, getToken, removeToken, decodeToken, fetchUserProfile, clearUserProfileCache, logoutApi, hasSessionHint, refreshAccessToken } from '../utils/api';
+import { fetchWithAuth, getToken, removeToken, decodeToken, fetchUserProfile, clearUserProfileCache, logoutApi, hasSessionHint, refreshAccessToken, getPublicWelcome } from '../utils/api';
 import {
   AppBar,
   Toolbar,
@@ -72,21 +72,22 @@ const AppLayout = ({ children }) => {
   const [selectedAvatar, setSelectedAvatar] = useState(() => getSelectedAvatar());
 
   useEffect(() => {
+    if (location.pathname === '/maintenance') {
+      return;
+    }
+
     const fetchWelcomeData = async () => {
       try {
-        const response = await fetch('/api/v1/public/welcome');
-        if (response.ok) {
-          const data = await response.json();
-          if (data && data.extendedParameters && data.extendedParameters.welcomeLeftColourHex) {
-            setDrawerTopColor(data.extendedParameters.welcomeLeftColourHex);
-          }
+        const data = await getPublicWelcome({ timeout: 10000 });
+        if (data && data.extendedParameters && data.extendedParameters.welcomeLeftColourHex) {
+          setDrawerTopColor(data.extendedParameters.welcomeLeftColourHex);
         }
       } catch (error) {
         console.error('Error fetching welcome data for drawer coloring:', error);
       }
     };
     fetchWelcomeData();
-  }, []);
+  }, [location.pathname]);
 
   useEffect(() => {
     const handleAvatarChanged = () => {
@@ -110,6 +111,32 @@ const AppLayout = ({ children }) => {
   const isAboutMePage = location.pathname === '/about-me';
   // Check if we're on the verify-account page where navigation buttons should be hidden
   const isVerifyAccountPage = location.pathname === '/verify-account';
+  // Check if we're on the maintenance page
+  const isMaintenancePage = location.pathname === '/maintenance';
+
+  // Redirect to maintenance page when site is inactive (non-admin routes).
+  useEffect(() => {
+    if (isAdminRoute) {
+      return;
+    }
+
+    const checkMaintenanceStatus = async () => {
+      try {
+        const data = await getPublicWelcome({ timeout: 10000 });
+        if (data && data.isActive === false && location.pathname !== '/maintenance') {
+          navigate('/maintenance', { replace: true });
+          return;
+        }
+        if (data && data.isActive === true && location.pathname === '/maintenance') {
+          navigate('/', { replace: true });
+        }
+      } catch (error) {
+        console.error('Error checking maintenance status:', error);
+      }
+    };
+
+    checkMaintenanceStatus();
+  }, [isAdminRoute, location.pathname, navigate]);
 
   // Handle scroll to change header background
   useEffect(() => {
@@ -480,17 +507,18 @@ const AppLayout = ({ children }) => {
 
   return (
     <Box sx={{ display: 'flex', flexDirection: 'column', minHeight: '100vh' }}>
-      <AppBar
-        position="fixed"
-        sx={{
-          top: 0,
-          zIndex: 1100,
-          bgcolor: isLandingPage && !scrolled ? 'transparent' : 'primary.main',
-          boxShadow: isLandingPage && !scrolled ? 'none' : 2,
-          transition: 'all 0.3s ease-in-out',
-        }}
-      >
-        <Toolbar sx={{ minHeight: { xs: 64, sm: 64 }, height: { xs: 64, sm: 64 }, position: 'relative' }}>
+      {!isMaintenancePage && (
+        <AppBar
+          position="fixed"
+          sx={{
+            top: 0,
+            zIndex: 1100,
+            bgcolor: isLandingPage && !scrolled ? 'transparent' : 'primary.main',
+            boxShadow: isLandingPage && !scrolled ? 'none' : 2,
+            transition: 'all 0.3s ease-in-out',
+          }}
+        >
+          <Toolbar sx={{ minHeight: { xs: 64, sm: 64 }, height: { xs: 64, sm: 64 }, position: 'relative' }}>
           {/* Mobile Hamburger Menu Icon (Aligned Left, Landing Page Only) */}
           {isMobile && isLandingPage && (
             <IconButton
@@ -1233,11 +1261,16 @@ const AppLayout = ({ children }) => {
               </Drawer>
             )}
           </Box>
-        </Toolbar>
-      </AppBar>
+          </Toolbar>
+        </AppBar>
+      )}
 
       {/* Main Content Area */}
-      {isLandingPage ? (
+      {isMaintenancePage ? (
+        <Box component="main" sx={{ flexGrow: 1 }}>
+          {children}
+        </Box>
+      ) : isLandingPage ? (
         <Box component="main" sx={{ flexGrow: 1 }}>
           {children}
         </Box>
@@ -1313,4 +1346,3 @@ const AppLayout = ({ children }) => {
 };
 
 export default AppLayout;
-

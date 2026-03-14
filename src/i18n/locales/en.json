@@ -29,6 +29,10 @@
     "charactersLeft": "characters left",
     "symbols": "Symbols"
   },
+  "maintenance": {
+    "title": "We’ll be back soon",
+    "message": "Sorry for the inconvenience. We’re doing some maintenance right now, and everything will be available again shortly. Thank you for your patience."
+  },
   "navigation": {
     "home": "Main",
     "about": "About me",
@@ -539,7 +543,11 @@
       "leftFrameColour": "Left Frame",
       "rightFrameColour": "Right Frame",
       "bookSessionButtonColour": "Book a Session Button",
-      "bookSessionButtonTextColour": "Button Text"
+      "bookSessionButtonTextColour": "Button Text",
+      "maintenanceMode": "Maintenance Mode",
+      "maintenanceModeSubtitle": "Turn off to show the maintenance page to visitors.",
+      "siteActive": "Site Active",
+      "siteMaintenance": "Maintenance Mode"
     },
     "blog": {
       "title": "Blog Management",

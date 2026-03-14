@@ -29,6 +29,10 @@
     "charactersLeft": "символов осталось",
     "symbols": "Символов"
   },
+  "maintenance": {
+    "title": "Мы скоро вернёмся",
+    "message": "Извините за неудобства. Сейчас мы проводим технические работы, и всё будет доступно в ближайшее время. Спасибо за ваше терпение."
+  },
   "navigation": {
     "home": "Главная",
     "about": "Работа со мной",
@@ -544,7 +548,11 @@
       "leftFrameColour": "Левый фрейм",
       "rightFrameColour": "Правый фрейм",
       "bookSessionButtonColour": "Кнопка 'Записаться'",
-      "bookSessionButtonTextColour": "Цвет текста кнопки"
+      "bookSessionButtonTextColour": "Цвет текста кнопки",
+      "maintenanceMode": "Режим обслуживания",
+      "maintenanceModeSubtitle": "Выключите сайт, чтобы показывать страницу обслуживания посетителям.",
+      "siteActive": "Сайт активен",
+      "siteMaintenance": "Режим обслуживания"
     },
     "blog": {
       "title": "Управление блогом",

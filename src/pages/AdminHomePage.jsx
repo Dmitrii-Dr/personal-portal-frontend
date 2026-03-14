@@ -23,6 +23,8 @@ import {
   InputLabel,
   Paper,
   Stack,
+  Switch,
+  FormControlLabel,
   Dialog,
   DialogTitle,
   DialogContent,
@@ -54,6 +56,7 @@ const AdminHomePage = () => {
   const [error, setError] = useState(null);
   const [saving, setSaving] = useState(false);
   const [saveSuccess, setSaveSuccess] = useState(false);
+  const [isSiteActive, setIsSiteActive] = useState(true);
 
   // Welcome message state
   const [aboutMeContent, setAboutMeContent] = useState('');
@@ -170,6 +173,7 @@ const AdminHomePage = () => {
         }
         const data = await response.json();
         setWelcomeData(data);
+        setIsSiteActive(typeof data.isActive === 'boolean' ? data.isActive : true);
         setAboutMeContent(data.aboutMessage || '');
         setEducationContent(data.educationMessage || '');
         setReviewMessage(data.reviewMessage || '');
@@ -797,6 +801,7 @@ const AdminHomePage = () => {
           educationMediaId: educationMediaId,
           reviewMediaIds: reviewMediaIds,
           welcomeArticleIds: welcomeArticleIds,
+          isActive: isSiteActive,
           contact: formatContactForBackend(),
           // Merge colour keys into any existing extendedParameters — do NOT wipe other keys
           extendedParameters: {
@@ -840,6 +845,78 @@ const AdminHomePage = () => {
         <Typography variant="h4" component="h1" gutterBottom>
           {t('admin.home.title')}
         </Typography>
+      </Box>
+
+
+      {/* Site Status Section */}
+      <Box
+        component="section"
+        sx={{
+          py: { xs: 3, md: 4 },
+          bgcolor: 'background.paper',
+          borderBottom: 1,
+          borderColor: 'divider',
+        }}
+      >
+        <Container maxWidth="lg">
+          <Paper
+            elevation={0}
+            sx={{
+              p: 2.5,
+              border: '1px solid',
+              borderColor: 'divider',
+              borderRadius: 2,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              gap: 2,
+              flexWrap: 'wrap',
+            }}
+          >
+            <Box>
+              <Typography variant="subtitle1" fontWeight={600}>
+                {t('admin.home.maintenanceMode', 'Maintenance Mode')}
+              </Typography>
+              <Typography variant="body2" color="text.secondary">
+                {t(
+                  'admin.home.maintenanceModeSubtitle',
+                  'Turn off to show the maintenance page to visitors.'
+                )}
+              </Typography>
+            </Box>
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+              <Typography
+                variant="body2"
+                fontWeight={600}
+                sx={{ minWidth: 150, textAlign: 'right' }}
+              >
+                {isSiteActive
+                  ? t('admin.home.siteActive', 'Site Active')
+                  : t('admin.home.siteMaintenance', 'Maintenance Mode')}
+              </Typography>
+              <Switch
+                checked={isSiteActive}
+                onChange={(event) => setIsSiteActive(event.target.checked)}
+                sx={{
+                  '& .MuiSwitch-switchBase': {
+                    color: '#111111',
+                    '& + .MuiSwitch-track': {
+                      backgroundColor: '#fbc02d',
+                      opacity: 1,
+                    },
+                  },
+                  '& .MuiSwitch-switchBase.Mui-checked': {
+                    color: '#2e7d32',
+                    '& + .MuiSwitch-track': {
+                      backgroundColor: '#2e7d32',
+                      opacity: 1,
+                    },
+                  },
+                }}
+              />
+            </Box>
+          </Paper>
+        </Container>
       </Box>
 
 

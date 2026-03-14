@@ -169,6 +169,39 @@ const apiClient = axios.create({
   withCredentials: false, // same-origin; cookies sent automatically
 });
 
+// ─── Public welcome cache ────────────────────────────────────────────────────
+let _welcomePromise = null;
+let _welcomeCache = null;
+let _welcomeCacheTime = 0;
+const WELCOME_CACHE_TTL_MS = 30000;
+
+export const getPublicWelcome = ({ timeout, force = false } = {}) => {
+  const now = Date.now();
+  if (!force && _welcomeCache && now - _welcomeCacheTime < WELCOME_CACHE_TTL_MS) {
+    return Promise.resolve(_welcomeCache);
+  }
+
+  if (!force && _welcomePromise) {
+    return _welcomePromise;
+  }
+
+  _welcomePromise = apiClient
+    .get('/api/v1/public/welcome', {
+      timeout,
+    })
+    .then((response) => {
+      const data = response.data;
+      _welcomeCache = data;
+      _welcomeCacheTime = Date.now();
+      return data;
+    })
+    .finally(() => {
+      _welcomePromise = null;
+    });
+
+  return _welcomePromise;
+};
+
 // Flag to prevent concurrent refresh attempts
 let isRefreshing = false;
 let failedQueue = []; // Array of { resolve, reject }
@@ -200,6 +233,24 @@ apiClient.interceptors.response.use(
   (response) => response,
   async (error) => {
     const originalRequest = error.config;
+
+    // Portal inactive — redirect to maintenance for /api/v1/user/** calls
+    if (error.response?.status === 500) {
+      try {
+        const body = error.response?.data;
+        const url = originalRequest?.url || '';
+        if (
+          body?.code === 'PEC-416' &&
+          url.startsWith('/api/v1/user/') &&
+          window.location.pathname !== '/maintenance'
+        ) {
+          window.location.assign('/maintenance');
+          return Promise.reject(error);
+        }
+      } catch (_) {
+        // ignore parse errors
+      }
+    }
 
     // Account not verified — redirect to verification page from anywhere
     if (error.response?.status === 403) {
@@ -269,6 +320,19 @@ export const fetchWithAuth = async (url, options = {}) => {
     ...options,
     headers,
   });
+
+  // Portal inactive — redirect to maintenance for /api/v1/user/** calls
+  if (response.status === 500 && typeof url === 'string' && url.startsWith('/api/v1/user/')) {
+    try {
+      const body = await response.clone().json();
+      if (body?.code === 'PEC-416' && window.location.pathname !== '/maintenance') {
+        window.location.assign('/maintenance');
+        return response;
+      }
+    } catch (_) {
+      // ignore parse errors
+    }
+  }
 
   // Transparent 401 refresh for plain-fetch callers
   if (response.status === 401) {
