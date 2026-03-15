@@ -71,6 +71,11 @@ const AppLayout = ({ children }) => {
   // Track selected profile avatar
   const [selectedAvatar, setSelectedAvatar] = useState(() => getSelectedAvatar());
 
+  const isAdminUser = (() => {
+    const token = getToken();
+    return !!token && hasAdminRole(token);
+  })();
+
   useEffect(() => {
     if (location.pathname === '/maintenance') {
       return;
@@ -924,8 +929,8 @@ const AppLayout = ({ children }) => {
               </MenuItem>
             </Menu>
 
-            {/* User menu - only show on non-admin routes when logged in */}
-            {hasToken && !isAdminRoute && (
+            {/* User menu - only show for non-admin users on non-admin routes */}
+            {hasToken && !isAdminUser && !isAdminRoute && (
               <>
                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
                   {getUserFullName() && (
@@ -1067,8 +1072,8 @@ const AppLayout = ({ children }) => {
               </>
             )}
 
-            {/* Admin user menu - show on admin routes when logged in */}
-            {hasToken && isAdminRoute && (
+            {/* Admin user menu - show for admin users on any route when logged in */}
+            {hasToken && isAdminUser && (
               <>
                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
                   {getUserFullName() && (
@@ -1167,6 +1172,12 @@ const AppLayout = ({ children }) => {
                       <PersonIcon fontSize="small" />
                     </ListItemIcon>
                     <ListItemText>{t('userMenu.myProfile')}</ListItemText>
+                  </MenuItem>
+                  <MenuItem onClick={() => handleUserMenuClick('/admin/dashboard')}>
+                    <ListItemIcon>
+                      <HomeIcon fontSize="small" />
+                    </ListItemIcon>
+                    <ListItemText>{t('navigation.dashboard')}</ListItemText>
                   </MenuItem>
                   <Divider />
                   <MenuItem onClick={() => handleUserMenuClick('logout')}>

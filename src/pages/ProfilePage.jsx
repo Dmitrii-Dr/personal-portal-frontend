@@ -1,7 +1,7 @@
 import React, { useEffect, useState, useMemo, useRef, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { fetchWithAuth, fetchUserProfile, clearUserProfileCache, fetchUserSettings, clearUserSettingsCache, getToken } from '../utils/api';
+import { fetchWithAuth, fetchUserProfile, clearUserProfileCache, fetchUserSettings, clearUserSettingsCache, getToken, hasAdminRole } from '../utils/api';
 import { SELECTABLE_AVATARS, DEFAULT_AVATAR_ID, getSelectedAvatar, setSelectedAvatar as storeSetSelectedAvatar } from '../utils/avatarStore';
 import { fetchTimezones, sortTimezonesByOffset, getOffsetFromTimezone, extractTimezoneOffset, findTimezoneIdByOffset } from '../utils/timezoneService';
 import {
@@ -50,6 +50,14 @@ const ProfilePage = ({ isAdminProfile = false }) => {
   const [editingFirstName, setEditingFirstName] = useState(false);
   const [editingLastName, setEditingLastName] = useState(false);
   const [editingPhoneNumber, setEditingPhoneNumber] = useState(false);
+
+  useEffect(() => {
+    if (isAdminProfile) return;
+    const token = getToken();
+    if (token && hasAdminRole(token)) {
+      navigate('/admin/profile', { replace: true });
+    }
+  }, [isAdminProfile, navigate]);
 
   // Avatar selection state – initialised from the profile API (avatarId field)
   const [selectedAvatarId, setSelectedAvatarId] = useState(DEFAULT_AVATAR_ID);
@@ -1035,5 +1043,4 @@ const ProfilePage = ({ isAdminProfile = false }) => {
 };
 
 export default ProfilePage;
-
 

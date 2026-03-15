@@ -10,7 +10,7 @@ import {
   Alert,
   CircularProgress,
 } from '@mui/material';
-import { getToken, setToken, hasAdminRole } from '../utils/api';
+import { getToken, setToken, hasAdminRole, hasSessionHint, refreshAccessToken } from '../utils/api';
 
 const AdminPage = () => {
   const navigate = useNavigate();
@@ -28,8 +28,11 @@ const AdminPage = () => {
 
   // Check token and roles on mount
   useEffect(() => {
-    const checkAccess = () => {
-      const token = getToken();
+    const checkAccess = async () => {
+      let token = getToken();
+      if (!token && hasSessionHint()) {
+        token = await refreshAccessToken();
+      }
 
       if (!token) {
         // No token - show login form
@@ -253,4 +256,3 @@ const AdminPage = () => {
 };
 
 export default AdminPage;
-

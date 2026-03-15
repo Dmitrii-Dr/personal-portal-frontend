@@ -10,7 +10,7 @@ import updateLocale from 'dayjs/plugin/updateLocale';
 import localeData from 'dayjs/plugin/localeData';
 import 'dayjs/locale/en-gb';
 import 'dayjs/locale/ru';
-import apiClient, { fetchWithAuth, getToken, fetchUserSettings as fetchUserSettingsCached } from '../utils/api';
+import apiClient, { fetchWithAuth, getToken, fetchUserSettings as fetchUserSettingsCached, hasAdminRole } from '../utils/api';
 import { getCachedSlots, setCachedSlots, invalidateCache, clearAllCache } from '../utils/bookingSlotCache';
 import { fetchTimezones, sortTimezonesByOffset, getOffsetFromTimezone, extractTimezoneOffset, findTimezoneIdByOffset } from '../utils/timezoneService';
 
@@ -118,6 +118,7 @@ const BookingPage = ({ sessionTypeId: propSessionTypeId, hideMyBookings = false 
   const [hasToken, setHasToken] = useState(false);
   const [loginRequiredDialogOpen, setLoginRequiredDialogOpen] = useState(false);
   const [updateDialogOpen, setUpdateDialogOpen] = useState(false);
+
   const [confirmUpdateDialogOpen, setConfirmUpdateDialogOpen] = useState(false);
   const [bookingToUpdate, setBookingToUpdate] = useState(null);
   const [updateSelectedDate, setUpdateSelectedDate] = useState(dayjs());
@@ -136,6 +137,13 @@ const BookingPage = ({ sessionTypeId: propSessionTypeId, hideMyBookings = false 
   const slotsScrollRef = useRef(null);
   const pendingBookingAttempted = useRef(false);
   const navigate = useNavigate();
+
+  useEffect(() => {
+    const token = getToken();
+    if (token && hasAdminRole(token)) {
+      navigate('/admin/dashboard', { replace: true });
+    }
+  }, [navigate]);
 
   // Timezones state
   const [timezones, setTimezones] = useState([]);
