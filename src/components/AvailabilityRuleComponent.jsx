@@ -36,10 +36,13 @@ import {
   Popover,
   InputLabel as MuiInputLabel,
   Tooltip,
+  useMediaQuery,
+  useTheme,
 } from '@mui/material';
 import EditIcon from '@mui/icons-material/Edit';
 import DeleteIcon from '@mui/icons-material/Delete';
 import AddIcon from '@mui/icons-material/Add';
+import CloseIcon from '@mui/icons-material/Close';
 import KeyboardArrowDownIcon from '@mui/icons-material/KeyboardArrowDown';
 import { DateCalendar } from '@mui/x-date-pickers/DateCalendar';
 import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
@@ -50,6 +53,13 @@ import 'dayjs/locale/ru';
 
 const AvailabilityRuleComponent = () => {
   const { t, i18n: i18nInstance } = useTranslation();
+  const theme = useTheme();
+  const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
+
+  useEffect(() => {
+    const language = i18nInstance.language || 'en';
+    dayjs.locale(language.startsWith('ru') ? 'ru' : 'en-gb');
+  }, [i18nInstance.language]);
 
   const DAYS_OF_WEEK = [
     { value: 'MONDAY', label: t('admin.sessionConfiguration.availabilityRules.monday'), shortLabel: t('admin.sessionConfiguration.availabilityRules.mondayShort') },
@@ -180,7 +190,7 @@ const AvailabilityRuleComponent = () => {
   const formatDate = (dateString) => {
     if (!dateString) return 'N/A';
     try {
-      return dayjs(dateString).format('MMM DD, YYYY');
+      return dayjs(dateString).format('MMMM DD, YYYY');
     } catch {
       return dateString;
     }
@@ -563,8 +573,15 @@ const AvailabilityRuleComponent = () => {
       )}
 
       {/* Create/Edit Dialog */}
-      <Dialog open={dialogOpen} onClose={handleCloseDialog} maxWidth="md" fullWidth>
-        <DialogTitle>{editingRule ? t('admin.sessionConfiguration.availabilityRules.editRule') : t('admin.sessionConfiguration.availabilityRules.createRule')}</DialogTitle>
+      <Dialog open={dialogOpen} onClose={handleCloseDialog} maxWidth="md" fullWidth fullScreen={isMobile}>
+        <DialogTitle sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 2 }}>
+          <Typography variant="h6" component="div">
+            {editingRule ? t('admin.sessionConfiguration.availabilityRules.editRule') : t('admin.sessionConfiguration.availabilityRules.createRule')}
+          </Typography>
+          <IconButton aria-label={t('common.close', 'Close')} onClick={handleCloseDialog} edge="end">
+            <CloseIcon />
+          </IconButton>
+        </DialogTitle>
         <DialogContent>
           {error && (
             <Alert severity="error" sx={{ mb: 2 }} onClose={() => setError(null)}>
@@ -842,15 +859,22 @@ const AvailabilityRuleComponent = () => {
             </Grid>
           </LocalizationProvider>
         </DialogContent>
-        <DialogActions>
-          <Button onClick={handleCloseDialog} sx={{ textTransform: 'none' }} disabled={submitting}>
-            {t('admin.sessionConfiguration.availabilityRules.cancel')}
-          </Button>
+        <DialogActions
+          disableSpacing
+          sx={{
+            flexDirection: isMobile ? 'column' : 'row',
+            alignItems: isMobile ? 'stretch' : 'center',
+            gap: isMobile ? 1 : 0,
+            justifyContent: isMobile ? 'stretch' : 'flex-end',
+            width: '100%',
+          }}
+        >
           <Button
             onClick={handleSubmit}
             variant="contained"
-            sx={{ textTransform: 'none' }}
+            sx={{ textTransform: 'none', width: isMobile ? '100%' : 'auto' }}
             disabled={submitting || !isFormValid()}
+            fullWidth={isMobile}
           >
             {submitting ? (
               <>
@@ -935,4 +959,3 @@ const AvailabilityRuleComponent = () => {
 };
 
 export default AvailabilityRuleComponent;
-

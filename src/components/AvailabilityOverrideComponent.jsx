@@ -30,10 +30,13 @@ import {
   Popover,
   InputLabel as MuiInputLabel,
   Tooltip,
+  useMediaQuery,
+  useTheme,
 } from '@mui/material';
 import EditIcon from '@mui/icons-material/Edit';
 import DeleteIcon from '@mui/icons-material/Delete';
 import AddIcon from '@mui/icons-material/Add';
+import CloseIcon from '@mui/icons-material/Close';
 import KeyboardArrowDownIcon from '@mui/icons-material/KeyboardArrowDown';
 import ArrowUpwardIcon from '@mui/icons-material/ArrowUpward';
 import ArrowDownwardIcon from '@mui/icons-material/ArrowDownward';
@@ -46,6 +49,13 @@ import 'dayjs/locale/ru';
 
 const AvailabilityOverrideComponent = () => {
   const { t, i18n: i18nInstance } = useTranslation();
+  const theme = useTheme();
+  const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
+
+  useEffect(() => {
+    const language = i18nInstance.language || 'en';
+    dayjs.locale(language.startsWith('ru') ? 'ru' : 'en-gb');
+  }, [i18nInstance.language]);
   const [overrides, setOverrides] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
@@ -174,7 +184,7 @@ const AvailabilityOverrideComponent = () => {
   const formatDate = (dateString) => {
     if (!dateString) return 'N/A';
     try {
-      return dayjs(dateString).format('MMM DD, YYYY');
+      return dayjs(dateString).format('MMMM DD, YYYY');
     } catch {
       return dateString;
     }
@@ -704,9 +714,14 @@ const AvailabilityOverrideComponent = () => {
       )}
 
       {/* Create/Edit Dialog */}
-      <Dialog open={dialogOpen} onClose={handleCloseDialog} maxWidth="sm" fullWidth>
-        <DialogTitle>
-          {editingOverride ? t('admin.sessionConfiguration.availabilityOverrides.editOverride') : t('admin.sessionConfiguration.availabilityOverrides.createOverride')}
+      <Dialog open={dialogOpen} onClose={handleCloseDialog} maxWidth="sm" fullWidth fullScreen={isMobile}>
+        <DialogTitle sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 2 }}>
+          <Typography variant="h6" component="div">
+            {editingOverride ? t('admin.sessionConfiguration.availabilityOverrides.editOverride') : t('admin.sessionConfiguration.availabilityOverrides.createOverride')}
+          </Typography>
+          <IconButton aria-label={t('common.close', 'Close')} onClick={handleCloseDialog} edge="end">
+            <CloseIcon />
+          </IconButton>
         </DialogTitle>
         <DialogContent>
           {error && (
@@ -1086,15 +1101,22 @@ const AvailabilityOverrideComponent = () => {
             </Grid>
           </LocalizationProvider>
         </DialogContent>
-        <DialogActions>
-          <Button onClick={handleCloseDialog} sx={{ textTransform: 'none' }} disabled={submitting}>
-            {t('admin.sessionConfiguration.availabilityOverrides.cancel')}
-          </Button>
+        <DialogActions
+          disableSpacing
+          sx={{
+            flexDirection: isMobile ? 'column' : 'row',
+            alignItems: isMobile ? 'stretch' : 'center',
+            gap: isMobile ? 1 : 0,
+            justifyContent: isMobile ? 'stretch' : 'flex-end',
+            width: '100%',
+          }}
+        >
           <Button
             onClick={handleSubmit}
             variant="contained"
-            sx={{ textTransform: 'none' }}
+            sx={{ textTransform: 'none', width: isMobile ? '100%' : 'auto' }}
             disabled={submitting || !isFormValid()}
+            fullWidth={isMobile}
           >
             {submitting ? (
               <>
@@ -1176,4 +1198,3 @@ const AvailabilityOverrideComponent = () => {
 };
 
 export default AvailabilityOverrideComponent;
-

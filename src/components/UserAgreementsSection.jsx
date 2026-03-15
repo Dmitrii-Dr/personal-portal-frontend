@@ -20,15 +20,20 @@ import {
     Alert,
     Chip,
     Tooltip,
+    useMediaQuery,
+    useTheme,
 } from '@mui/material';
 import AddIcon from '@mui/icons-material/Add';
 import EditIcon from '@mui/icons-material/Edit';
 import DeleteIcon from '@mui/icons-material/Delete';
+import CloseIcon from '@mui/icons-material/Close';
 import { fetchWithAuth } from '../utils/api';
 import dayjs from 'dayjs';
 
 const UserAgreementsSection = () => {
     const { t } = useTranslation();
+    const theme = useTheme();
+    const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
     const [agreements, setAgreements] = useState([]);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState(null);
@@ -214,9 +219,14 @@ const UserAgreementsSection = () => {
                     </Typography>
                 )}
 
-                <Dialog open={dialogOpen} onClose={handleCloseDialog} maxWidth="md" fullWidth>
-                    <DialogTitle>
-                        {editingAgreement ? t('admin.sessionConfiguration.userAgreements.editAgreement') : t('admin.sessionConfiguration.userAgreements.newAgreement')}
+                <Dialog open={dialogOpen} onClose={handleCloseDialog} maxWidth="md" fullWidth fullScreen={isMobile}>
+                    <DialogTitle sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 2 }}>
+                        <Typography variant="h6" component="div">
+                            {editingAgreement ? t('admin.sessionConfiguration.userAgreements.editAgreement') : t('admin.sessionConfiguration.userAgreements.newAgreement')}
+                        </Typography>
+                        <IconButton aria-label={t('common.close', 'Close')} onClick={handleCloseDialog} edge="end">
+                            <CloseIcon />
+                        </IconButton>
                     </DialogTitle>
                     <DialogContent>
                         <TextField
@@ -252,14 +262,22 @@ const UserAgreementsSection = () => {
                             required
                         />
                     </DialogContent>
-                    <DialogActions>
-                        <Button onClick={handleCloseDialog} disabled={saveLoading}>
-                            {t('common.cancel')}
-                        </Button>
+                    <DialogActions
+                        disableSpacing
+                        sx={{
+                            flexDirection: isMobile ? 'column' : 'row',
+                            alignItems: isMobile ? 'stretch' : 'center',
+                            gap: isMobile ? 1 : 0,
+                            justifyContent: isMobile ? 'stretch' : 'flex-end',
+                            width: '100%',
+                        }}
+                    >
                         <Button
                             onClick={handleSave}
                             variant="contained"
                             disabled={saveLoading || !formData.name.trim() || !formData.slug.trim() || !formData.content.trim()}
+                            fullWidth={isMobile}
+                            sx={{ width: isMobile ? '100%' : 'auto' }}
                         >
                             {saveLoading ? <CircularProgress size={24} /> : t('common.save')}
                         </Button>

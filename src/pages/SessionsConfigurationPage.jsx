@@ -36,10 +36,13 @@ import {
   FormControlLabel,
   Checkbox,
   Tooltip,
+  useMediaQuery,
+  useTheme,
 } from '@mui/material';
 import EditIcon from '@mui/icons-material/Edit';
 import DeleteIcon from '@mui/icons-material/Delete';
 import AddIcon from '@mui/icons-material/Add';
+import CloseIcon from '@mui/icons-material/Close';
 import KeyboardArrowDownIcon from '@mui/icons-material/KeyboardArrowDown';
 import KeyboardArrowUpIcon from '@mui/icons-material/KeyboardArrowUp';
 import { DateCalendar } from '@mui/x-date-pickers/DateCalendar';
@@ -58,6 +61,8 @@ dayjs.locale('en-gb'); // Use en-gb locale which starts week on Monday
 
 const SessionsConfigurationPage = () => {
   const { t, i18n: i18nInstance } = useTranslation();
+  const theme = useTheme();
+  const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
 
   // Session types state
   const [sessionTypes, setSessionTypes] = useState([]);
@@ -806,8 +811,15 @@ const SessionsConfigurationPage = () => {
       </Box>
 
       {/* Session Type Dialog */}
-      <Dialog open={sessionTypeDialogOpen} onClose={handleCloseSessionTypeDialog} maxWidth="sm" fullWidth>
-        <DialogTitle>{editingSessionType ? t('admin.sessionConfiguration.editSessionType') : t('admin.sessionConfiguration.addSessionType')}</DialogTitle>
+      <Dialog open={sessionTypeDialogOpen} onClose={handleCloseSessionTypeDialog} maxWidth="sm" fullWidth fullScreen={isMobile}>
+        <DialogTitle sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 2 }}>
+          <Typography variant="h6" component="div">
+            {editingSessionType ? t('admin.sessionConfiguration.editSessionType') : t('admin.sessionConfiguration.addSessionType')}
+          </Typography>
+          <IconButton aria-label={t('common.close', 'Close')} onClick={handleCloseSessionTypeDialog} edge="end">
+            <CloseIcon />
+          </IconButton>
+        </DialogTitle>
         <DialogContent>
           <TextField
             fullWidth
@@ -924,11 +936,22 @@ const SessionsConfigurationPage = () => {
             required
           />
         </DialogContent>
-        <DialogActions>
-          <Button onClick={handleCloseSessionTypeDialog} sx={{ textTransform: 'none' }}>
-            {t('admin.sessionConfiguration.cancel')}
-          </Button>
-          <Button onClick={handleSaveSessionType} variant="contained" sx={{ textTransform: 'none' }}>
+        <DialogActions
+          disableSpacing
+          sx={{
+            flexDirection: isMobile ? 'column' : 'row',
+            alignItems: isMobile ? 'stretch' : 'center',
+            gap: isMobile ? 1 : 0,
+            justifyContent: isMobile ? 'stretch' : 'flex-end',
+            width: '100%',
+          }}
+        >
+          <Button
+            onClick={handleSaveSessionType}
+            variant="contained"
+            sx={{ textTransform: 'none', width: isMobile ? '100%' : 'auto' }}
+            fullWidth={isMobile}
+          >
             {t('admin.sessionConfiguration.save')}
           </Button>
         </DialogActions>
@@ -972,4 +995,3 @@ const SessionsConfigurationPage = () => {
 };
 
 export default SessionsConfigurationPage;
-
