@@ -21,7 +21,6 @@ import AccountVerificationPage from './pages/AccountVerificationPage';
 import AgreementPage from './pages/AgreementPage';
 import AdminRoute from './components/AdminRoute';
 import PrivateRoute from './components/PrivateRoute';
-import AdminRedirect from './components/AdminRedirect';
 import ErrorBoundary from './components/ErrorBoundary';
 import CookieNotification from './components/CookieNotification';
 import { ThemeProvider, createTheme } from '@mui/material/styles';
@@ -676,9 +675,8 @@ function AppInner() {
   return (
     <>
       <CookieNotification />
-      <AdminRedirect>
-        <AppLayout>
-          <Routes>
+      <AppLayout>
+        <Routes>
             {/* Public routes — accessible to everyone */}
             <Route path="/" element={<LandingPage />} />
             <Route path="/blog" element={<BlogPage />} />
@@ -713,9 +711,8 @@ function AppInner() {
                 </AdminRoute>
               }
             />
-          </Routes>
-        </AppLayout>
-      </AdminRedirect>
+        </Routes>
+      </AppLayout>
     </>
   );
 }

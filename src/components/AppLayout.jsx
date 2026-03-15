@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { fetchWithAuth, getToken, removeToken, decodeToken, fetchUserProfile, clearUserProfileCache, logoutApi, hasSessionHint, refreshAccessToken, getPublicWelcome } from '../utils/api';
+import { fetchWithAuth, getToken, removeToken, decodeToken, fetchUserProfile, clearUserProfileCache, logoutApi, hasSessionHint, refreshAccessToken, getPublicWelcome, hasAdminRole } from '../utils/api';
 import {
   AppBar,
   Toolbar,
@@ -122,6 +122,16 @@ const AppLayout = ({ children }) => {
 
     const checkMaintenanceStatus = async () => {
       try {
+        // Ensure admin tokens restored before deciding on maintenance redirect.
+        let token = getToken();
+        if (!token && hasSessionHint()) {
+          token = await refreshAccessToken();
+        }
+        const isAdminUser = !!token && hasAdminRole(token);
+        if (isAdminUser) {
+          return;
+        }
+
         const data = await getPublicWelcome({ timeout: 10000 });
         if (data && data.isActive === false && location.pathname !== '/maintenance') {
           navigate('/maintenance', { replace: true });
