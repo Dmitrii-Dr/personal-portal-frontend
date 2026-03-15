@@ -5,11 +5,27 @@ import ruTranslations from './locales/ru.json';
 import enErrors from './locales/errors.en.json';
 import ruErrors from './locales/errors.ru.json';
 
-// Get saved language from localStorage or default to Russian
+// Supported language codes
+const SUPPORTED_LANGS = ['en', 'ru'];
+
+/**
+ * Get language from URL search params (e.g. ?lang=en).
+ * Used so adding ?lang=en to any URL switches to English and the choice is persisted.
+ */
+const getLangFromUrl = () => {
+  if (typeof window === 'undefined') return null;
+  const params = new URLSearchParams(window.location.search);
+  const lang = params.get('lang');
+  return SUPPORTED_LANGS.includes(lang) ? lang : null;
+};
+
+// Get saved language: URL param overrides localStorage; default to Russian
 const getStoredLanguage = () => {
+  const urlLang = getLangFromUrl();
+  if (urlLang) return urlLang;
   try {
     const saved = localStorage.getItem('i18nextLng');
-    if (saved && (saved === 'en' || saved === 'ru')) {
+    if (saved && SUPPORTED_LANGS.includes(saved)) {
       return saved;
     }
   } catch (e) {

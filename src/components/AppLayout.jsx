@@ -38,7 +38,6 @@ import LoginIcon from '@mui/icons-material/Login';
 import HomeIcon from '@mui/icons-material/Home';
 import BookOnlineIcon from '@mui/icons-material/BookOnline';
 import PersonIcon from '@mui/icons-material/Person';
-import LanguageIcon from '@mui/icons-material/Language';
 import MenuIcon from '@mui/icons-material/Menu';
 import LoginModal from './LoginModal';
 import SignUpModal from './SignUpModal';
@@ -60,9 +59,6 @@ const AppLayout = ({ children }) => {
   const [scrolled, setScrolled] = useState(false);
   const [userMenuAnchorEl, setUserMenuAnchorEl] = useState(null);
   const userMenuOpen = Boolean(userMenuAnchorEl);
-  const [languageMenuAnchorEl, setLanguageMenuAnchorEl] = useState(null);
-  const languageMenuOpen = Boolean(languageMenuAnchorEl);
-
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down('md'));
   const [mobileOpen, setMobileOpen] = useState(false);
@@ -463,20 +459,6 @@ const AppLayout = ({ children }) => {
     } else {
       navigate(path);
     }
-  };
-
-  // Handle language menu
-  const handleLanguageMenuOpen = (event) => {
-    setLanguageMenuAnchorEl(event.currentTarget);
-  };
-
-  const handleLanguageMenuClose = () => {
-    setLanguageMenuAnchorEl(null);
-  };
-
-  const handleLanguageChange = (lang) => {
-    i18n.changeLanguage(lang);
-    handleLanguageMenuClose();
   };
 
   // Check URL for login/signup redirects
@@ -883,54 +865,8 @@ const AppLayout = ({ children }) => {
             </Stack>
           </Box>
 
-          {/* Right side: Language selector, User menu and Login button */}
+          {/* Right side: User menu and Login button */}
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, ml: 'auto' }}>
-            {/* Language Selector */}
-            <Tooltip title={i18n.language === 'ru' ? 'Русский' : 'English'} arrow>
-              <IconButton
-                onClick={handleLanguageMenuOpen}
-                color="inherit"
-                size="medium"
-                aria-label="language selector"
-                sx={{
-                  transition: 'all 0.2s ease-in-out',
-                  '&:hover': {
-                    bgcolor: 'rgba(255, 255, 255, 0.1)',
-                    transform: 'scale(1.1)',
-                  },
-                }}
-              >
-                <LanguageIcon />
-              </IconButton>
-            </Tooltip>
-            <Menu
-              anchorEl={languageMenuAnchorEl}
-              open={languageMenuOpen}
-              onClose={handleLanguageMenuClose}
-              disableScrollLock
-              anchorOrigin={{
-                vertical: 'bottom',
-                horizontal: 'right',
-              }}
-              transformOrigin={{
-                vertical: 'top',
-                horizontal: 'right',
-              }}
-            >
-              <MenuItem
-                onClick={() => handleLanguageChange('ru')}
-                selected={i18n.language === 'ru'}
-              >
-                <ListItemText>Русский</ListItemText>
-              </MenuItem>
-              <MenuItem
-                onClick={() => handleLanguageChange('en')}
-                selected={i18n.language === 'en'}
-              >
-                <ListItemText>English</ListItemText>
-              </MenuItem>
-            </Menu>
-
             {/* User menu - only show for non-admin users on non-admin routes */}
             {hasToken && !isAdminUser && !isAdminRoute && (
               <>

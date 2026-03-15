@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { BrowserRouter as Router, Routes, Route, useNavigate, useLocation } from 'react-router-dom';
+import i18n from './i18n/i18n';
 import AppLayout from './components/AppLayout';
 import LandingPage from './pages/LandingPage';
 import BlogPage from './pages/BlogPage';
@@ -649,6 +650,19 @@ const AccountPage = () => (
   </div>
 );
 
+// Sync ?lang=en or ?lang=ru from URL to i18n and persist (so language is remembered across navigation).
+function UrlLanguageSync() {
+  const location = useLocation();
+  useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    const lang = params.get('lang');
+    if (lang === 'en' || lang === 'ru') {
+      i18n.changeLanguage(lang);
+    }
+  }, [location.search]);
+  return null;
+}
+
 // AppInner must live inside <Router> so it can use useNavigate.
 function AppInner() {
   const navigate = useNavigate();
@@ -674,6 +688,7 @@ function AppInner() {
 
   return (
     <>
+      <UrlLanguageSync />
       <CookieNotification />
       <AppLayout>
         <Routes>
