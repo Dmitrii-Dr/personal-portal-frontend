@@ -397,7 +397,11 @@
       "createdAt": "Created At",
       "pageSize": "Items per page"
     },
-    "bookingsManagement": {
+  "bookingsManagement": {
+    "statusFilter": "Booking type",
+    "filterAll": "All",
+    "filterConfirmed": "Confirmed",
+    "filterPending": "Waiting for approval",
       "title": "Bookings Management",
       "dateRange": "Date Range",
       "today": "Today",

@@ -402,7 +402,11 @@
       "createdAt": "Создано",
       "pageSize": "Элементов на странице"
     },
-    "bookingsManagement": {
+  "bookingsManagement": {
+    "statusFilter": "Тип записей",
+    "filterAll": "Все",
+    "filterConfirmed": "Подтвержденные",
+    "filterPending": "Ожидают подтверждения",
       "title": "Управление записями",
       "dateRange": "Диапазон дат",
       "today": "Сегодня",

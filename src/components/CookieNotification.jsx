@@ -27,6 +27,9 @@ const CookieNotification = () => {
             open={open}
             anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
             sx={{
+                left: { xs: 0, sm: '50%' },
+                right: { xs: 0, sm: 'auto' },
+                transform: { xs: 'none', sm: 'translateX(-50%)' },
                 maxWidth: '100%',
                 width: '100%',
                 '& .MuiSnackbarContent-root': {
@@ -37,7 +40,9 @@ const CookieNotification = () => {
             <Paper
                 elevation={6}
                 sx={{
-                    width: '75%',
+                    width: { xs: '100%', sm: '75%' },
+                    maxWidth: '100%',
+                    boxSizing: 'border-box',
                     px: 3,
                     py: 2,
                     display: 'flex',

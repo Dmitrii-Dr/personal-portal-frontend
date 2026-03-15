@@ -42,14 +42,16 @@ import {
   TextField,
   IconButton,
   Tooltip,
+  useMediaQuery,
+  useTheme,
 } from '@mui/material';
 import { DateCalendar } from '@mui/x-date-pickers/DateCalendar';
 import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
 import { AdapterDayjs } from '@mui/x-date-pickers/AdapterDayjs';
 import EditIcon from '@mui/icons-material/Edit';
 import AccessTimeIcon from '@mui/icons-material/AccessTime';
-import FilterAltIcon from '@mui/icons-material/FilterAlt';
 import ClearIcon from '@mui/icons-material/Clear';
+import CalendarMonthIcon from '@mui/icons-material/CalendarMonth';
 import CloseIcon from '@mui/icons-material/Close';
 import ArrowUpwardIcon from '@mui/icons-material/ArrowUpward';
 import ArrowDownwardIcon from '@mui/icons-material/ArrowDownward';
@@ -76,6 +78,8 @@ const STATUS_TRANSITIONS = {
 
 const BookingsManagement = () => {
   const { t } = useTranslation();
+  const theme = useTheme();
+  const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
   const [bookings, setBookings] = useState({
     PENDING_APPROVAL: [],
     CONFIRMED: [],
@@ -88,6 +92,7 @@ const BookingsManagement = () => {
   const [error, setError] = useState(null);
   const [updateDialogOpen, setUpdateDialogOpen] = useState(false);
   const [selectedBooking, setSelectedBooking] = useState(null);
+  const [mobileBookingFilter, setMobileBookingFilter] = useState('all');
   const [newStatus, setNewStatus] = useState('');
   const [updating, setUpdating] = useState(false);
   const [updateError, setUpdateError] = useState(null);
@@ -1325,7 +1330,7 @@ const BookingsManagement = () => {
   return (
     <LocalizationProvider dateAdapter={AdapterDayjs}>
       <Box>
-        <Box sx={{ mb: 3 }}>
+        <Box sx={{ mb: '11px' }}>
           <Typography variant="h5" component="h2">
             {t('admin.bookingsManagement.title')}
           </Typography>
@@ -1333,67 +1338,104 @@ const BookingsManagement = () => {
 
         {/* Date Range Filter */}
         <Paper sx={{ p: 2, mb: 3, bgcolor: 'background.paper' }}>
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, flexWrap: 'wrap' }}>
-            <FilterAltIcon color="action" />
-            <Button
-              variant={startDate && endDate && !getActiveFilter() ? 'contained' : 'outlined'}
-              size="small"
-              startIcon={<FilterAltIcon />}
-              onClick={(e) => setCalendarAnchorEl(e.currentTarget)}
-              sx={{ textTransform: 'none' }}
-            >
-              {t('admin.bookingsManagement.dateRange')}
-            </Button>
-            <Button
-              variant={getActiveFilter() === 'today' ? 'contained' : 'outlined'}
-              size="small"
-              onClick={handleTodayFilter}
-              sx={{ textTransform: 'none' }}
-            >
-              {t('admin.bookingsManagement.today')}
-            </Button>
-            <Button
-              variant={getActiveFilter() === 'thisWeek' ? 'contained' : 'outlined'}
-              size="small"
-              onClick={handleThisWeekFilter}
-              sx={{ textTransform: 'none' }}
-            >
-              {t('admin.bookingsManagement.thisWeek')}
-            </Button>
-            <Button
-              variant={getActiveFilter() === 'thisMonth' ? 'contained' : 'outlined'}
-              size="small"
-              onClick={handleThisMonthFilter}
-              sx={{ textTransform: 'none' }}
-            >
-              {t('admin.bookingsManagement.thisMonth')}
-            </Button>
-            {startDate && (
-              <Typography variant="body2" color="text.secondary">
-                {endDate && dayjs(startDate).format('YYYY-MM-DD') !== dayjs(endDate).format('YYYY-MM-DD') ? (
-                  <>
-                    {t('admin.bookingsManagement.fromTo', {
-                      start: formatDateRangeLabel(startDate),
-                      end: formatDateRangeLabel(endDate)
-                    })}
-                  </>
-                ) : (
-                  <>{t('admin.bookingsManagement.date', { date: formatDateRangeLabel(startDate) })}</>
-                )}
-              </Typography>
-            )}
-            {(startDate || endDate) && (
+          {isMobile ? (
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, flexWrap: 'wrap' }}>
+              <FormControl size="small" sx={{ minWidth: 200, flex: 1 }}>
+                <InputLabel>{t('admin.bookingsManagement.dateRange')}</InputLabel>
+                <Select
+                  value={getActiveFilter() || (startDate || endDate ? 'range' : 'all')}
+                  label={t('admin.bookingsManagement.dateRange')}
+                  onChange={(e) => {
+                    const value = e.target.value;
+                    if (value === 'all') handleClearFilter();
+                    if (value === 'today') handleTodayFilter();
+                    if (value === 'thisWeek') handleThisWeekFilter();
+                    if (value === 'thisMonth') handleThisMonthFilter();
+                    if (value === 'range') setCalendarAnchorEl(e.currentTarget);
+                  }}
+                >
+                  <MenuItem value="all">{t('admin.bookingsManagement.filterAll')}</MenuItem>
+                  <MenuItem value="today">{t('admin.bookingsManagement.today')}</MenuItem>
+                  <MenuItem value="thisWeek">{t('admin.bookingsManagement.thisWeek')}</MenuItem>
+                  <MenuItem value="thisMonth">{t('admin.bookingsManagement.thisMonth')}</MenuItem>
+                  <MenuItem value="range">{t('admin.bookingsManagement.dateRange')}</MenuItem>
+                </Select>
+              </FormControl>
+              <FormControl size="small" sx={{ minWidth: 200, flex: 1 }}>
+                <InputLabel>{t('admin.bookingsManagement.statusFilter')}</InputLabel>
+                <Select
+                  value={mobileBookingFilter}
+                  label={t('admin.bookingsManagement.statusFilter')}
+                  onChange={(e) => setMobileBookingFilter(e.target.value)}
+                >
+                  <MenuItem value="all">{t('admin.bookingsManagement.filterAll')}</MenuItem>
+                  <MenuItem value="confirmed">{t('admin.bookingsManagement.filterConfirmed')}</MenuItem>
+                  <MenuItem value="pending">{t('admin.bookingsManagement.filterPending')}</MenuItem>
+                </Select>
+              </FormControl>
+            </Box>
+          ) : (
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, flexWrap: 'wrap' }}>
               <Button
-                variant="outlined"
+                variant={startDate && endDate && !getActiveFilter() ? 'contained' : 'outlined'}
                 size="small"
-                startIcon={<ClearIcon />}
-                onClick={handleClearFilter}
-                sx={{ textTransform: 'none', ml: 'auto' }}
+                onClick={(e) => setCalendarAnchorEl(e.currentTarget)}
+                aria-label={t('admin.bookingsManagement.dateRange')}
+                sx={{ textTransform: 'none', minWidth: 36, px: 1 }}
               >
-                {t('admin.bookingsManagement.clearFilter')}
+                <CalendarMonthIcon fontSize="small" />
               </Button>
-            )}
-          </Box>
+              <Button
+                variant={getActiveFilter() === 'today' ? 'contained' : 'outlined'}
+                size="small"
+                onClick={handleTodayFilter}
+                sx={{ textTransform: 'none' }}
+              >
+                {t('admin.bookingsManagement.today')}
+              </Button>
+              <Button
+                variant={getActiveFilter() === 'thisWeek' ? 'contained' : 'outlined'}
+                size="small"
+                onClick={handleThisWeekFilter}
+                sx={{ textTransform: 'none' }}
+              >
+                {t('admin.bookingsManagement.thisWeek')}
+              </Button>
+              <Button
+                variant={getActiveFilter() === 'thisMonth' ? 'contained' : 'outlined'}
+                size="small"
+                onClick={handleThisMonthFilter}
+                sx={{ textTransform: 'none' }}
+              >
+                {t('admin.bookingsManagement.thisMonth')}
+              </Button>
+              {startDate && (
+                <Typography variant="body2" color="text.secondary">
+                  {endDate && dayjs(startDate).format('YYYY-MM-DD') !== dayjs(endDate).format('YYYY-MM-DD') ? (
+                    <>
+                      {t('admin.bookingsManagement.fromTo', {
+                        start: formatDateRangeLabel(startDate),
+                        end: formatDateRangeLabel(endDate)
+                      })}
+                    </>
+                  ) : (
+                    <>{t('admin.bookingsManagement.date', { date: formatDateRangeLabel(startDate) })}</>
+                  )}
+                </Typography>
+              )}
+              {(startDate || endDate) && (
+                <Button
+                  variant="outlined"
+                  size="small"
+                  onClick={handleClearFilter}
+                  aria-label={t('admin.bookingsManagement.clearFilter')}
+                  sx={{ textTransform: 'none', ml: 'auto', minWidth: 36, px: 1 }}
+                >
+                  <ClearIcon fontSize="small" />
+                </Button>
+              )}
+            </Box>
+          )}
 
           {/* Calendar Popover */}
           <Popover
@@ -1552,7 +1594,7 @@ const BookingsManagement = () => {
         ) : (
           <Grid container spacing={3}>
             {/* Pending Approval Section */}
-            <Grid item xs={12} md={6}>
+            <Grid item xs={12} md={6} sx={{ display: isMobile && mobileBookingFilter === 'confirmed' ? 'none' : 'block' }}>
               <Box>
                 <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
                   <Typography variant="body2" color="text.secondary">
@@ -1572,7 +1614,7 @@ const BookingsManagement = () => {
             </Grid>
 
             {/* Confirmed Section */}
-            <Grid item xs={12} md={6}>
+            <Grid item xs={12} md={6} sx={{ display: isMobile && mobileBookingFilter === 'pending' ? 'none' : 'block' }}>
               <Box>
                 <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
                   <Typography variant="body2" color="text.secondary">

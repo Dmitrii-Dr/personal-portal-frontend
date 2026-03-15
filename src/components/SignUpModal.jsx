@@ -518,13 +518,12 @@ const SignUpModal = ({ open, onClose, onSwitchToLogin }) => {
             sx={{
               display: 'flex',
               gap: 2,
-              flexDirection: { xs: 'column', sm: 'row' },
-              mt: 2,
+              flexDirection: 'row',
+              mt: 0,
             }}
           >
             <TextField
               select
-              fullWidth
               id="countryCode"
               name="countryCode"
               label={t('auth.countryCode')}
@@ -534,7 +533,10 @@ const SignUpModal = ({ open, onClose, onSwitchToLogin }) => {
               required
               disabled={loading || success}
               variant="outlined"
-              sx={{ flex: { xs: '1 1 auto', sm: '0 0 200px' } }}
+              sx={{
+                flex: { xs: '0 0 130px', sm: '0 0 200px' },
+                minWidth: { xs: 120, sm: 180 },
+              }}
               SelectProps={{
                 renderValue: (selected) => {
                   const match = countryCodes.find((c) => c.key === selected);

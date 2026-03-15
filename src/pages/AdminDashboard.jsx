@@ -37,16 +37,18 @@ import {
   IconButton,
   Tooltip,
   Snackbar,
+  useMediaQuery,
+  useTheme,
 } from '@mui/material';
 import dayjs from 'dayjs';
 import utc from 'dayjs/plugin/utc';
 import timezone from 'dayjs/plugin/timezone';
 import 'dayjs/locale/en-gb';
 import 'dayjs/locale/ru';
-import FilterAltIcon from '@mui/icons-material/FilterAlt';
 import ClearIcon from '@mui/icons-material/Clear';
 import CloseIcon from '@mui/icons-material/Close';
 import AddIcon from '@mui/icons-material/Add';
+import CalendarMonthIcon from '@mui/icons-material/CalendarMonth';
 import AccessTimeIcon from '@mui/icons-material/AccessTime';
 import ArrowUpwardIcon from '@mui/icons-material/ArrowUpward';
 import ArrowDownwardIcon from '@mui/icons-material/ArrowDownward';
@@ -72,6 +74,8 @@ const monthsGenitive = 'Января_Февраля_Марта_Апреля_Ма
 
 const PastSessions = () => {
   const { t } = useTranslation();
+  const theme = useTheme();
+  const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
   const [infoDialogOpen, setInfoDialogOpen] = useState(false);
   const [selectedBookingInfo, setSelectedBookingInfo] = useState(null);
 
@@ -494,8 +498,8 @@ const PastSessions = () => {
   return (
     <LocalizationProvider dateAdapter={AdapterDayjs} adapterLocale={i18n.language === 'ru' ? 'ru' : 'en-gb'}>
       <Box>
-        <Box sx={{ mb: 3, display: 'flex', alignItems: 'center', gap: 2 }}>
-          <FormControl sx={{ minWidth: 200 }}>
+        <Box sx={{ mb: 3, display: 'flex', alignItems: { xs: 'stretch', sm: 'center' }, gap: 2, flexDirection: { xs: 'column', sm: 'row' } }}>
+          <FormControl sx={{ minWidth: { xs: '100%', sm: 200 }, width: { xs: '100%', sm: 'auto' } }}>
             <InputLabel>{t('admin.dashboard.statusFilter')}</InputLabel>
             <Select
               value={status}
@@ -518,67 +522,101 @@ const PastSessions = () => {
 
         {/* Date Range Filter */}
         <Paper sx={{ p: 2, mb: 3, bgcolor: 'background.paper' }}>
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, flexWrap: 'wrap' }}>
-            <FilterAltIcon color="action" />
-            <Button
-              variant={startDate && endDate && !getActiveFilter() ? 'contained' : 'outlined'}
-              size="small"
-              startIcon={<FilterAltIcon />}
-              onClick={(e) => setCalendarAnchorEl(e.currentTarget)}
-              sx={{ textTransform: 'none' }}
-            >
-              {t('admin.dashboard.dateRange')}
-            </Button>
-            <Button
-              variant={getActiveFilter() === 'today' ? 'contained' : 'outlined'}
-              size="small"
-              onClick={handleTodayFilter}
-              sx={{ textTransform: 'none' }}
-            >
-              {t('admin.dashboard.today')}
-            </Button>
-            <Button
-              variant={getActiveFilter() === 'thisWeek' ? 'contained' : 'outlined'}
-              size="small"
-              onClick={handleThisWeekFilter}
-              sx={{ textTransform: 'none' }}
-            >
-              {t('admin.dashboard.thisWeek')}
-            </Button>
-            <Button
-              variant={getActiveFilter() === 'thisMonth' ? 'contained' : 'outlined'}
-              size="small"
-              onClick={handleThisMonthFilter}
-              sx={{ textTransform: 'none' }}
-            >
-              {t('admin.dashboard.thisMonth')}
-            </Button>
-            {startDate && (
-              <Typography variant="body2" color="text.secondary">
-                {endDate && dayjs(startDate).format('YYYY-MM-DD') !== dayjs(endDate).format('YYYY-MM-DD') ? (
-                  <>
-                    {t('admin.dashboard.fromTo', {
-                      start: formatDateTimeForDisplay(startDate),
-                      end: formatDateTimeForDisplay(endDate)
-                    })}
-                  </>
-                ) : (
-                  <>{t('admin.dashboard.date', { date: formatDateTimeForDisplay(startDate) })}</>
-                )}
-              </Typography>
-            )}
-            {(startDate || endDate) && (
+          {isMobile ? (
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+              <FormControl size="small" sx={{ minWidth: 200, flex: 1 }}>
+                <InputLabel>{t('admin.dashboard.dateRange')}</InputLabel>
+                <Select
+                  value={getActiveFilter() || (startDate || endDate ? 'range' : '')}
+                  label={t('admin.dashboard.dateRange')}
+                  onChange={(e) => {
+                    const value = e.target.value;
+                    if (value === 'today') handleTodayFilter();
+                    if (value === 'thisWeek') handleThisWeekFilter();
+                    if (value === 'thisMonth') handleThisMonthFilter();
+                    if (value === 'range') setCalendarAnchorEl(e.currentTarget);
+                  }}
+                >
+                  <MenuItem value="today">{t('admin.dashboard.today')}</MenuItem>
+                  <MenuItem value="thisWeek">{t('admin.dashboard.thisWeek')}</MenuItem>
+                  <MenuItem value="thisMonth">{t('admin.dashboard.thisMonth')}</MenuItem>
+                  <MenuItem value="range">{t('admin.dashboard.dateRange')}</MenuItem>
+                </Select>
+              </FormControl>
+              {(startDate || endDate) && (
+                <Button
+                  variant="outlined"
+                  size="small"
+                  onClick={handleClearFilter}
+                  aria-label={`${t('admin.dashboard.clear')} Filter`}
+                  sx={{ textTransform: 'none', flexShrink: 0, minWidth: 36, px: 1 }}
+                >
+                  <ClearIcon fontSize="small" />
+                </Button>
+              )}
+            </Box>
+          ) : (
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, flexWrap: 'wrap' }}>
               <Button
-                variant="outlined"
+                variant={startDate && endDate && !getActiveFilter() ? 'contained' : 'outlined'}
                 size="small"
-                startIcon={<ClearIcon />}
-                onClick={handleClearFilter}
-                sx={{ textTransform: 'none', ml: 'auto' }}
+                onClick={(e) => setCalendarAnchorEl(e.currentTarget)}
+                aria-label={t('admin.dashboard.dateRange')}
+                sx={{ textTransform: 'none', minWidth: 36, px: 1 }}
               >
-                {t('admin.dashboard.clear')} Filter
+                <CalendarMonthIcon fontSize="small" />
               </Button>
-            )}
-          </Box>
+              <Button
+                variant={getActiveFilter() === 'today' ? 'contained' : 'outlined'}
+                size="small"
+                onClick={handleTodayFilter}
+                sx={{ textTransform: 'none' }}
+              >
+                {t('admin.dashboard.today')}
+              </Button>
+              <Button
+                variant={getActiveFilter() === 'thisWeek' ? 'contained' : 'outlined'}
+                size="small"
+                onClick={handleThisWeekFilter}
+                sx={{ textTransform: 'none' }}
+              >
+                {t('admin.dashboard.thisWeek')}
+              </Button>
+              <Button
+                variant={getActiveFilter() === 'thisMonth' ? 'contained' : 'outlined'}
+                size="small"
+                onClick={handleThisMonthFilter}
+                sx={{ textTransform: 'none' }}
+              >
+                {t('admin.dashboard.thisMonth')}
+              </Button>
+              {startDate && (
+                <Typography variant="body2" color="text.secondary">
+                  {endDate && dayjs(startDate).format('YYYY-MM-DD') !== dayjs(endDate).format('YYYY-MM-DD') ? (
+                    <>
+                      {t('admin.dashboard.fromTo', {
+                        start: formatDateTimeForDisplay(startDate),
+                        end: formatDateTimeForDisplay(endDate)
+                      })}
+                    </>
+                  ) : (
+                    <>{t('admin.dashboard.date', { date: formatDateTimeForDisplay(startDate) })}</>
+                  )}
+                </Typography>
+              )}
+              {(startDate || endDate) && (
+                <Button
+                  variant="outlined"
+                  size="small"
+                  onClick={handleClearFilter}
+                  aria-label={`${t('admin.dashboard.clear')} Filter`}
+                  sx={{ textTransform: 'none', ml: 'auto', minWidth: 36, px: 1 }}
+                >
+                  <ClearIcon fontSize="small" />
+                </Button>
+              )}
+            </Box>
+          )}
 
           {/* Calendar Popover */}
           <Popover
@@ -738,7 +776,7 @@ const PastSessions = () => {
                 const sessionTitleDisplay = sessionTitle.length > 200 ? `${sessionTitle.slice(0, 200)}...` : sessionTitle;
                 return (
                   <Grid item xs={12} key={booking.id}>
-                    <Card sx={{ height: 210 }}>
+                    <Card sx={{ height: { xs: 'auto', sm: 210 } }}>
                       <CardContent sx={{ height: '100%', overflow: 'hidden' }}>
                         <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2, flexWrap: 'wrap', gap: 1 }}>
                           <Box sx={{ display: 'flex', gap: 1, alignItems: 'center', flexWrap: 'wrap' }}>
@@ -802,8 +840,8 @@ const PastSessions = () => {
                             </Typography>
                           </Grid>
                           <Grid item xs={12} sm={6}>
-                            <Box sx={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'flex-start' }}>
-                              <Box sx={{ textAlign: 'right' }}>
+                            <Box sx={{ display: 'flex', justifyContent: { xs: 'flex-start', sm: 'flex-end' }, alignItems: 'flex-start' }}>
+                              <Box sx={{ textAlign: { xs: 'left', sm: 'right' } }}>
                                 <Typography variant="body2" color="text.secondary">
                                   {t('admin.dashboard.startTime')}
                                 </Typography>
@@ -822,8 +860,8 @@ const PastSessions = () => {
             </Grid>
 
             {/* Pagination and Page Size Controls */}
-            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mt: 4, flexWrap: 'wrap', gap: 2 }}>
-              <FormControl size="small" sx={{ minWidth: 180 }}>
+            <Box sx={{ display: 'flex', justifyContent: { xs: 'flex-start', sm: 'space-between' }, alignItems: { xs: 'stretch', sm: 'center' }, mt: 4, flexWrap: 'wrap', gap: 2, flexDirection: { xs: 'column', sm: 'row' } }}>
+              <FormControl size="small" sx={{ minWidth: { xs: '100%', sm: 180 } }}>
                 <InputLabel id="page-size-label">{t('admin.dashboard.pageSize')}</InputLabel>
                 <Select
                   labelId="page-size-label"
@@ -846,8 +884,9 @@ const PastSessions = () => {
                   color="primary"
                   showFirstButton
                   showLastButton
-                  siblingCount={2}
-                  boundaryCount={1}
+                  siblingCount={isMobile ? 0 : 2}
+                  boundaryCount={isMobile ? 0 : 1}
+                  size={isMobile ? 'small' : 'medium'}
                 />
               )}
             </Box>
@@ -898,6 +937,8 @@ const PastSessions = () => {
 
 const AdminDashboard = () => {
   const { t } = useTranslation();
+  const theme = useTheme();
+  const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState(0);
   const [addPostOpen, setAddPostOpen] = useState(false);
@@ -1788,8 +1829,15 @@ const AdminDashboard = () => {
 
         {/* Sessions Tabs */}
         <Box sx={{ mb: 4 }}>
-          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
-            <Tabs value={activeTab} onChange={handleTabChange}>
+          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: { xs: 'stretch', sm: 'center' }, mb: 2, flexDirection: { xs: 'column', sm: 'row' }, gap: 2 }}>
+            <Tabs
+              value={activeTab}
+              onChange={handleTabChange}
+              variant={isMobile ? 'scrollable' : 'standard'}
+              scrollButtons={false}
+              allowScrollButtonsMobile={false}
+              sx={{ width: { xs: '100%', sm: 'auto' } }}
+            >
               <Tab label={t('admin.dashboard.activeSessions')} />
               <Tab label={t('admin.dashboard.pastSessions')} />
             </Tabs>
@@ -1798,7 +1846,8 @@ const AdminDashboard = () => {
                 variant="contained"
                 startIcon={<AddIcon />}
                 onClick={handleNewBookingOpen}
-                sx={{ textTransform: 'none' }}
+                fullWidth={isMobile}
+                sx={{ textTransform: 'none', width: { xs: '100%', sm: 'auto' } }}
               >
                 {t('admin.dashboard.newBooking')}
               </Button>
