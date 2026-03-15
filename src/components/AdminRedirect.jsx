@@ -9,10 +9,16 @@ const AdminRedirect = ({ children }) => {
   useEffect(() => {
     const token = getToken();
     
-    // Only redirect if user has admin role and is not on an admin route
-    const isAdminRoute = location.pathname.startsWith('/admin');
+    // Only redirect if user has admin role and is not on an admin route.
+    // Normalize to avoid trailing-slash mismatches (e.g. /about-me/).
+    const normalizedPath = location.pathname.replace(/\/+$/, '') || '/';
+    const isAdminRoute = normalizedPath.startsWith('/admin');
+    const isPublicAllowedRoute =
+      normalizedPath === '/' ||
+      normalizedPath === '/about-me' ||
+      normalizedPath.startsWith('/blog');
     
-    if (token && hasAdminRole(token) && !isAdminRoute) {
+    if (token && hasAdminRole(token) && !isAdminRoute && !isPublicAllowedRoute) {
       navigate('/admin/dashboard', { replace: true });
     }
   }, [location.pathname, navigate]);
@@ -21,4 +27,3 @@ const AdminRedirect = ({ children }) => {
 };
 
 export default AdminRedirect;
-

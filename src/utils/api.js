@@ -185,10 +185,19 @@ export const getPublicWelcome = ({ timeout, force = false } = {}) => {
     return _welcomePromise;
   }
 
-  _welcomePromise = apiClient
-    .get('/api/v1/public/welcome', {
+  _welcomePromise = (async () => {
+    let token = getToken();
+    if (!token && hasSessionHint()) {
+      token = await refreshAccessToken();
+    }
+
+    const headers = token ? { Authorization: `Bearer ${token}` } : undefined;
+
+    return apiClient.get('/api/v1/public/welcome', {
       timeout,
-    })
+      headers,
+    });
+  })()
     .then((response) => {
       const data = response.data;
       _welcomeCache = data;
@@ -311,7 +320,10 @@ apiClient.interceptors.response.use(
 // For 401 handling in plain-fetch paths use the axios client instead, or
 // handle manually.  Most protected calls in this codebase use apiClient.
 export const fetchWithAuth = async (url, options = {}) => {
-  const token = getToken();
+  let token = getToken();
+  if (!token && hasSessionHint()) {
+    token = await refreshAccessToken();
+  }
   const headers = { ...options.headers };
   if (token) headers.Authorization = `Bearer ${token}`;
 

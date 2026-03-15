@@ -533,8 +533,7 @@ const AppLayout = ({ children }) => {
           )}
 
           {/* Home Button - Top Left */}
-          {!isAdminRoute && (
-            isLandingPage ? (
+          {isLandingPage && !isAdminRoute ? (
               <Tooltip title={t('navigation.home')} arrow>
                 <IconButton
                   onClick={() => scrollToSection('hero')}
@@ -555,47 +554,47 @@ const AppLayout = ({ children }) => {
                 </IconButton>
               </Tooltip>
             ) : (
-              <>
-                {/* Mobile Home Icon (Only on non-landing pages) */}
-                <IconButton
-                  onClick={() => navigate('/')}
-                  color="inherit"
-                  size="medium"
-                  aria-label="home"
-                  sx={{
-                    display: { xs: 'inline-flex', md: 'none' },
-                    mr: { xs: 1, sm: 2 },
-                  }}
-                >
-                  <HomeIcon />
-                </IconButton>
+            <>
+              {/* Mobile Home Icon (Only on non-landing pages) */}
+              <IconButton
+                onClick={() => navigate('/')}
+                color="inherit"
+                size="medium"
+                aria-label="home"
+                sx={{
+                  display: { xs: 'inline-flex', md: 'none' },
+                  mr: { xs: 1, sm: 2 },
+                }}
+              >
+                <HomeIcon />
+              </IconButton>
 
-                {/* Desktop Home Button (with text) */}
-                <Button
-                  onClick={() => navigate('/')}
-                  color="inherit"
-                  startIcon={<HomeIcon />}
-                  sx={{
-                    display: { xs: 'none', md: 'inline-flex' },
-                    mr: { xs: 1, sm: 2 },
-                    textTransform: 'none',
-                    fontWeight: 500,
-                    fontSize: { xs: '0.875rem', sm: '0.9375rem' },
-                    px: { xs: 1, sm: 1.5 },
-                    py: 1,
-                    borderRadius: 1,
-                    transition: 'all 0.2s ease-in-out',
-                    '&:hover': {
-                      bgcolor: 'rgba(255, 255, 255, 0.1)',
-                      transform: 'translateY(-1px)',
-                    },
-                  }}
-                >
-                  {t('navigation.home')}
-                </Button>
-              </>
+              {/* Desktop Home Button (with text) */}
+              <Button
+                onClick={() => navigate('/')}
+                color="inherit"
+                startIcon={<HomeIcon />}
+                sx={{
+                  display: { xs: 'none', md: 'inline-flex' },
+                  mr: { xs: 1, sm: 2 },
+                  textTransform: 'none',
+                  fontWeight: 500,
+                  fontSize: { xs: '0.875rem', sm: '0.9375rem' },
+                  px: { xs: 1, sm: 1.5 },
+                  py: 1,
+                  borderRadius: 1,
+                  transition: 'all 0.2s ease-in-out',
+                  '&:hover': {
+                    bgcolor: 'rgba(255, 255, 255, 0.1)',
+                    transform: 'translateY(-1px)',
+                  },
+                }}
+              >
+                {t('navigation.home')}
+              </Button>
+            </>
             )
-          )}
+          }
 
           {/* Navigation Links (Desktop) */}
           <Box sx={{ flexGrow: 1, display: { xs: 'none', md: 'flex' }, justifyContent: 'center' }}>

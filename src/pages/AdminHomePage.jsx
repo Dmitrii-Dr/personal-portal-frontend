@@ -167,7 +167,7 @@ const AdminHomePage = () => {
       setLoading(true);
       setError(null);
       try {
-        const response = await fetch('/api/v1/public/welcome');
+        const response = await fetchWithAuth('/api/v1/public/welcome');
         if (!response.ok) {
           throw new Error(`Failed to load: ${response.status}`);
         }
