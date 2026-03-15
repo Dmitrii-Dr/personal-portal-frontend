@@ -977,8 +977,15 @@ const BookingsManagement = () => {
 
   // Handle "Clear" button
   const handleClearTime = () => {
-    setCustomStartTime(null);
     setRescheduleSelectedSlot(null);
+    setRescheduleBookingError(null);
+    setRescheduleSlotError(null);
+    const baseDate = rescheduleSelectedDate
+      ? rescheduleSelectedDate.hour(0).minute(0).second(0).millisecond(0)
+      : dayjs().hour(0).minute(0).second(0).millisecond(0);
+    setCustomStartTime(baseDate);
+    setHourInput('');
+    setMinuteInput('');
   };
 
   // Handle reschedule dialog close
@@ -1199,12 +1206,18 @@ const BookingsManagement = () => {
       <Card
         key={booking.id}
         sx={{
-          height: 210,
+          height: { xs: 'auto', sm: 210 },
           mb: 2,
           bgcolor: (overdue || past) ? 'grey.300' : 'background.paper'
         }}
       >
-        <CardContent sx={{ height: '100%', overflow: 'hidden' }}>
+        <CardContent
+          sx={{
+            height: { xs: 'auto', sm: '100%' },
+            overflow: 'hidden',
+            pb: { xs: 2.5, sm: 2 },
+          }}
+        >
           {/* First row: Status chips and Info button on left, Update button on right */}
           <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2, flexWrap: 'wrap', gap: 1 }}>
             <Box sx={{ display: 'flex', gap: 1, alignItems: 'center', flexWrap: 'wrap' }}>
@@ -1310,12 +1323,30 @@ const BookingsManagement = () => {
               </Typography>
             </Grid>
             <Grid item xs={12} sm={6}>
-              <Box sx={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'flex-start' }}>
-                <Box sx={{ textAlign: 'right' }}>
-                  <Typography variant="body2" color="text.secondary">
-                    {t('admin.bookingsManagement.startTime')}
+              <Box sx={{ display: 'flex', justifyContent: { xs: 'flex-start', sm: 'flex-end' }, alignItems: 'flex-start' }}>
+                <Box
+                  sx={{
+                    textAlign: { xs: 'left', sm: 'right' },
+                    display: { xs: 'flex', sm: 'block' },
+                    alignItems: { xs: 'baseline', sm: 'initial' },
+                    gap: { xs: 1, sm: 0 },
+                    pb: 0,
+                  }}
+                >
+                  <Typography
+                    variant="body2"
+                    color="text.secondary"
+                    component="div"
+                    sx={{ display: { xs: 'inline', sm: 'block' } }}
+                  >
+                    {t('admin.bookingsManagement.startTime')}:
                   </Typography>
-                  <Typography variant="body1" noWrap sx={{ mt: 0.5 }}>
+                  <Typography
+                    variant="body1"
+                    noWrap={isMobile}
+                    component="div"
+                    sx={{ mt: { xs: 0, sm: 0.5 }, maxWidth: '100%', display: { xs: 'inline', sm: 'block' } }}
+                  >
                     {formatDateTime(booking.startTimeInstant)}
                   </Typography>
                 </Box>
@@ -1636,9 +1667,39 @@ const BookingsManagement = () => {
         )}
 
         {/* Update Status Dialog */}
-        <Dialog open={updateDialogOpen} onClose={handleUpdateClose} maxWidth="sm" fullWidth>
-          <DialogTitle>{t('admin.bookingsManagement.updateBookingStatus')}</DialogTitle>
-          <DialogContent>
+        <Dialog
+          open={updateDialogOpen}
+          onClose={handleUpdateClose}
+          maxWidth="sm"
+          fullWidth
+          fullScreen={isMobile}
+          PaperProps={{
+            sx: {
+              borderRadius: isMobile ? 0 : 2,
+              maxHeight: isMobile ? 'none' : '95vh',
+              height: isMobile ? '100%' : undefined,
+              display: 'flex',
+              flexDirection: 'column',
+            },
+          }}
+        >
+          <DialogTitle sx={{ m: 0, p: 2, pr: 6 }}>
+            {t('admin.bookingsManagement.updateBookingStatus')}
+            <IconButton
+              aria-label="close"
+              onClick={handleUpdateClose}
+              disabled={updating}
+              sx={{
+                position: 'absolute',
+                right: 8,
+                top: 8,
+                color: (theme) => theme.palette.grey[500],
+              }}
+            >
+              <CloseIcon />
+            </IconButton>
+          </DialogTitle>
+          <DialogContent sx={{ flex: 1, overflowY: 'auto' }}>
             {updateError && (
               <Alert severity="error" sx={{ mb: 2 }} onClose={() => setUpdateError(null)}>
                 {updateError}
@@ -1680,19 +1741,13 @@ const BookingsManagement = () => {
               </Box>
             )}
           </DialogContent>
-          <DialogActions>
-            <Button
-              onClick={handleUpdateClose}
-              sx={{ textTransform: 'none' }}
-              disabled={updating}
-            >
-              {t('admin.bookingsManagement.cancel')}
-            </Button>
+          <DialogActions sx={{ px: 3, pb: 2 }}>
             <Button
               onClick={handleStatusUpdate}
               variant="contained"
               sx={{ textTransform: 'none' }}
               disabled={updating || !newStatus}
+              fullWidth
             >
               {updating ? (
                 <>
@@ -1855,9 +1910,38 @@ const BookingsManagement = () => {
         </Dialog>
 
         {/* Reschedule/Update Booking Dialog */}
-        <Dialog open={rescheduleDialogOpen} onClose={handleRescheduleDialogClose} maxWidth="md" fullWidth>
-          <DialogTitle>{t('admin.bookingsManagement.updateSessionDateTime')}</DialogTitle>
-          <DialogContent sx={{ pb: 1, minHeight: '555px' }}>
+        <Dialog
+          open={rescheduleDialogOpen}
+          onClose={handleRescheduleDialogClose}
+          maxWidth="md"
+          fullWidth
+          fullScreen={isMobile}
+          PaperProps={{
+            sx: {
+              borderRadius: isMobile ? 0 : 2,
+              maxHeight: isMobile ? 'none' : '95vh',
+              height: isMobile ? '100%' : undefined,
+              display: 'flex',
+              flexDirection: 'column',
+            },
+          }}
+        >
+          <DialogTitle sx={{ m: 0, p: 2, pr: 6 }}>
+            {t('admin.bookingsManagement.updateSessionDateTime')}
+            <IconButton
+              aria-label="close"
+              onClick={handleRescheduleDialogClose}
+              sx={{
+                position: 'absolute',
+                right: 8,
+                top: 8,
+                color: (theme) => theme.palette.grey[500],
+              }}
+            >
+              <CloseIcon />
+            </IconButton>
+          </DialogTitle>
+          <DialogContent sx={{ pb: 1, minHeight: '555px', flex: 1, overflowY: 'auto' }}>
             {bookingToReschedule && (
               <>
                 <DialogContentText sx={{ mb: 2 }}>
@@ -2183,7 +2267,7 @@ const BookingsManagement = () => {
                                 <Button
                                   variant="contained"
                                   fullWidth
-                                  disabled={!customStartTime}
+                                  disabled={!customStartTime || !hourInput || !minuteInput}
                                   onClick={() => {
                                     if (customStartTime) {
                                       setConfirmRescheduleDialogOpen(true);
@@ -2412,7 +2496,7 @@ const BookingsManagement = () => {
                             <Button
                               variant="contained"
                               fullWidth
-                              disabled={!customStartTime}
+                              disabled={!customStartTime || !hourInput || !minuteInput}
                               onClick={() => {
                                 if (customStartTime) {
                                   setConfirmRescheduleDialogOpen(true);
@@ -2435,7 +2519,22 @@ const BookingsManagement = () => {
         </Dialog>
 
         {/* Confirm Reschedule Dialog */}
-        <Dialog open={confirmRescheduleDialogOpen} onClose={handleConfirmRescheduleDialogClose} maxWidth="md" fullWidth>
+        <Dialog
+          open={confirmRescheduleDialogOpen}
+          onClose={handleConfirmRescheduleDialogClose}
+          maxWidth="md"
+          fullWidth
+          fullScreen={isMobile}
+          PaperProps={{
+            sx: {
+              borderRadius: isMobile ? 0 : 2,
+              maxHeight: isMobile ? 'none' : '95vh',
+              height: isMobile ? '100%' : undefined,
+              display: 'flex',
+              flexDirection: 'column',
+            },
+          }}
+        >
           <DialogTitle sx={{ m: 0, p: 2, pr: 6 }}>
             {t('pages.booking.confirmUpdateTitle')}
             <IconButton
@@ -2452,9 +2551,9 @@ const BookingsManagement = () => {
               <CloseIcon />
             </IconButton>
           </DialogTitle>
-          <DialogContent>
+          <DialogContent sx={{ flex: 1, overflowY: 'auto' }}>
             {(rescheduleSelectedSlot || (customStartTime && rescheduleSelectedDate)) && bookingToReschedule && (
-              <Alert severity="info" sx={{ mb: 2, '& .MuiAlert-message': { whiteSpace: 'nowrap' } }}>
+              <Alert severity="info" sx={{ mb: 2, '& .MuiAlert-message': { whiteSpace: { xs: 'normal', sm: 'nowrap' } } }}>
                 <Trans
                   i18nKey="admin.bookingsManagement.dateTimeWillBeUpdated"
                   values={{
@@ -2476,7 +2575,7 @@ const BookingsManagement = () => {
                 />
               </Alert>
             )}
-            <DialogContentText sx={{ mb: 2, whiteSpace: 'nowrap' }}>
+            <DialogContentText sx={{ mb: 2, whiteSpace: { xs: 'normal', sm: 'nowrap' } }}>
               {t('pages.booking.confirmUpdateMessage')}{' '}
               {i18n.language === 'ru' ? (
                 <strong>

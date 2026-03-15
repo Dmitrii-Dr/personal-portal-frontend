@@ -356,6 +356,7 @@
       "createNewSlot": "+ Create new slot",
       "enterTime": "Enter time",
       "now": "Now",
+      "createSlot": "Create Slot",
       "messageOptional": "Message (Optional)",
       "messagePlaceholder": "Add any additional notes or questions...",
       "messageMaxLength": "Message must be 2000 characters or less",

@@ -1548,8 +1548,14 @@ const AdminDashboard = () => {
 
   // Handle "Clear" button
   const handleClearTime = () => {
-    setCustomStartTime(null);
     setSelectedBookingSlot(null);
+    setBookingError(null);
+    const baseDate = bookingSelectedDate
+      ? bookingSelectedDate.hour(0).minute(0).second(0).millisecond(0)
+      : dayjs().hour(0).minute(0).second(0).millisecond(0);
+    setCustomStartTime(baseDate);
+    setHourInput('');
+    setMinuteInput('');
   };
 
   // Effect to handle scroll indicator initial state when slots are loaded for New Booking
@@ -2100,7 +2106,22 @@ const AdminDashboard = () => {
         </Dialog>
 
         {/* New Booking Dialog */}
-        <Dialog open={newBookingOpen} onClose={handleNewBookingClose} maxWidth="md" fullWidth>
+        <Dialog
+          open={newBookingOpen}
+          onClose={handleNewBookingClose}
+          maxWidth="md"
+          fullWidth
+          fullScreen={isMobile}
+          PaperProps={{
+            sx: {
+              borderRadius: isMobile ? 0 : 2,
+              maxHeight: isMobile ? 'none' : '95vh',
+              height: isMobile ? '100%' : undefined,
+              display: 'flex',
+              flexDirection: 'column',
+            },
+          }}
+        >
           <DialogTitle>
             {t('landing.booking.title')}
             <IconButton
@@ -2116,7 +2137,7 @@ const AdminDashboard = () => {
               <CloseIcon />
             </IconButton>
           </DialogTitle>
-          <DialogContent sx={{ pb: 1, minHeight: '555px' }}>
+          <DialogContent sx={{ pb: 1, minHeight: '555px', flex: 1, overflowY: 'auto' }}>
             {bookingError && (
               <Alert severity="error" sx={{ mb: 2 }} onClose={() => setBookingError(null)}>
                 {bookingError}
@@ -2490,7 +2511,7 @@ const AdminDashboard = () => {
                                 </Box>
 
                                 {/* Now and Clear buttons */}
-                                <Box sx={{ display: 'flex', justifyContent: 'space-between', gap: 1 }}>
+                                <Box sx={{ display: 'flex', justifyContent: 'space-between', gap: 1, mb: 1 }}>
                                   <Button
                                     size="small"
                                     onClick={handleSetNow}
@@ -2506,6 +2527,20 @@ const AdminDashboard = () => {
                                     {t('admin.dashboard.clear')}
                                   </Button>
                                 </Box>
+                                {/* Create Slot button */}
+                                <Button
+                                  variant="contained"
+                                  fullWidth
+                                  disabled={!customStartTime || !bookingSelectedDate || !!bookingError || !hourInput || !minuteInput}
+                                  onClick={() => {
+                                    if (customStartTime && bookingSelectedDate && !bookingError && hourInput && minuteInput) {
+                                      setConfirmBookingDialogOpen(true);
+                                    }
+                                  }}
+                                  sx={{ textTransform: 'none' }}
+                                >
+                                  {t('admin.dashboard.createSlot')}
+                                </Button>
                               </Box>
                             )}
                           </List>
@@ -2706,7 +2741,7 @@ const AdminDashboard = () => {
                             </Box>
 
                             {/* Now and Clear buttons */}
-                            <Box sx={{ display: 'flex', justifyContent: 'space-between', gap: 1 }}>
+                            <Box sx={{ display: 'flex', justifyContent: 'space-between', gap: 1, mb: 1 }}>
                               <Button
                                 size="small"
                                 onClick={handleSetNow}
@@ -2722,6 +2757,20 @@ const AdminDashboard = () => {
                                 {t('admin.dashboard.clear')}
                               </Button>
                             </Box>
+                            {/* Create Slot button */}
+                            <Button
+                              variant="contained"
+                              fullWidth
+                              disabled={!customStartTime || !bookingSelectedDate || !!bookingError || !hourInput || !minuteInput}
+                              onClick={() => {
+                                if (customStartTime && bookingSelectedDate && !bookingError && hourInput && minuteInput) {
+                                  setConfirmBookingDialogOpen(true);
+                                }
+                              }}
+                              sx={{ textTransform: 'none' }}
+                            >
+                              {t('admin.dashboard.createSlot')}
+                            </Button>
                           </Box>
                         )}
                       </>
@@ -2735,7 +2784,22 @@ const AdminDashboard = () => {
         </Dialog>
 
         {/* Confirm Booking Dialog */}
-        <Dialog open={confirmBookingDialogOpen} onClose={handleConfirmBookingDialogClose} maxWidth="sm" fullWidth>
+        <Dialog
+          open={confirmBookingDialogOpen}
+          onClose={handleConfirmBookingDialogClose}
+          maxWidth="sm"
+          fullWidth
+          fullScreen={isMobile}
+          PaperProps={{
+            sx: {
+              borderRadius: isMobile ? 0 : 2,
+              maxHeight: isMobile ? 'none' : '95vh',
+              height: isMobile ? '100%' : undefined,
+              display: 'flex',
+              flexDirection: 'column',
+            },
+          }}
+        >
           <DialogTitle sx={{ m: 0, p: 2, pr: 6 }}>
             {t('pages.booking.confirmBookingTitle')}
             <IconButton
@@ -2752,7 +2816,7 @@ const AdminDashboard = () => {
               <CloseIcon />
             </IconButton>
           </DialogTitle>
-          <DialogContent>
+          <DialogContent sx={{ flex: 1, overflowY: 'auto' }}>
             <DialogContentText sx={{ mb: 2 }}>
               {t('pages.booking.confirmBookingMessage')}{' '}
               <strong>
