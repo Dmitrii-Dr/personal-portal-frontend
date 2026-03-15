@@ -156,7 +156,6 @@ const ProfilePage = ({ isAdminProfile = false }) => {
   const currencies = [
     { value: 'Rubles', symbol: '₽', displayName: t('pages.profile.currencies.RUB') },
     { value: 'Tenge', symbol: '₸', displayName: t('pages.profile.currencies.TENGE') },
-    { value: 'USD', symbol: '$', displayName: t('pages.profile.currencies.USD') },
   ];
 
   // Track current token to detect user changes
@@ -1043,4 +1042,3 @@ const ProfilePage = ({ isAdminProfile = false }) => {
 };
 
 export default ProfilePage;
-

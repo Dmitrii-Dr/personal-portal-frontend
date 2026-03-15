@@ -54,7 +54,6 @@ const getCurrencySymbol = (currency) => {
   const currencyMap = {
     'Rubles': '₽',
     'Tenge': '₸',
-    'USD': '$',
   };
   return currencyMap[currency] || currency;
 };
@@ -1089,15 +1088,6 @@ const LandingPage = () => {
                     selected={selectedCurrency === 'Tenge'}
                   >
                     ₸ {t('landing.services.currencies.Tenge')}
-                  </MenuItem>
-                  <MenuItem
-                    onClick={() => {
-                      setSelectedCurrency('USD');
-                      setCurrencyMenuAnchor(null);
-                    }}
-                    selected={selectedCurrency === 'USD'}
-                  >
-                    $ {t('landing.services.currencies.USD')}
                   </MenuItem>
                 </Menu>
               </Box>

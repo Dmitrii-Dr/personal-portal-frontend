@@ -547,12 +547,18 @@ const SessionsConfigurationPage = () => {
                   ) : sessionTypes.length > 0 ? (
                     <List>
                       {sessionTypes.map((sessionType) => (
-                        <ListItem key={sessionType.id || sessionType.sessionTypeId}>
+                        <ListItem
+                          key={sessionType.id || sessionType.sessionTypeId}
+                          sx={{
+                            alignItems: 'flex-start',
+                            pr: isMobile ? 8 : 10,
+                          }}
+                        >
                           <ListItemText
                             primary={sessionType.name}
                             secondary={
                               <>
-                                {sessionType.description && (
+                                {!isMobile && sessionType.description && (
                                   <Typography variant="body2" color="text.secondary">
                                     {sessionType.description}
                                   </Typography>
@@ -564,19 +570,23 @@ const SessionsConfigurationPage = () => {
                                     color={sessionType.active !== false ? 'success' : 'default'}
                                   />
                                   <Chip label={`${sessionType.durationMinutes} min`} size="small" />
-                                  {sessionType.prices && Object.keys(sessionType.prices).length > 0 ? (
-                                    Object.entries(sessionType.prices).map(([currency, price]) => (
-                                      <Chip
-                                        key={currency}
-                                        label={`${currency}: ${price}`}
-                                        size="small"
-                                        color="primary"
-                                      />
-                                    ))
-                                  ) : sessionType.price ? (
-                                    <Chip label={`$${sessionType.price}`} size="small" color="primary" />
-                                  ) : null}
                                 </Box>
+                                {(sessionType.prices && Object.keys(sessionType.prices).length > 0) || sessionType.price ? (
+                                  <Box sx={{ display: 'flex', gap: 1, mt: 0.5, pt: 0.5, flexWrap: 'wrap' }}>
+                                    {sessionType.prices && Object.keys(sessionType.prices).length > 0 ? (
+                                      Object.entries(sessionType.prices).map(([currency, price]) => (
+                                        <Chip
+                                          key={currency}
+                                          label={`${currency}: ${price}`}
+                                          size="small"
+                                          color="primary"
+                                        />
+                                      ))
+                                    ) : (
+                                      <Chip label={`$${sessionType.price}`} size="small" color="primary" />
+                                    )}
+                                  </Box>
+                                ) : null}
                               </>
                             }
                           />
