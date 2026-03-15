@@ -534,8 +534,8 @@ const AppLayout = ({ children }) => {
           }}
         >
           <Toolbar sx={{ minHeight: { xs: 64, sm: 64 }, height: { xs: 64, sm: 64 }, position: 'relative' }}>
-          {/* Mobile Hamburger Menu Icon (Aligned Left, Landing Page Only) */}
-          {isMobile && isLandingPage && (
+          {/* Mobile Hamburger Menu Icon (Aligned Left) */}
+          {isMobile && (isLandingPage || isAdminRoute) && (
             <IconButton
               color="inherit"
               aria-label="open drawer"
@@ -570,19 +570,21 @@ const AppLayout = ({ children }) => {
               </Tooltip>
             ) : (
             <>
-              {/* Mobile Home Icon (Only on non-landing pages) */}
-              <IconButton
-                onClick={() => navigate('/')}
-                color="inherit"
-                size="medium"
-                aria-label="home"
-                sx={{
-                  display: { xs: 'inline-flex', md: 'none' },
-                  mr: { xs: 1, sm: 2 },
-                }}
-              >
-                <HomeIcon />
-              </IconButton>
+              {/* Mobile Home Icon (Only on non-landing, non-admin pages) */}
+              {!isAdminRoute && (
+                <IconButton
+                  onClick={() => navigate('/')}
+                  color="inherit"
+                  size="medium"
+                  aria-label="home"
+                  sx={{
+                    display: { xs: 'inline-flex', md: 'none' },
+                    mr: { xs: 1, sm: 2 },
+                  }}
+                >
+                  <HomeIcon />
+                </IconButton>
+              )}
 
               {/* Desktop Home Button (with text) */}
               <Button
@@ -1212,7 +1214,7 @@ const AppLayout = ({ children }) => {
             )}
 
             {/* Mobile Drawer */}
-            {isMobile && isLandingPage && (
+            {isMobile && (isLandingPage || isAdminRoute) && (
               <Drawer
                 anchor="left"
                 open={mobileOpen}
@@ -1234,6 +1236,37 @@ const AppLayout = ({ children }) => {
                 <Box sx={{ height: { xs: 64, sm: 64 }, minHeight: { xs: 64, sm: 64 }, bgcolor: drawerTopColor, width: '100%' }} />
                 <Divider />
                 <List onClick={() => setMobileOpen(false)} sx={{ bgcolor: 'transparent' }}>
+                  {/* Admin Navigation Links */}
+                  {isAdminRoute && (
+                    <>
+                      <ListItem disablePadding>
+                        <ListItemButton onClick={() => navigate('/admin/dashboard')}>
+                          <ListItemText primary={t('navigation.dashboard')} />
+                        </ListItemButton>
+                      </ListItem>
+                      <ListItem disablePadding>
+                        <ListItemButton onClick={() => navigate('/admin/home')}>
+                          <ListItemText primary={t('navigation.homePage')} />
+                        </ListItemButton>
+                      </ListItem>
+                      <ListItem disablePadding>
+                        <ListItemButton onClick={() => navigate('/admin/blog')}>
+                          <ListItemText primary={t('navigation.blog')} />
+                        </ListItemButton>
+                      </ListItem>
+                      <ListItem disablePadding>
+                        <ListItemButton onClick={() => navigate('/admin/session/configuration')}>
+                          <ListItemText primary={t('navigation.sessions')} />
+                        </ListItemButton>
+                      </ListItem>
+                      <ListItem disablePadding>
+                        <ListItemButton onClick={() => navigate('/admin/gallery')}>
+                          <ListItemText primary={t('navigation.gallery')} />
+                        </ListItemButton>
+                      </ListItem>
+                    </>
+                  )}
+
                   {/* Landing Page Home Link - Scroll to hero */}
                   {(isLandingPage && !isAdminRoute) && (
                     <ListItem disablePadding>
