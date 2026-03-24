@@ -259,9 +259,14 @@ const SectionState = ({
   onRetry = null,
   isEmpty = false,
   emptyMessage = 'No results found.',
+  hasData = false,
+  refreshingMessage = 'Updating...',
   children,
 }) => {
-  if (loading) {
+  const isInitialLoading = loading && !hasData;
+  const isRefreshing = loading && hasData;
+
+  if (isInitialLoading) {
     return (
       <Box sx={{ py: 5, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
         <CircularProgress size={28} />
@@ -288,7 +293,34 @@ const SectionState = ({
     return <Alert severity="info">{emptyMessage}</Alert>;
   }
 
-  return children;
+  return (
+    <Box sx={{ position: 'relative' }}>
+      {isRefreshing ? (
+        <Box
+          sx={{
+            position: 'absolute',
+            top: -8,
+            right: 0,
+            zIndex: 2,
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: 0.75,
+            px: 1,
+            py: 0.5,
+            borderRadius: 1,
+            bgcolor: 'background.paper',
+            border: (theme) => `1px solid ${theme.palette.divider}`,
+          }}
+        >
+          <CircularProgress size={14} />
+          <Typography variant="caption" color="text.secondary">
+            {refreshingMessage}
+          </Typography>
+        </Box>
+      ) : null}
+      {children}
+    </Box>
+  );
 };
 
 const RequestLogsPanel = ({
@@ -509,6 +541,8 @@ const RequestLogsPanel = ({
       loading={loading}
       error={error}
       onRetry={onRetryLoad}
+      hasData={Boolean(requestLogsData)}
+      refreshingMessage="Refreshing request logs..."
       isEmpty={!requestLogsData?.content?.length}
       emptyMessage="No request logs found for the selected filters."
     >
@@ -1075,6 +1109,8 @@ const DailyStatsPanel = ({ endpointPaths, endpointPathsLoading, onDrillDown, isM
           loading={loading}
           error={error}
           onRetry={dailyStatsRetryHandler}
+          hasData={Boolean(data)}
+          refreshingMessage="Refreshing daily statistics..."
           isEmpty={Boolean(data && !chartRows.length)}
           emptyMessage="No daily statistics found for the selected filters."
         >
@@ -1308,6 +1344,8 @@ const DailyStatsPanel = ({ endpointPaths, endpointPathsLoading, onDrillDown, isM
               loading={periodStatsLoading}
               error={periodStatsError}
               onRetry={periodStatsRetryHandler}
+              hasData={Boolean(periodStatsData)}
+              refreshingMessage="Refreshing grouped statistics..."
               isEmpty={Array.isArray(periodStatsData) && periodStatsData.length === 0}
               emptyMessage="No grouped period statistics found for the selected filters."
             >
@@ -1592,6 +1630,8 @@ const TopErrorEndpointsCard = ({ isMobileLayout }) => {
             loading={loading}
             error={error}
             onRetry={retryHandler}
+            hasData={Boolean(data?.content?.length)}
+            refreshingMessage="Refreshing top error endpoints..."
             isEmpty={false}
           >
             <TableContainer component={Paper} variant="outlined">
