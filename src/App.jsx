@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useLayoutEffect } from 'react';
 import { BrowserRouter as Router, Routes, Route, useNavigate, useLocation } from 'react-router-dom';
 import i18n from './i18n/i18n';
 import AppLayout from './components/AppLayout';
@@ -663,6 +663,15 @@ function UrlLanguageSync() {
   return null;
 }
 
+// Vite proxies /admin/sba to Spring Boot Admin; a full document load is required. Client-side
+// navigation would otherwise match /admin/* and render the SPA shell with no SBA content.
+function SpringBootAdminProxyEntry() {
+  useLayoutEffect(() => {
+    window.location.reload();
+  }, []);
+  return null;
+}
+
 // AppInner must live inside <Router> so it can use useNavigate.
 function AppInner() {
   const navigate = useNavigate();
@@ -700,6 +709,7 @@ function AppInner() {
             <Route path="/maintenance" element={<MaintenancePage />} />
             {/* /admin is the admin login page — keep public */}
             <Route path="/admin" element={<AdminPage />} />
+            <Route path="/admin/sba/*" element={<SpringBootAdminProxyEntry />} />
 
             {/* Private routes — anonymous users are redirected to / */}
             <Route path="/booking" element={<PrivateRoute><BookingPage /></PrivateRoute>} />

@@ -1,0 +1,826 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Admin Observability - UI Design Proposal</title>
+  <style>
+    :root {
+      --primary: #2c5f5f;
+      --primary-strong: #234d4d;
+      --primary-soft: #e9f4f4;
+      --accent: #4a9b9b;
+      --ok: #2e7d32;
+      --warn: #ed6c02;
+      --danger: #d32f2f;
+      --bg: #f6f8fa;
+      --card: #ffffff;
+      --border: #d7dde3;
+      --text-main: #1f2a37;
+      --text-muted: #5f6b7a;
+      --shadow: 0 8px 20px rgba(17, 24, 39, 0.08);
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+      color: var(--text-main);
+      background: var(--bg);
+    }
+
+    .topbar {
+      position: sticky;
+      top: 0;
+      z-index: 20;
+      background: linear-gradient(90deg, var(--primary), var(--accent));
+      color: #fff;
+      padding: 14px 24px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      box-shadow: 0 2px 10px rgba(0, 0, 0, 0.2);
+    }
+
+    .topbar h1 {
+      margin: 0;
+      font-size: 20px;
+      font-weight: 600;
+      letter-spacing: 0.2px;
+    }
+
+    .topbar .meta {
+      font-size: 13px;
+      opacity: 0.95;
+    }
+
+    .page {
+      max-width: 1400px;
+      margin: 20px auto 40px;
+      padding: 0 20px;
+      display: grid;
+      gap: 16px;
+    }
+
+    .card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      box-shadow: var(--shadow);
+    }
+
+    .card-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 14px 16px;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .card-header h2 {
+      margin: 0;
+      font-size: 17px;
+      font-weight: 600;
+    }
+
+    .card-body {
+      padding: 16px;
+    }
+
+    .kpis {
+      display: grid;
+      grid-template-columns: repeat(6, minmax(160px, 1fr));
+      gap: 12px;
+    }
+
+    .kpi {
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 12px;
+      background: #fff;
+    }
+
+    .kpi .label {
+      margin: 0 0 6px;
+      font-size: 12px;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.4px;
+    }
+
+    .kpi .value {
+      margin: 0;
+      font-size: 22px;
+      font-weight: 700;
+    }
+
+    .kpi.ok .value { color: var(--ok); }
+    .kpi.warn .value { color: var(--warn); }
+    .kpi.danger .value { color: var(--danger); }
+
+    .filters-grid {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(180px, 1fr));
+      gap: 10px;
+      margin-bottom: 12px;
+    }
+
+    label {
+      display: block;
+      font-size: 12px;
+      color: var(--text-muted);
+      margin-bottom: 4px;
+    }
+
+    input, select {
+      width: 100%;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      height: 36px;
+      padding: 0 10px;
+      font-size: 14px;
+      background: #fff;
+      color: var(--text-main);
+    }
+
+    select[multiple] {
+      height: auto;
+      min-height: 108px;
+      padding: 8px 10px;
+    }
+
+    .actions {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+
+    .btn {
+      border: 1px solid transparent;
+      border-radius: 8px;
+      padding: 8px 14px;
+      font-size: 14px;
+      cursor: default;
+      user-select: none;
+    }
+
+    .btn.primary {
+      background: var(--primary);
+      color: #fff;
+    }
+
+    .btn.secondary {
+      background: #fff;
+      color: var(--primary);
+      border-color: var(--primary);
+    }
+
+    .hint {
+      font-size: 12px;
+      color: var(--text-muted);
+    }
+
+    .content-grid {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 16px;
+      align-items: start;
+    }
+
+    .tabs {
+      display: flex;
+      gap: 8px;
+      border-bottom: 1px solid var(--border);
+      padding: 0 2px;
+      margin-bottom: 12px;
+    }
+
+    .tab {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      border: 1px solid var(--border);
+      border-bottom: none;
+      border-radius: 10px 10px 0 0;
+      padding: 9px 14px;
+      font-size: 13px;
+      color: var(--text-muted);
+      background: #eef3f6;
+    }
+
+    .tab.active {
+      background: #fff;
+      color: var(--primary-strong);
+      font-weight: 600;
+    }
+
+    .tab-panel {
+      display: none;
+    }
+
+    .tab-panel.active {
+      display: block;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 13px;
+    }
+
+    thead {
+      background: var(--primary-soft);
+    }
+
+    th, td {
+      border-bottom: 1px solid var(--border);
+      padding: 10px 8px;
+      text-align: left;
+      vertical-align: top;
+    }
+
+    th {
+      font-weight: 600;
+      color: var(--primary-strong);
+      white-space: nowrap;
+    }
+
+    .mono {
+      font-family: "SFMono-Regular", Menlo, Consolas, monospace;
+      font-size: 12px;
+    }
+
+    .badge {
+      display: inline-block;
+      min-width: 44px;
+      text-align: center;
+      border-radius: 999px;
+      padding: 3px 8px;
+      font-size: 12px;
+      font-weight: 600;
+    }
+
+    .status-200 { background: #e7f6eb; color: #216e2f; }
+    .status-401 { background: #fff4e8; color: #a85b00; }
+    .status-404 { background: #fff4e8; color: #a85b00; }
+    .status-500 { background: #fdecec; color: #a31515; }
+
+    .details-panel {
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      overflow: hidden;
+      background: #fff;
+    }
+
+    .details-head {
+      padding: 12px 14px;
+      background: #f8fafb;
+      border-bottom: 1px solid var(--border);
+      font-weight: 600;
+    }
+
+    .details-body {
+      padding: 12px 14px;
+      display: grid;
+      gap: 10px;
+    }
+
+    .kv {
+      display: grid;
+      grid-template-columns: 130px 1fr;
+      gap: 8px;
+      font-size: 13px;
+    }
+
+    .kv .k {
+      color: var(--text-muted);
+    }
+
+    .codebox {
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      background: #0f172a;
+      color: #cbd5e1;
+      padding: 10px;
+      font-size: 12px;
+      line-height: 1.45;
+      max-height: 140px;
+      overflow: auto;
+    }
+
+    .stats-layout {
+      display: grid;
+      grid-template-columns: 1.2fr 1fr;
+      gap: 16px;
+    }
+
+    .chart {
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 12px;
+      height: 250px;
+      display: flex;
+      align-items: flex-end;
+      gap: 10px;
+      background: linear-gradient(180deg, #ffffff 0%, #f5f8fb 100%);
+    }
+
+    .bar-wrap {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .bar {
+      width: 100%;
+      max-width: 34px;
+      border-radius: 8px 8px 0 0;
+      background: linear-gradient(180deg, var(--accent), var(--primary));
+    }
+
+    .bar-label {
+      font-size: 11px;
+      color: var(--text-muted);
+    }
+
+    .legend {
+      display: flex;
+      gap: 12px;
+      flex-wrap: wrap;
+      margin-top: 8px;
+      font-size: 12px;
+      color: var(--text-muted);
+    }
+
+    .dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      display: inline-block;
+      margin-right: 4px;
+      vertical-align: middle;
+    }
+
+    .footer-note {
+      font-size: 12px;
+      color: var(--text-muted);
+      padding: 0 2px;
+    }
+
+
+    .detail-btn {
+      border: 1px solid var(--primary);
+      background: #fff;
+      color: var(--primary-strong);
+      border-radius: 8px;
+      padding: 4px 10px;
+      font-size: 12px;
+      font-weight: 600;
+      cursor: pointer;
+    }
+
+    .detail-btn:hover {
+      background: var(--primary-soft);
+    }
+
+    .modal-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(15, 23, 42, 0.55);
+      display: none;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+      z-index: 200;
+    }
+
+    .modal-overlay.open {
+      display: flex;
+    }
+
+    .modal-card {
+      width: min(980px, 100%);
+      max-height: 85vh;
+      overflow: auto;
+      border-radius: 12px;
+      background: #fff;
+      border: 1px solid var(--border);
+      box-shadow: 0 18px 45px rgba(15, 23, 42, 0.35);
+    }
+
+    .modal-head {
+      position: sticky;
+      top: 0;
+      z-index: 2;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 12px 14px;
+      background: #f8fafb;
+      border-bottom: 1px solid var(--border);
+      font-weight: 600;
+    }
+
+    .close-btn {
+      border: 1px solid var(--border);
+      background: #fff;
+      color: var(--text-main);
+      border-radius: 8px;
+      padding: 5px 10px;
+      font-size: 12px;
+      cursor: pointer;
+    }
+
+    @media (max-width: 1200px) {
+      .kpis {
+        grid-template-columns: repeat(3, minmax(150px, 1fr));
+      }
+      .content-grid,
+      .stats-layout {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    @media (max-width: 760px) {
+      .kpis {
+        grid-template-columns: repeat(2, minmax(140px, 1fr));
+      }
+      .filters-grid {
+        grid-template-columns: 1fr 1fr;
+      }
+      .kv {
+        grid-template-columns: 1fr;
+      }
+    }
+  </style>
+</head>
+<body>
+  <header class="topbar">
+    <h1>Admin Observability - Service State</h1>
+    <div class="meta">Design-only mockup | no behavior wired</div>
+  </header>
+
+  <main class="page">
+    <section class="card">
+      <div class="card-body">
+        <div class="tabs">
+          <div class="tab active">Request Logs</div>
+          <div class="tab">Daily Endpoint Statistics</div>
+        </div>
+
+        <div class="tab-panel active">
+          <section class="content-grid">
+            <article class="card">
+              <div class="card-header">
+                <h2>Request Logs</h2>
+                <span class="hint">Page 1 / 83 | size 20</span>
+              </div>
+              <div class="card-body" style="padding-top: 0;">
+                <div class="card" style="margin: 12px 0 14px; box-shadow: none;">
+                  <div class="card-header">
+                    <h2>Request Log Filters</h2>
+                    <span class="hint">From/to required, max range 31 days</span>
+                  </div>
+                  <div class="card-body">
+                    <div class="filters-grid">
+                      <div>
+                        <label>From (date &amp; time)</label>
+                        <input type="datetime-local" value="2026-03-20T00:00" />
+                      </div>
+                      <div>
+                        <label>To (date &amp; time)</label>
+                        <input type="datetime-local" value="2026-03-23T00:00" />
+                      </div>
+                      <div>
+                        <label>Method</label>
+                        <select multiple size="5">
+                          <option>GET</option>
+                          <option>POST</option>
+                          <option>PUT</option>
+                          <option>DELETE</option>
+                          <option>PATCH</option>
+                        </select>
+                      </div>
+                      <div>
+                        <label>Status</label>
+                        <select multiple size="5">
+                          <option>200</option>
+                          <option>201</option>
+                          <option>400</option>
+                          <option>401</option>
+                          <option>404</option>
+                          <option>500</option>
+                        </select>
+                      </div>
+                      <div>
+                        <label>Template path (max 5 selected)</label>
+                        <select multiple size="6">
+                          <option>/api/v1/admin/observability/request-logs</option>
+                          <option>/api/v1/admin/observability/request-logs/{id}</option>
+                          <option>/api/v1/admin/blog</option>
+                          <option>/api/v1/admin/profile</option>
+                          <option>/api/v1/admin/gallery/{id}</option>
+                          <option>/api/v1/health</option>
+                        </select>
+                        <div class="hint">Multi-select dropdown; select up to 5 options.</div>
+                      </div>
+                      <div>
+                        <label>User ID (UUID)</label>
+                        <input type="text" value="6ec7e8f2-b86b-43cd-8d55-5898f7d61c8f" />
+                      </div>
+                      <div>
+                        <label>Error code contains</label>
+                        <select multiple size="5">
+                          <option>PEC-</option>
+                          <option>AUTH-</option>
+                          <option>TIMEOUT</option>
+                          <option>VALIDATION</option>
+                          <option>DB-</option>
+                        </select>
+                      </div>
+                      <div>
+                        <label>Error message contains</label>
+                        <input type="text" value="timeout" />
+                      </div>
+                    </div>
+                    <div class="actions">
+                      <span class="btn primary">Apply</span>
+                      <span class="btn secondary">Reset</span>
+                      <span class="btn secondary">Save preset</span>
+                      <span class="hint">Default sort: createdAt desc, id desc</span>
+                    </div>
+                  </div>
+                </div>
+                <table>
+                  <thead>
+                    <tr>
+                      <th>ID</th>
+                      <th>Created At</th>
+                      <th>Method</th>
+                      <th>Status</th>
+                      <th>Duration</th>
+                      <th>Template Path</th>
+                      <th>User</th>
+                      <th>Error</th>
+                      <th>Action</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr>
+                      <td class="mono">309918</td>
+                      <td class="mono">2026-03-22T14:26:32Z</td>
+                      <td>POST</td>
+                      <td><span class="badge status-500">500</span></td>
+                      <td>1239 ms</td>
+                      <td class="mono">/api/v1/admin/blog</td>
+                      <td class="mono">6ec7e8f2-...61c8f</td>
+                      <td class="mono">PEC-5001</td>
+                      <td><button class="detail-btn" data-log-id="309918">Details</button></td>
+                    </tr>
+                    <tr>
+                      <td class="mono">309912</td>
+                      <td class="mono">2026-03-22T14:24:09Z</td>
+                      <td>GET</td>
+                      <td><span class="badge status-401">401</span></td>
+                      <td>88 ms</td>
+                      <td class="mono">/api/v1/admin/profile</td>
+                      <td class="mono">null</td>
+                      <td class="mono">PEC-4010</td>
+                      <td><button class="detail-btn" data-log-id="309912">Details</button></td>
+                    </tr>
+                    <tr>
+                      <td class="mono">309905</td>
+                      <td class="mono">2026-03-22T14:20:44Z</td>
+                      <td>GET</td>
+                      <td><span class="badge status-200">200</span></td>
+                      <td>65 ms</td>
+                      <td class="mono">/api/v1/health</td>
+                      <td class="mono">null</td>
+                      <td class="mono">-</td>
+                      <td><button class="detail-btn" data-log-id="309905">Details</button></td>
+                    </tr>
+                    <tr>
+                      <td class="mono">309900</td>
+                      <td class="mono">2026-03-22T14:18:31Z</td>
+                      <td>GET</td>
+                      <td><span class="badge status-404">404</span></td>
+                      <td>41 ms</td>
+                      <td class="mono">/api/v1/admin/gallery/{id}</td>
+                      <td class="mono">11de1cb5-...02b16</td>
+                      <td class="mono">PEC-4043</td>
+                      <td><button class="detail-btn" data-log-id="309900">Details</button></td>
+                    </tr>
+                  </tbody>
+                </table>
+                <div style="display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-top: 10px; flex-wrap: wrap;">
+                  <div class="hint">Total: 1,648 records</div>
+                  <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
+                    <label style="margin: 0;">Size</label>
+                    <select style="width: auto; min-width: 84px;">
+                      <option>20</option>
+                      <option>50</option>
+                      <option>100</option>
+                    </select>
+                    <label style="margin: 0;">Page</label>
+                    <select style="width: auto; min-width: 84px;">
+                      <option>1</option>
+                      <option>2</option>
+                      <option>3</option>
+                      <option>4</option>
+                      <option>5</option>
+                    </select>
+                    <span class="btn secondary" style="padding: 6px 10px;">Prev</span>
+                    <span class="btn secondary" style="padding: 6px 10px;">Next</span>
+                  </div>
+                </div>
+                <p class="hint" style="margin: 12px 0 0;">
+                  Use the Details button to open request detail popup (GET /request-logs/{id}).
+                </p>
+              </div>
+            </article>
+          </section>
+        </div>
+
+        <div class="tab-panel">
+          <section class="card" style="margin-top: 2px;">
+            <div class="card-header">
+              <h2>Daily Endpoint Statistics</h2>
+              <span class="hint">Endpoint: /api/v1/admin/observability/endpoint-stats</span>
+            </div>
+            <div class="card-body">
+              <div class="card" style="margin-bottom: 14px; box-shadow: none;">
+                <div class="card-header">
+                  <h2>Daily Stats Filters</h2>
+                  <span class="hint">Date-only filters for endpoint aggregates</span>
+                </div>
+                <div class="card-body">
+                  <div class="filters-grid">
+                    <div>
+                      <label>From (date)</label>
+                      <input type="date" value="2026-03-17" />
+                    </div>
+                    <div>
+                      <label>To (date)</label>
+                      <input type="date" value="2026-03-23" />
+                    </div>
+                    <div>
+                      <label>Method</label>
+                      <select>
+                        <option>ALL</option>
+                        <option>GET</option>
+                        <option>POST</option>
+                        <option>PUT</option>
+                        <option>DELETE</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label>Template path</label>
+                      <input type="text" value="/api/v1/admin/blog" />
+                    </div>
+                  </div>
+                  <div class="actions">
+                    <span class="btn primary">Apply</span>
+                    <span class="btn secondary">Reset</span>
+                    <span class="hint">Default sort: bucketStart desc, method desc, templatePath desc</span>
+                  </div>
+                </div>
+              </div>
+              <div class="stats-layout">
+                <div>
+                  <div class="chart">
+                    <div class="bar-wrap"><div class="bar" style="height: 46%;"></div><div class="bar-label">Mar 17</div></div>
+                    <div class="bar-wrap"><div class="bar" style="height: 51%;"></div><div class="bar-label">Mar 18</div></div>
+                    <div class="bar-wrap"><div class="bar" style="height: 58%;"></div><div class="bar-label">Mar 19</div></div>
+                    <div class="bar-wrap"><div class="bar" style="height: 72%;"></div><div class="bar-label">Mar 20</div></div>
+                    <div class="bar-wrap"><div class="bar" style="height: 64%;"></div><div class="bar-label">Mar 21</div></div>
+                    <div class="bar-wrap"><div class="bar" style="height: 90%;"></div><div class="bar-label">Mar 22</div></div>
+                    <div class="bar-wrap"><div class="bar" style="height: 68%;"></div><div class="bar-label">Mar 23</div></div>
+                  </div>
+                  <div class="legend">
+                    <span><span class="dot" style="background: var(--primary);"></span>Total count (grouped by day)</span>
+                    <span><span class="dot" style="background: var(--warn);"></span>Error overlays in real chart</span>
+                  </div>
+                </div>
+
+                <div>
+                  <table>
+                    <thead>
+                      <tr>
+                        <th>Day</th>
+                        <th>Method</th>
+                        <th>Total</th>
+                        <th>Success</th>
+                        <th>4xx</th>
+                        <th>5xx</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      <tr>
+                        <td>2026-03-22</td>
+                        <td>POST</td>
+                        <td>842</td>
+                        <td>781</td>
+                        <td>46</td>
+                        <td>15</td>
+                      </tr>
+                      <tr>
+                        <td>2026-03-22</td>
+                        <td>GET</td>
+                        <td>2134</td>
+                        <td>2088</td>
+                        <td>42</td>
+                        <td>4</td>
+                      </tr>
+                      <tr>
+                        <td>2026-03-21</td>
+                        <td>GET</td>
+                        <td>1819</td>
+                        <td>1769</td>
+                        <td>44</td>
+                        <td>6</td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+          </section>
+        </div>
+      </div>
+    </section>
+
+    <p class="footer-note">
+      Suggested behavior for implementation stage: separate filter models for Logs (datetime required) and Daily Stats (date-only optional), shared quick presets, and synchronized drill-down from chart to logs.
+    </p>
+  </main>
+
+
+  <div class="modal-overlay" id="requestDetailModal">
+    <div class="modal-card">
+      <div class="modal-head">
+        <span id="requestDetailTitle">Request Detail (selected: #309918)</span>
+        <button class="close-btn" id="closeDetailModal" type="button">Close</button>
+      </div>
+      <div class="details-body">
+        <div class="kv"><div class="k">Path</div><div class="mono">/api/v1/admin/blog</div></div>
+        <div class="kv"><div class="k">Template Path</div><div class="mono">/api/v1/admin/blog</div></div>
+        <div class="kv"><div class="k">Method / Status</div><div>POST / <span class="badge status-500">500</span></div></div>
+        <div class="kv"><div class="k">Duration</div><div>1239 ms</div></div>
+        <div class="kv"><div class="k">User ID</div><div class="mono">6ec7e8f2-b86b-43cd-8d55-5898f7d61c8f</div></div>
+        <div class="kv"><div class="k">Error</div><div class="mono">PEC-5001 | "timeout while writing image metadata"</div></div>
+
+        <div>
+          <label>Request Headers (sanitized)</label>
+          <div class="codebox mono">{ "content-type": "application/json", "authorization": "***redacted***" }</div>
+        </div>
+        <div>
+          <label>Response Headers (sanitized)</label>
+          <div class="codebox mono">{ "content-type": "application/json", "cache-control": "no-store" }</div>
+        </div>
+        <div>
+          <label>Request Body (sanitized)</label>
+          <div class="codebox mono">{ "title": "Draft", "description": "***redacted***" }</div>
+        </div>
+        <div>
+          <label>Stack Trace</label>
+          <div class="codebox mono">java.net.SocketTimeoutException: timeout... at service.ImageWriter.write(...) ...</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    (function () {
+      var modal = document.getElementById('requestDetailModal');
+      var title = document.getElementById('requestDetailTitle');
+      var closeBtn = document.getElementById('closeDetailModal');
+      var detailButtons = document.querySelectorAll('.detail-btn');
+
+      detailButtons.forEach(function (btn) {
+        btn.addEventListener('click', function () {
+          var id = btn.getAttribute('data-log-id') || 'unknown';
+          title.textContent = 'Request Detail (selected: #' + id + ')';
+          modal.classList.add('open');
+        });
+      });
+
+      closeBtn.addEventListener('click', function () {
+        modal.classList.remove('open');
+      });
+
+      modal.addEventListener('click', function (event) {
+        if (event.target === modal) {
+          modal.classList.remove('open');
+        }
+      });
+    })();
+  </script>
+
+</body>
+</html>
