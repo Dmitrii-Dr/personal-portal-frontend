@@ -14,6 +14,7 @@ import AdminBlogPage from './pages/AdminBlogPage';
 import AdminProfilePage from './pages/AdminProfilePage';
 import AdminHomePage from './pages/AdminHomePage';
 import AdminGalleryPage from './pages/AdminGalleryPage';
+import AdminObservabilityPage from './pages/AdminObservabilityPage';
 import AboutMePage from './pages/AboutMePage';
 import MaintenancePage from './pages/MaintenancePage';
 import SessionsConfigurationPage from './pages/SessionsConfigurationPage';
@@ -731,6 +732,7 @@ function AppInner() {
                     <Route path="blog" element={<AdminBlogPage />} />
                     <Route path="gallery" element={<AdminGalleryPage />} />
                     <Route path="profile" element={<AdminProfilePage />} />
+                    <Route path="observability" element={<AdminObservabilityPage />} />
                     <Route path="session/configuration" element={<SessionsConfigurationPage />} />
                   </Routes>
                 </AdminRoute>

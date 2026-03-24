@@ -118,7 +118,9 @@
   },
   "userMenu": {
     "myProfile": "Профиль",
-    "myBookings": "Записи"
+    "myBookings": "Записи",
+    "observability": "Сетевые запросы",
+    "adminDevConsole": "Консоль администратора"
   },
   "dialog": {
     "aboutMe": "Работа со мной"
