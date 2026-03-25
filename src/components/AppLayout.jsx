@@ -39,6 +39,8 @@ import HomeIcon from '@mui/icons-material/Home';
 import BookOnlineIcon from '@mui/icons-material/BookOnline';
 import PersonIcon from '@mui/icons-material/Person';
 import MenuIcon from '@mui/icons-material/Menu';
+import MonitorHeartIcon from '@mui/icons-material/MonitorHeart';
+import PersonalVideoIcon from '@mui/icons-material/PersonalVideo';
 import LoginModal from './LoginModal';
 import SignUpModal from './SignUpModal';
 import { getSelectedAvatar, setSelectedAvatar as storeSetSelectedAvatar, DEFAULT_AVATAR_ID } from '../utils/avatarStore';
@@ -110,6 +112,8 @@ const AppLayout = ({ children }) => {
   const isAgreementPage = location.pathname.startsWith('/agreement');
   // Check if we're on the About Me page where navigation buttons should be hidden
   const isAboutMePage = location.pathname === '/about-me';
+  // Hide centered header navigation on selected admin pages.
+  const hideCenterHeaderButtons = ['/admin/observability', '/admin/profile'].includes(location.pathname);
   // Check if we're on the verify-account page where navigation buttons should be hidden
   const isVerifyAccountPage = location.pathname === '/verify-account';
   // Check if we're on the maintenance page
@@ -596,6 +600,7 @@ const AppLayout = ({ children }) => {
           }
 
           {/* Navigation Links (Desktop) */}
+          {!hideCenterHeaderButtons && (
           <Box sx={{ flexGrow: 1, display: { xs: 'none', md: 'flex' }, justifyContent: 'center' }}>
             <Stack
               direction="row"
@@ -864,6 +869,7 @@ const AppLayout = ({ children }) => {
               )}
             </Stack>
           </Box>
+          )}
 
           {/* Right side: User menu and Login button */}
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, ml: 'auto' }}>
@@ -1116,6 +1122,18 @@ const AppLayout = ({ children }) => {
                       <HomeIcon fontSize="small" />
                     </ListItemIcon>
                     <ListItemText>{t('navigation.dashboard')}</ListItemText>
+                  </MenuItem>
+                  <MenuItem onClick={() => handleUserMenuClick('/admin/observability')}>
+                    <ListItemIcon>
+                      <MonitorHeartIcon fontSize="small" />
+                    </ListItemIcon>
+                    <ListItemText>{t('userMenu.observability')}</ListItemText>
+                  </MenuItem>
+                  <MenuItem onClick={() => handleUserMenuClick('/admin/sba')}>
+                    <ListItemIcon>
+                      <PersonalVideoIcon fontSize="small" />
+                    </ListItemIcon>
+                    <ListItemText>{t('userMenu.adminDevConsole')}</ListItemText>
                   </MenuItem>
                   <Divider />
                   <MenuItem onClick={() => handleUserMenuClick('logout')}>

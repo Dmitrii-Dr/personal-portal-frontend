@@ -1,0 +1,881 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Admin Observability - UI Design Proposal</title>
+  <style>
+    :root {
+      --primary: #2c5f5f;
+      --primary-strong: #234d4d;
+      --primary-soft: #e9f4f4;
+      --accent: #4a9b9b;
+      --ok: #2e7d32;
+      --warn: #ed6c02;
+      --danger: #d32f2f;
+      --bg: #f6f8fa;
+      --card: #ffffff;
+      --border: #d7dde3;
+      --text-main: #1f2a37;
+      --text-muted: #5f6b7a;
+      --shadow: 0 8px 20px rgba(17, 24, 39, 0.08);
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+      color: var(--text-main);
+      background: var(--bg);
+    }
+
+    .topbar {
+      position: sticky;
+      top: 0;
+      z-index: 20;
+      background: linear-gradient(90deg, var(--primary), var(--accent));
+      color: #fff;
+      padding: 14px 24px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      box-shadow: 0 2px 10px rgba(0, 0, 0, 0.2);
+    }
+
+    .topbar h1 {
+      margin: 0;
+      font-size: 20px;
+      font-weight: 600;
+      letter-spacing: 0.2px;
+    }
+
+    .topbar .meta {
+      font-size: 13px;
+      opacity: 0.95;
+    }
+
+    .page {
+      max-width: 1400px;
+      margin: 20px auto 40px;
+      padding: 0 20px;
+      display: grid;
+      gap: 16px;
+    }
+
+    .card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      box-shadow: var(--shadow);
+    }
+
+    .card-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 14px 16px;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .card-header h2 {
+      margin: 0;
+      font-size: 17px;
+      font-weight: 600;
+    }
+
+    .card-body {
+      padding: 16px;
+    }
+
+    .kpis {
+      display: grid;
+      grid-template-columns: repeat(6, minmax(160px, 1fr));
+      gap: 12px;
+    }
+
+    .kpi {
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 12px;
+      background: #fff;
+    }
+
+    .kpi .label {
+      margin: 0 0 6px;
+      font-size: 12px;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.4px;
+    }
+
+    .kpi .value {
+      margin: 0;
+      font-size: 22px;
+      font-weight: 700;
+    }
+
+    .kpi.ok .value { color: var(--ok); }
+    .kpi.warn .value { color: var(--warn); }
+    .kpi.danger .value { color: var(--danger); }
+
+    .filters-grid {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(180px, 1fr));
+      gap: 10px;
+      margin-bottom: 12px;
+    }
+
+    label {
+      display: block;
+      font-size: 12px;
+      color: var(--text-muted);
+      margin-bottom: 4px;
+    }
+
+    input, select {
+      width: 100%;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      height: 36px;
+      padding: 0 10px;
+      font-size: 14px;
+      background: #fff;
+      color: var(--text-main);
+    }
+
+    .actions {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+
+    .btn {
+      border: 1px solid transparent;
+      border-radius: 8px;
+      padding: 8px 14px;
+      font-size: 14px;
+      cursor: default;
+      user-select: none;
+    }
+
+    .btn.primary {
+      background: var(--primary);
+      color: #fff;
+    }
+
+    .btn.secondary {
+      background: #fff;
+      color: var(--primary);
+      border-color: var(--primary);
+    }
+
+    .hint {
+      font-size: 12px;
+      color: var(--text-muted);
+    }
+
+    .content-grid {
+      display: grid;
+      grid-template-columns: 1.8fr 1fr;
+      gap: 16px;
+      align-items: start;
+    }
+
+    .tabs {
+      display: flex;
+      gap: 8px;
+      border-bottom: 1px solid var(--border);
+      padding: 0 2px;
+      margin-bottom: 12px;
+    }
+
+    .tab {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      border: 1px solid var(--border);
+      border-bottom: none;
+      border-radius: 10px 10px 0 0;
+      padding: 9px 14px;
+      font-size: 13px;
+      color: var(--text-muted);
+      background: #eef3f6;
+    }
+
+    .tab.active {
+      background: #fff;
+      color: var(--primary-strong);
+      font-weight: 600;
+    }
+
+    .tab-panel {
+      display: none;
+    }
+
+    .tab-panel.active {
+      display: block;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 13px;
+    }
+
+    thead {
+      background: var(--primary-soft);
+    }
+
+    th, td {
+      border-bottom: 1px solid var(--border);
+      padding: 10px 8px;
+      text-align: left;
+      vertical-align: top;
+    }
+
+    th {
+      font-weight: 600;
+      color: var(--primary-strong);
+      white-space: nowrap;
+    }
+
+    .mono {
+      font-family: "SFMono-Regular", Menlo, Consolas, monospace;
+      font-size: 12px;
+    }
+
+    .badge {
+      display: inline-block;
+      min-width: 44px;
+      text-align: center;
+      border-radius: 999px;
+      padding: 3px 8px;
+      font-size: 12px;
+      font-weight: 600;
+    }
+
+    .status-200 { background: #e7f6eb; color: #216e2f; }
+    .status-401 { background: #fff4e8; color: #a85b00; }
+    .status-404 { background: #fff4e8; color: #a85b00; }
+    .status-500 { background: #fdecec; color: #a31515; }
+
+    .details-panel {
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      overflow: hidden;
+      background: #fff;
+    }
+
+    .details-head {
+      padding: 12px 14px;
+      background: #f8fafb;
+      border-bottom: 1px solid var(--border);
+      font-weight: 600;
+    }
+
+    .details-body {
+      padding: 12px 14px;
+      display: grid;
+      gap: 10px;
+    }
+
+    .kv {
+      display: grid;
+      grid-template-columns: 130px 1fr;
+      gap: 8px;
+      font-size: 13px;
+    }
+
+    .kv .k {
+      color: var(--text-muted);
+    }
+
+    .codebox {
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      background: #0f172a;
+      color: #cbd5e1;
+      padding: 10px;
+      font-size: 12px;
+      line-height: 1.45;
+      max-height: 140px;
+      overflow: auto;
+    }
+
+    .stats-layout {
+      display: grid;
+      grid-template-columns: 1.2fr 1fr;
+      gap: 16px;
+    }
+
+    .chart {
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 12px;
+      height: 250px;
+      display: flex;
+      align-items: flex-end;
+      gap: 10px;
+      background: linear-gradient(180deg, #ffffff 0%, #f5f8fb 100%);
+    }
+
+    .bar-wrap {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .bar {
+      width: 100%;
+      max-width: 34px;
+      border-radius: 8px 8px 0 0;
+      background: linear-gradient(180deg, var(--accent), var(--primary));
+    }
+
+    .bar-label {
+      font-size: 11px;
+      color: var(--text-muted);
+    }
+
+    .legend {
+      display: flex;
+      gap: 12px;
+      flex-wrap: wrap;
+      margin-top: 8px;
+      font-size: 12px;
+      color: var(--text-muted);
+    }
+
+    .dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      display: inline-block;
+      margin-right: 4px;
+      vertical-align: middle;
+    }
+
+    .footer-note {
+      font-size: 12px;
+      color: var(--text-muted);
+      padding: 0 2px;
+    }
+
+    @media (max-width: 1200px) {
+      .kpis {
+        grid-template-columns: repeat(3, minmax(150px, 1fr));
+      }
+      .content-grid,
+      .stats-layout {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    @media (max-width: 760px) {
+      .kpis {
+        grid-template-columns: repeat(2, minmax(140px, 1fr));
+      }
+      .filters-grid {
+        grid-template-columns: 1fr 1fr;
+      }
+      .kv {
+        grid-template-columns: 1fr;
+      }
+    }
+  </style>
+</head>
+<body>
+  <header class="topbar">
+    <h1>Admin Observability - Service State</h1>
+    <div class="meta">Design-only mockup | no behavior wired</div>
+  </header>
+
+  <main class="page">
+    <section class="card">
+      <div class="card-header">
+        <h2>Top Error Endpoints in Selected Period</h2>
+        <span class="hint">GET /api/v1/admin/observability/endpoint-stats/period/top-errors</span>
+      </div>
+      <div class="card-body">
+        <div class="filters-grid">
+          <div>
+            <label>From (date, required)</label>
+            <input type="date" value="2026-03-01" />
+          </div>
+          <div>
+            <label>To (date, required)</label>
+            <input type="date" value="2026-03-23" />
+          </div>
+          <div>
+            <label>Page</label>
+            <input type="number" value="0" min="0" />
+          </div>
+          <div>
+            <label>Size (max 20)</label>
+            <select>
+              <option>10</option>
+              <option selected>20</option>
+            </select>
+          </div>
+        </div>
+        <div class="actions">
+          <span class="btn primary">Load top errors</span>
+          <span class="btn secondary">Reset</span>
+          <span class="hint">Sorted by totalErrorCount desc. Rows with 0 errors are excluded.</span>
+        </div>
+
+        <div style="margin-top: 12px;">
+          <table>
+            <thead>
+              <tr>
+                <th>Row ID</th>
+                <th>Method</th>
+                <th>Template Path</th>
+                <th>Total Success</th>
+                <th>Errors (sum)</th>
+                <th>Auth Errors</th>
+                <th>Client Errors</th>
+                <th>Server Errors</th>
+                <th>Other Non-success</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td class="mono">1</td>
+                <td>POST</td>
+                <td class="mono">/api/v1/admin/blog</td>
+                <td>781</td>
+                <td>61</td>
+                <td>11</td>
+                <td>35</td>
+                <td>15</td>
+                <td>0</td>
+              </tr>
+              <tr>
+                <td class="mono">2</td>
+                <td>GET</td>
+                <td class="mono">/api/v1/admin/profile</td>
+                <td>2088</td>
+                <td>46</td>
+                <td>22</td>
+                <td>20</td>
+                <td>4</td>
+                <td>0</td>
+              </tr>
+              <tr>
+                <td class="mono">3</td>
+                <td>GET</td>
+                <td class="mono">/api/v1/admin/gallery/{id}</td>
+                <td>544</td>
+                <td>19</td>
+                <td>4</td>
+                <td>12</td>
+                <td>3</td>
+                <td>0</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <p class="hint" style="margin: 10px 0 0;">
+          Pageable result example: page 0, size 20, total elements 124, first row is the method + template path with the most errors for the selected period.
+        </p>
+      </div>
+    </section>
+
+    <section class="card">
+      <div class="card-body">
+        <div class="tabs">
+          <div class="tab">Request Logs</div>
+          <div class="tab active">Daily Endpoint Statistics</div>
+        </div>
+
+        <div class="tab-panel">
+          <section class="content-grid">
+            <article class="card">
+              <div class="card-header">
+                <h2>Request Logs</h2>
+                <span class="hint">Page 1 / 83 | size 20</span>
+              </div>
+              <div class="card-body" style="padding-top: 0;">
+                <div class="card" style="margin: 12px 0 14px; box-shadow: none;">
+                  <div class="card-header">
+                    <h2>Request Log Filters</h2>
+                    <span class="hint">From/to required, max range 31 days</span>
+                  </div>
+                  <div class="card-body">
+                    <div class="filters-grid">
+                      <div>
+                        <label>From (date &amp; time)</label>
+                        <input type="datetime-local" value="2026-03-20T00:00" />
+                      </div>
+                      <div>
+                        <label>To (date &amp; time)</label>
+                        <input type="datetime-local" value="2026-03-23T00:00" />
+                      </div>
+                      <div>
+                        <label>Method</label>
+                        <select>
+                          <option>ALL</option>
+                          <option>GET</option>
+                          <option>POST</option>
+                          <option>PUT</option>
+                          <option>DELETE</option>
+                        </select>
+                      </div>
+                      <div>
+                        <label>Status</label>
+                        <input type="number" value="500" />
+                      </div>
+                      <div>
+                        <label>Template path</label>
+                        <input type="text" value="/api/v1/admin/observability/request-logs" />
+                      </div>
+                      <div>
+                        <label>User ID (UUID)</label>
+                        <input type="text" value="6ec7e8f2-b86b-43cd-8d55-5898f7d61c8f" />
+                      </div>
+                      <div>
+                        <label>Error code contains</label>
+                        <input type="text" value="PEC-" />
+                      </div>
+                      <div>
+                        <label>Error message contains</label>
+                        <input type="text" value="timeout" />
+                      </div>
+                    </div>
+                    <div class="actions">
+                      <span class="btn primary">Apply</span>
+                      <span class="btn secondary">Reset</span>
+                      <span class="btn secondary">Save preset</span>
+                      <span class="hint">Default sort: createdAt desc, id desc</span>
+                    </div>
+                  </div>
+                </div>
+                <table>
+                  <thead>
+                    <tr>
+                      <th>ID</th>
+                      <th>Created At</th>
+                      <th>Method</th>
+                      <th>Status</th>
+                      <th>Duration</th>
+                      <th>Template Path</th>
+                      <th>User</th>
+                      <th>Error</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr>
+                      <td class="mono">309918</td>
+                      <td class="mono">2026-03-22T14:26:32Z</td>
+                      <td>POST</td>
+                      <td><span class="badge status-500">500</span></td>
+                      <td>1239 ms</td>
+                      <td class="mono">/api/v1/admin/blog</td>
+                      <td class="mono">6ec7e8f2-...61c8f</td>
+                      <td class="mono">PEC-5001</td>
+                    </tr>
+                    <tr>
+                      <td class="mono">309912</td>
+                      <td class="mono">2026-03-22T14:24:09Z</td>
+                      <td>GET</td>
+                      <td><span class="badge status-401">401</span></td>
+                      <td>88 ms</td>
+                      <td class="mono">/api/v1/admin/profile</td>
+                      <td class="mono">null</td>
+                      <td class="mono">PEC-4010</td>
+                    </tr>
+                    <tr>
+                      <td class="mono">309905</td>
+                      <td class="mono">2026-03-22T14:20:44Z</td>
+                      <td>GET</td>
+                      <td><span class="badge status-200">200</span></td>
+                      <td>65 ms</td>
+                      <td class="mono">/api/v1/health</td>
+                      <td class="mono">null</td>
+                      <td class="mono">-</td>
+                    </tr>
+                    <tr>
+                      <td class="mono">309900</td>
+                      <td class="mono">2026-03-22T14:18:31Z</td>
+                      <td>GET</td>
+                      <td><span class="badge status-404">404</span></td>
+                      <td>41 ms</td>
+                      <td class="mono">/api/v1/admin/gallery/{id}</td>
+                      <td class="mono">11de1cb5-...02b16</td>
+                      <td class="mono">PEC-4043</td>
+                    </tr>
+                  </tbody>
+                </table>
+                <p class="hint" style="margin: 12px 0 0;">
+                  Row click opens details panel (GET /request-logs/{id}).
+                </p>
+              </div>
+            </article>
+
+            <article class="details-panel">
+              <div class="details-head">Request Detail (selected: #309918)</div>
+              <div class="details-body">
+                <div class="kv"><div class="k">Path</div><div class="mono">/api/v1/admin/blog</div></div>
+                <div class="kv"><div class="k">Template Path</div><div class="mono">/api/v1/admin/blog</div></div>
+                <div class="kv"><div class="k">Method / Status</div><div>POST / <span class="badge status-500">500</span></div></div>
+                <div class="kv"><div class="k">Duration</div><div>1239 ms</div></div>
+                <div class="kv"><div class="k">User ID</div><div class="mono">6ec7e8f2-b86b-43cd-8d55-5898f7d61c8f</div></div>
+                <div class="kv"><div class="k">Error</div><div class="mono">PEC-5001 | "timeout while writing image metadata"</div></div>
+
+                <div>
+                  <label>Request Headers (sanitized)</label>
+                  <div class="codebox mono">{ "content-type": "application/json", "authorization": "***redacted***" }</div>
+                </div>
+                <div>
+                  <label>Response Headers (sanitized)</label>
+                  <div class="codebox mono">{ "content-type": "application/json", "cache-control": "no-store" }</div>
+                </div>
+                <div>
+                  <label>Request Body (sanitized)</label>
+                  <div class="codebox mono">{ "title": "Draft", "description": "***redacted***" }</div>
+                </div>
+                <div>
+                  <label>Stack Trace</label>
+                  <div class="codebox mono">java.net.SocketTimeoutException: timeout... at service.ImageWriter.write(...) ...</div>
+                </div>
+              </div>
+            </article>
+          </section>
+        </div>
+
+        <div class="tab-panel active">
+          <section class="card" style="margin-top: 2px;">
+            <div class="card-header">
+              <h2>Daily Endpoint Statistics</h2>
+
+            </div>
+            <div class="card-body">
+              <div class="card" style="margin-bottom: 14px; box-shadow: none;">
+  
+                <div class="card-body">
+                  <div class="filters-grid">
+                    <div>
+                      <label>From (date)</label>
+                      <input type="date" value="2026-03-17" />
+                    </div>
+                    <div>
+                      <label>To (date)</label>
+                      <input type="date" value="2026-03-23" />
+                    </div>
+                    <div>
+                      <label>Method</label>
+                      <select>
+                        <option>ALL</option>
+                        <option>GET</option>
+                        <option>POST</option>
+                        <option>PUT</option>
+                        <option>DELETE</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label>Template path</label>
+                      <input type="text" value="/api/v1/admin/blog" />
+                    </div>
+                  </div>
+                  <div class="actions">
+                    <span class="btn primary">Load Statistics</span>
+                    <span class="btn secondary">Reset</span>
+                  </div>
+                </div>
+              </div>
+
+              <div class="stats-layout">
+                <div>
+                  <div class="chart">
+                    <svg viewBox="0 0 700 230" width="100%" height="100%" aria-label="Daily stats plot example">
+                      <line x1="40" y1="20" x2="40" y2="190" stroke="#94a3b8" stroke-width="1" />
+                      <line x1="40" y1="190" x2="680" y2="190" stroke="#94a3b8" stroke-width="1" />
+                      <polyline
+                        fill="none"
+                        stroke="#2c5f5f"
+                        stroke-width="3"
+                        points="60,148 155,136 250,122 345,94 440,108 535,62 630,102"
+                      />
+                      <polyline
+                        fill="none"
+                        stroke="#ed6c02"
+                        stroke-width="2"
+                        stroke-dasharray="5 5"
+                        points="60,174 155,171 250,166 345,156 440,160 535,142 630,154"
+                      />
+                      <circle cx="60" cy="148" r="4" fill="#2c5f5f" />
+                      <circle cx="155" cy="136" r="4" fill="#2c5f5f" />
+                      <circle cx="250" cy="122" r="4" fill="#2c5f5f" />
+                      <circle cx="345" cy="94" r="4" fill="#2c5f5f" />
+                      <circle cx="440" cy="108" r="4" fill="#2c5f5f" />
+                      <circle cx="535" cy="62" r="4" fill="#2c5f5f" />
+                      <circle cx="630" cy="102" r="4" fill="#2c5f5f" />
+                      <text x="52" y="212" font-size="11" fill="#64748b">Mar 17</text>
+                      <text x="147" y="212" font-size="11" fill="#64748b">Mar 18</text>
+                      <text x="242" y="212" font-size="11" fill="#64748b">Mar 19</text>
+                      <text x="337" y="212" font-size="11" fill="#64748b">Mar 20</text>
+                      <text x="432" y="212" font-size="11" fill="#64748b">Mar 21</text>
+                      <text x="527" y="212" font-size="11" fill="#64748b">Mar 22</text>
+                      <text x="622" y="212" font-size="11" fill="#64748b">Mar 23</text>
+                    </svg>
+                  </div>
+                  <div class="legend">
+                    <span><span class="dot" style="background: var(--primary);"></span>Total count trend</span>
+                    <span><span class="dot" style="background: var(--warn);"></span>Error count trend (dashed)</span>
+                  </div>
+                </div>
+
+                <div>
+                  <table>
+                    <thead>
+                      <tr>
+                        <th>Day</th>
+                        <th>Method</th>
+                        <th>Total</th>
+                        <th>Success</th>
+                        <th>4xx</th>
+                        <th>5xx</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      <tr>
+                        <td>2026-03-22</td>
+                        <td>POST</td>
+                        <td>842</td>
+                        <td>781</td>
+                        <td>46</td>
+                        <td>15</td>
+                      </tr>
+                      <tr>
+                        <td>2026-03-22</td>
+                        <td>GET</td>
+                        <td>2134</td>
+                        <td>2088</td>
+                        <td>42</td>
+                        <td>4</td>
+                      </tr>
+                      <tr>
+                        <td>2026-03-21</td>
+                        <td>GET</td>
+                        <td>1819</td>
+                        <td>1769</td>
+                        <td>44</td>
+                        <td>6</td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+
+              <div class="card" style="margin-top: 14px; box-shadow: none;">
+                <div class="card-header">
+                  <h2>Endpoint Period Stats (Grouped)</h2>
+                  <span class="hint">GET /api/v1/admin/observability/endpoint-stats/period</span>
+                </div>
+                <div class="card-body">
+                  <div class="filters-grid">
+                    <div>
+                      <label>From (date, required)</label>
+                      <input type="date" value="2026-03-01" />
+                    </div>
+                    <div>
+                      <label>To (date, required)</label>
+                      <input type="date" value="2026-03-23" />
+                    </div>
+                    <div>
+                      <label>Methods (multi-select)</label>
+                      <select multiple size="4">
+                        <option>GET</option>
+                        <option>POST</option>
+                        <option>PUT</option>
+                        <option>DELETE</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label>Template paths (multi-select)</label>
+                      <select multiple size="4">
+                        <option>/api/v1/admin/blog</option>
+                        <option>/api/v1/admin/profile</option>
+                        <option>/api/v1/admin/gallery/{id}</option>
+                        <option>/api/v1/health</option>
+                      </select>
+                    </div>
+                  </div>
+                  <div class="actions">
+                    <span class="btn primary">Load grouped stats</span>
+                    <span class="btn secondary">Reset</span>
+                    <span class="hint">Grouping depends on selected filters: method + templatePath, or method-only, or templatePath-only.</span>
+                  </div>
+
+                  <div style="margin-top: 12px;">
+                    <table>
+                      <thead>
+                        <tr>
+                          <th>Method</th>
+                          <th>Template Path</th>
+                          <th>Total</th>
+                          <th>Success</th>
+                          <th>Auth Errors</th>
+                          <th>Client Errors</th>
+                          <th>Server Errors</th>
+                          <th>Other Non-success</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        <tr>
+                          <td>POST</td>
+                          <td class="mono">/api/v1/admin/blog</td>
+                          <td>842</td>
+                          <td>781</td>
+                          <td>11</td>
+                          <td>35</td>
+                          <td>15</td>
+                          <td>0</td>
+                        </tr>
+                        <tr>
+                          <td>GET</td>
+                          <td class="mono">/api/v1/admin/profile</td>
+                          <td>2134</td>
+                          <td>2088</td>
+                          <td>22</td>
+                          <td>20</td>
+                          <td>4</td>
+                          <td>0</td>
+                        </tr>
+                        <tr>
+                          <td>null</td>
+                          <td class="mono">/api/v1/health</td>
+                          <td>364</td>
+                          <td>360</td>
+                          <td>0</td>
+                          <td>2</td>
+                          <td>2</td>
+                          <td>0</td>
+                        </tr>
+                      </tbody>
+                    </table>
+                  </div>
+                  <p class="hint" style="margin: 10px 0 0;">
+                    API returns empty array when neither methods nor template paths are selected. Allowed range: up to one calendar month.
+                  </p>
+                </div>
+              </div>
+            </div>
+          </section>
+        </div>
+      </div>
+    </section>
+
+    <p class="footer-note">
+      Suggested behavior for implementation stage: separate filter models for Logs (datetime required) and Daily Stats (date-only optional), shared quick presets, and synchronized drill-down from chart to logs.
+    </p>
+  </main>
+</body>
+</html>

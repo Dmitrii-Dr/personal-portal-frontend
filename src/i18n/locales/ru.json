@@ -113,12 +113,14 @@
     "verificationFailed": "Ошибка верификации. Пожалуйста, попробуйте снова.",
     "noEmailProvided": "Email не найден. Пожалуйста, войдите снова.",
     "resendCode": "Отправить код повторно",
-    "resendCodeIn": "Повторная отправка через {{seconds}}с",
+    "resendCodeIn": "Повторная отправка через {{seconds}}",
     "codeSentAgain": "Новый код подтверждения отправлен на вашу почту."
   },
   "userMenu": {
     "myProfile": "Профиль",
-    "myBookings": "Записи"
+    "myBookings": "Записи",
+    "observability": "Сетевые запросы",
+    "adminDevConsole": "Консоль администратора"
   },
   "dialog": {
     "aboutMe": "Работа со мной"

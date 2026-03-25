@@ -1,0 +1,498 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Admin Observability - Request Logs Mobile Mockup</title>
+  <style>
+    :root {
+      --primary: #2c5f5f;
+      --primary-strong: #234d4d;
+      --primary-soft: #e9f4f4;
+      --accent: #4a9b9b;
+      --warn: #ed6c02;
+      --danger: #d32f2f;
+      --ok: #2e7d32;
+      --bg: #f6f8fa;
+      --card: #ffffff;
+      --border: #d7dde3;
+      --text-main: #1f2a37;
+      --text-muted: #5f6b7a;
+      --shadow: 0 8px 20px rgba(17, 24, 39, 0.08);
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+      color: var(--text-main);
+      background: var(--bg);
+    }
+
+    .topbar {
+      position: sticky;
+      top: 0;
+      z-index: 20;
+      background: linear-gradient(90deg, var(--primary), var(--accent));
+      color: #fff;
+      padding: 12px 14px;
+      box-shadow: 0 2px 10px rgba(0, 0, 0, 0.2);
+    }
+
+    .topbar h1 {
+      margin: 0;
+      font-size: 16px;
+      font-weight: 600;
+      letter-spacing: 0.2px;
+    }
+
+    .topbar .meta {
+      margin-top: 2px;
+      font-size: 12px;
+      opacity: 0.95;
+    }
+
+    .page {
+      width: 100%;
+      max-width: 430px;
+      margin: 12px auto 24px;
+      padding: 0 10px;
+      display: grid;
+      gap: 12px;
+    }
+
+    .card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      box-shadow: var(--shadow);
+      overflow: hidden;
+    }
+
+    .card-header {
+      padding: 12px;
+      border-bottom: 1px solid var(--border);
+      display: grid;
+      gap: 4px;
+    }
+
+    .card-header h2 {
+      margin: 0;
+      font-size: 15px;
+      font-weight: 600;
+    }
+
+    .card-body { padding: 12px; }
+
+    .hint {
+      font-size: 11px;
+      color: var(--text-muted);
+    }
+
+    .tabs {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+      margin-bottom: 12px;
+    }
+
+    .tab {
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      background: #eef3f6;
+      color: var(--text-muted);
+      font-size: 12px;
+      font-weight: 600;
+      text-align: center;
+      padding: 9px 8px;
+    }
+
+    .tab.active {
+      background: #fff;
+      color: var(--primary-strong);
+      border-color: var(--primary);
+    }
+
+    .filters {
+      display: grid;
+      gap: 10px;
+      margin-bottom: 10px;
+    }
+
+    label {
+      display: block;
+      margin-bottom: 4px;
+      font-size: 11px;
+      color: var(--text-muted);
+    }
+
+    input, select {
+      width: 100%;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      height: 36px;
+      padding: 0 10px;
+      font-size: 14px;
+      background: #fff;
+      color: var(--text-main);
+    }
+
+    select[multiple] {
+      min-height: 94px;
+      height: auto;
+      padding: 8px;
+    }
+
+    .actions {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+      margin-bottom: 6px;
+    }
+
+    .btn {
+      border: 1px solid transparent;
+      border-radius: 8px;
+      padding: 8px 12px;
+      font-size: 13px;
+      font-weight: 600;
+      user-select: none;
+    }
+
+    .btn.primary {
+      background: var(--primary);
+      color: #fff;
+    }
+
+    .btn.secondary {
+      background: #fff;
+      color: var(--primary);
+      border-color: var(--primary);
+    }
+
+    .logs-list {
+      display: grid;
+      gap: 8px;
+      margin-top: 10px;
+    }
+
+    .log-item {
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      background: #fff;
+      padding: 10px;
+      display: grid;
+      gap: 6px;
+    }
+
+    .log-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+    }
+
+    .mono {
+      font-family: "SFMono-Regular", Menlo, Consolas, monospace;
+      font-size: 11px;
+      word-break: break-word;
+    }
+
+    .badge {
+      display: inline-block;
+      min-width: 44px;
+      text-align: center;
+      border-radius: 999px;
+      padding: 3px 8px;
+      font-size: 12px;
+      font-weight: 600;
+    }
+
+    .status-200 { background: #e7f6eb; color: #216e2f; }
+    .status-401 { background: #fff4e8; color: #a85b00; }
+    .status-404 { background: #fff4e8; color: #a85b00; }
+    .status-500 { background: #fdecec; color: #a31515; }
+
+    .detail-btn {
+      border: 1px solid var(--primary);
+      background: #fff;
+      color: var(--primary-strong);
+      border-radius: 8px;
+      padding: 6px 10px;
+      font-size: 12px;
+      font-weight: 600;
+      cursor: pointer;
+    }
+
+    .pager {
+      margin-top: 10px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+    }
+
+    .modal-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(15, 23, 42, 0.62);
+      display: none;
+      align-items: flex-end;
+      z-index: 100;
+    }
+
+    .modal-overlay.open { display: flex; }
+
+    .modal-card {
+      width: 100%;
+      max-height: 90vh;
+      background: #fff;
+      border-radius: 16px 16px 0 0;
+      border-top: 1px solid var(--border);
+      box-shadow: 0 -14px 40px rgba(15, 23, 42, 0.35);
+      overflow: auto;
+    }
+
+    .modal-head {
+      position: sticky;
+      top: 0;
+      z-index: 2;
+      padding: 12px;
+      background: #f8fafb;
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+    }
+
+    .close-btn {
+      border: 1px solid var(--border);
+      background: #fff;
+      color: var(--text-main);
+      border-radius: 8px;
+      padding: 6px 10px;
+      font-size: 12px;
+      cursor: pointer;
+    }
+
+    .detail-body {
+      padding: 12px;
+      display: grid;
+      gap: 10px;
+    }
+
+    .kv {
+      display: grid;
+      gap: 2px;
+      font-size: 13px;
+    }
+
+    .kv .k { color: var(--text-muted); font-size: 11px; }
+
+    .codebox {
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      background: #0f172a;
+      color: #cbd5e1;
+      padding: 10px;
+      font-size: 11px;
+      line-height: 1.45;
+      max-height: 120px;
+      overflow: auto;
+    }
+  </style>
+</head>
+<body>
+  <header class="topbar">
+    <h1>Admin Observability - Mobile</h1>
+    <div class="meta">Request Logs + Details Popup</div>
+  </header>
+
+  <main class="page">
+    <section class="card">
+      <div class="card-body">
+        <div class="tabs">
+          <div class="tab active">Request Logs</div>
+          <div class="tab">Daily Stats</div>
+        </div>
+
+        <div class="card">
+          <div class="card-header">
+            <h2>Request Log Filters</h2>
+            <div class="hint">From/to required, max range 31 days</div>
+          </div>
+          <div class="card-body">
+            <div class="filters">
+              <div>
+                <label>From (date &amp; time, required)</label>
+                <input type="datetime-local" value="2026-03-20T00:00" />
+              </div>
+              <div>
+                <label>To (date &amp; time, required)</label>
+                <input type="datetime-local" value="2026-03-23T00:00" />
+              </div>
+              <div>
+                <label>Methods (multi-select)</label>
+                <select multiple size="5">
+                  <option>GET</option>
+                  <option>POST</option>
+                  <option>PUT</option>
+                  <option>DELETE</option>
+                  <option>PATCH</option>
+                </select>
+              </div>
+              <div>
+                <label>Status (multi-select)</label>
+                <select multiple size="6">
+                  <option>200</option>
+                  <option>201</option>
+                  <option>400</option>
+                  <option>401</option>
+                  <option>404</option>
+                  <option>500</option>
+                </select>
+              </div>
+              <div>
+                <label>Template paths (max 5)</label>
+                <select multiple size="6">
+                  <option>/api/v1/admin/observability/request-logs</option>
+                  <option>/api/v1/admin/observability/request-logs/{id}</option>
+                  <option>/api/v1/admin/blog</option>
+                  <option>/api/v1/admin/profile</option>
+                  <option>/api/v1/admin/gallery/{id}</option>
+                  <option>/api/v1/health</option>
+                </select>
+              </div>
+              <div>
+                <label>User ID (UUID)</label>
+                <input type="text" value="6ec7e8f2-b86b-43cd-8d55-5898f7d61c8f" />
+              </div>
+              <div>
+                <label>Error code contains</label>
+                <input type="text" value="PEC-" />
+              </div>
+              <div>
+                <label>Error message contains</label>
+                <input type="text" value="timeout" />
+              </div>
+            </div>
+
+            <div class="actions">
+              <span class="btn primary">Apply</span>
+              <span class="btn secondary">Reset</span>
+              <span class="btn secondary">Save Preset</span>
+            </div>
+            <div class="hint">Default sort: createdAt desc, id desc.</div>
+          </div>
+        </div>
+
+        <div class="logs-list">
+          <article class="log-item">
+            <div class="log-head">
+              <strong>#309918</strong>
+              <span class="badge status-500">500</span>
+            </div>
+            <div class="mono">2026-03-22T14:26:32Z | POST | 1239 ms</div>
+            <div class="mono">/api/v1/admin/blog</div>
+            <div class="mono">user: 6ec7e8f2-...61c8f | error: PEC-5001</div>
+            <div><button class="detail-btn" data-log-id="309918" type="button">Open Details</button></div>
+          </article>
+
+          <article class="log-item">
+            <div class="log-head">
+              <strong>#309912</strong>
+              <span class="badge status-401">401</span>
+            </div>
+            <div class="mono">2026-03-22T14:24:09Z | GET | 88 ms</div>
+            <div class="mono">/api/v1/admin/profile</div>
+            <div class="mono">user: null | error: PEC-4010</div>
+            <div><button class="detail-btn" data-log-id="309912" type="button">Open Details</button></div>
+          </article>
+
+          <article class="log-item">
+            <div class="log-head">
+              <strong>#309900</strong>
+              <span class="badge status-404">404</span>
+            </div>
+            <div class="mono">2026-03-22T14:18:31Z | GET | 41 ms</div>
+            <div class="mono">/api/v1/admin/gallery/{id}</div>
+            <div class="mono">user: 11de1cb5-...02b16 | error: PEC-4043</div>
+            <div><button class="detail-btn" data-log-id="309900" type="button">Open Details</button></div>
+          </article>
+        </div>
+
+        <div class="pager">
+          <span class="hint">Page 1 / 83 | size 20</span>
+          <div class="actions" style="margin: 0;">
+            <span class="btn secondary">Prev</span>
+            <span class="btn secondary">Next</span>
+          </div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <div class="modal-overlay" id="requestDetailModal">
+    <div class="modal-card">
+      <div class="modal-head">
+        <strong id="requestDetailTitle">Request Detail (#309918)</strong>
+        <button class="close-btn" id="closeDetailModal" type="button">Close</button>
+      </div>
+      <div class="detail-body">
+        <div class="kv"><div class="k">Path</div><div class="mono">/api/v1/admin/blog</div></div>
+        <div class="kv"><div class="k">Template Path</div><div class="mono">/api/v1/admin/blog</div></div>
+        <div class="kv"><div class="k">Method / Status</div><div>POST / <span class="badge status-500">500</span></div></div>
+        <div class="kv"><div class="k">Duration</div><div>1239 ms</div></div>
+        <div class="kv"><div class="k">User ID</div><div class="mono">6ec7e8f2-b86b-43cd-8d55-5898f7d61c8f</div></div>
+        <div class="kv"><div class="k">Error</div><div class="mono">PEC-5001 | "timeout while writing image metadata"</div></div>
+
+        <div>
+          <label>Request Headers (sanitized)</label>
+          <div class="codebox mono">{ "content-type": "application/json", "authorization": "***redacted***" }</div>
+        </div>
+        <div>
+          <label>Response Headers (sanitized)</label>
+          <div class="codebox mono">{ "content-type": "application/json", "cache-control": "no-store" }</div>
+        </div>
+        <div>
+          <label>Request Body (sanitized)</label>
+          <div class="codebox mono">{ "title": "Draft", "description": "***redacted***" }</div>
+        </div>
+        <div>
+          <label>Stack Trace</label>
+          <div class="codebox mono">java.net.SocketTimeoutException: timeout... at service.ImageWriter.write(...) ...</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    (function () {
+      var modal = document.getElementById('requestDetailModal');
+      var closeBtn = document.getElementById('closeDetailModal');
+      var title = document.getElementById('requestDetailTitle');
+      var detailButtons = document.querySelectorAll('.detail-btn');
+
+      detailButtons.forEach(function (btn) {
+        btn.addEventListener('click', function () {
+          var id = btn.getAttribute('data-log-id') || 'unknown';
+          title.textContent = 'Request Detail (#' + id + ')';
+          modal.classList.add('open');
+        });
+      });
+
+      closeBtn.addEventListener('click', function () {
+        modal.classList.remove('open');
+      });
+
+      modal.addEventListener('click', function (event) {
+        if (event.target === modal) {
+          modal.classList.remove('open');
+        }
+      });
+    })();
+  </script>
+</body>
+</html>

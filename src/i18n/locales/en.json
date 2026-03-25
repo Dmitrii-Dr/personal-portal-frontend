@@ -112,7 +112,9 @@
   },
   "userMenu": {
     "myProfile": "My Profile",
-    "myBookings": "My Bookings"
+    "myBookings": "My Bookings",
+    "observability": "Observability",
+    "adminDevConsole": "Admin Dev Console"
   },
   "dialog": {
     "aboutMe": "About Me"
