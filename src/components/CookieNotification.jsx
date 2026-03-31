@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Box, Typography, Button, Paper, Snackbar } from '@mui/material';
 import { useTranslation } from 'react-i18next';
+import { hasSessionHint } from '../utils/api';
 
 const COOKIE_CONSENT_KEY = 'cookieConsentAccepted';
 
@@ -9,16 +10,21 @@ const CookieNotification = () => {
     const [open, setOpen] = useState(false);
 
     useEffect(() => {
-        // Check if user has already accepted cookies in this session
-        const hasAccepted = sessionStorage.getItem(COOKIE_CONSENT_KEY);
+        // Do not show consent prompt for users with an active authenticated session.
+        if (hasSessionHint()) {
+            return;
+        }
+
+        // Check if user has already accepted cookies persistently.
+        const hasAccepted = localStorage.getItem(COOKIE_CONSENT_KEY);
         if (!hasAccepted) {
             setOpen(true);
         }
     }, []);
 
     const handleAccept = () => {
-        // Store acceptance in session storage
-        sessionStorage.setItem(COOKIE_CONSENT_KEY, 'true');
+        // Store acceptance persistently across browser sessions.
+        localStorage.setItem(COOKIE_CONSENT_KEY, 'true');
         setOpen(false);
     };
 

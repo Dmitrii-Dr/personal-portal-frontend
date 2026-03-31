@@ -23,6 +23,7 @@ import {
 } from '@mui/material';
 import ErrorOutlineIcon from '@mui/icons-material/ErrorOutline';
 import CloseIcon from '@mui/icons-material/Close';
+import { getPasswordComplexityErrorMessage } from '../utils/passwordValidation';
 
 const SignUpModal = ({ open, onClose, onSwitchToLogin }) => {
   const theme = useTheme();
@@ -159,6 +160,7 @@ const SignUpModal = ({ open, onClose, onSwitchToLogin }) => {
     const hasPassword = formData.password.trim().length > 0;
     const hasConfirmPassword = formData.confirmPassword.trim().length > 0;
     const hasValidPhoneNumber = hasPhoneNumber && validatePhoneNumber(formData.phoneNumber);
+    const hasValidEmail = hasEmail && validateEmail(formData.email);
 
     // Check if all agreements are checked
     const allAgreementsChecked = Array.isArray(agreements) && agreements.every(agreement => {
@@ -166,7 +168,8 @@ const SignUpModal = ({ open, onClose, onSwitchToLogin }) => {
       return formData[fieldName] === true;
     });
 
-    return hasFirstName && hasLastName && hasValidPhoneNumber && hasEmail &&
+    // Password complexity and match are validated on submit only.
+    return hasFirstName && hasLastName && hasValidPhoneNumber && hasValidEmail &&
       hasPassword && hasConfirmPassword && allAgreementsChecked;
   };
 
@@ -274,9 +277,12 @@ const SignUpModal = ({ open, onClose, onSwitchToLogin }) => {
     if (!formData.password.trim()) {
       newErrors.password = t('auth.passwordRequired');
       isValid = false;
-    } else if (formData.password.length < 6) {
-      newErrors.password = t('auth.passwordMinLength');
-      isValid = false;
+    } else {
+      const passwordError = getPasswordComplexityErrorMessage(t, formData.password);
+      if (passwordError) {
+        newErrors.password = passwordError;
+        isValid = false;
+      }
     }
 
     // Validate confirmPassword
@@ -618,20 +624,23 @@ const SignUpModal = ({ open, onClose, onSwitchToLogin }) => {
             value={formData.password}
             onChange={handleChange}
             error={!!errors.password}
+            helperText={
+              errors.password || (
+                <Typography
+                  component="span"
+                  variant="caption"
+                  color="text.secondary"
+                  sx={{ fontSize: '0.7rem', lineHeight: 1.35, display: 'block' }}
+                >
+                  {t('auth.passwordRequirementsHint')}
+                </Typography>
+              )
+            }
             margin="normal"
             required
             autoComplete="new-password"
             disabled={loading || success}
             variant="outlined"
-            InputProps={{
-              endAdornment: errors.password && (
-                <Tooltip title={errors.password} arrow placement="top">
-                  <IconButton size="small" edge="end" color="error">
-                    <ErrorOutlineIcon />
-                  </IconButton>
-                </Tooltip>
-              ),
-            }}
           />
 
           <TextField
@@ -643,20 +652,12 @@ const SignUpModal = ({ open, onClose, onSwitchToLogin }) => {
             value={formData.confirmPassword}
             onChange={handleChange}
             error={!!errors.confirmPassword}
+            helperText={errors.confirmPassword}
             margin="normal"
             required
             autoComplete="new-password"
             disabled={loading || success}
             variant="outlined"
-            InputProps={{
-              endAdornment: errors.confirmPassword && (
-                <Tooltip title={errors.confirmPassword} arrow placement="top">
-                  <IconButton size="small" edge="end" color="error">
-                    <ErrorOutlineIcon />
-                  </IconButton>
-                </Tooltip>
-              ),
-            }}
           />
 
           <Box sx={{ mt: 2 }}>

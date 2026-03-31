@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
+import { getPasswordComplexityErrorMessage } from '../utils/passwordValidation';
 
 import {
   Box,
@@ -100,9 +101,12 @@ const SignUpPage = () => {
     if (!formData.password.trim()) {
       newErrors.password = t('auth.passwordRequired');
       isValid = false;
-    } else if (formData.password.length < 6) {
-      newErrors.password = t('auth.passwordMinLength');
-      isValid = false;
+    } else {
+      const passwordError = getPasswordComplexityErrorMessage(t, formData.password);
+      if (passwordError) {
+        newErrors.password = passwordError;
+        isValid = false;
+      }
     }
 
     if (!formData.confirmPassword.trim()) {

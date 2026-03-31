@@ -1,5 +1,5 @@
 import React, { useRef, useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import {
   Box,
@@ -28,26 +28,39 @@ import {
   MenuItem,
   Menu,
   Tooltip,
+  Link,
 } from '@mui/material';
 import CloseIcon from '@mui/icons-material/Close';
 import ArrowBackIosIcon from '@mui/icons-material/ArrowBackIos';
 import ArrowForwardIosIcon from '@mui/icons-material/ArrowForwardIos';
-import TelegramIcon from '@mui/icons-material/Telegram';
-import LinkedInIcon from '@mui/icons-material/LinkedIn';
-import GitHubIcon from '@mui/icons-material/GitHub';
-import EmailIcon from '@mui/icons-material/Email';
-import LanguageIcon from '@mui/icons-material/Language';
-import PhoneIcon from '@mui/icons-material/Phone';
-import InstagramIcon from '@mui/icons-material/Instagram';
-import TwitterIcon from '@mui/icons-material/Twitter';
-import FacebookIcon from '@mui/icons-material/Facebook';
-import YouTubeIcon from '@mui/icons-material/YouTube';
 import dayjs from 'dayjs';
 import axios from 'axios';
 import apiClient, { getPublicWelcome } from '../utils/api';
+import { contactLinksFromWelcome } from '../utils/contactLinksFromWelcome';
+import ContactLinksGrid from '../components/ContactLinksGrid';
 import BookingPageContent from './BookingPage';
 import { loadImageWithCache } from '../utils/imageCache';
 import { useResponsiveLayout } from '../utils/useResponsiveLayout';
+
+/** Ensure external footer URLs open correctly (prepend https if scheme missing). */
+function normalizeFooterHref(url) {
+  const trimmed = (url || '').trim();
+  if (!trimmed) return '#';
+  if (/^https?:\/\//i.test(trimmed)) return trimmed;
+  return `https://${trimmed}`;
+}
+
+function parseFooterLinksFromWelcome(welcomeData) {
+  const raw = welcomeData?.extendedParameters?.footerLinks;
+  if (!Array.isArray(raw)) return [];
+  return raw
+    .filter((item) => item && typeof item === 'object')
+    .map((item) => ({
+      linkDisplayName: typeof item.linkDisplayName === 'string' ? item.linkDisplayName.trim() : '',
+      linkUrl: typeof item.linkUrl === 'string' ? item.linkUrl.trim() : '',
+    }))
+    .filter((item) => item.linkDisplayName && item.linkUrl);
+}
 
 // Currency symbol mapping
 const getCurrencySymbol = (currency) => {
@@ -70,6 +83,7 @@ const areAllPricesZero = (prices) => {
 const LandingPage = () => {
   const { t } = useTranslation();
   const navigate = useNavigate();
+  const location = useLocation();
   const { isMobileLayout } = useResponsiveLayout();
   const isMobile = isMobileLayout;
   const isMobileImage = isMobileLayout;
@@ -129,7 +143,7 @@ const LandingPage = () => {
   // {
   //   "contact": [
   //     {
-  //       "platform": "Telegram",  // Required: Platform name (Telegram, LinkedIn, GitHub, Email, Phone, Instagram, Twitter, Facebook, YouTube, WhatsApp, Website, B17)
+  //       "platform": "Telegram",  // Required: Platform name (Telegram, LinkedIn, GitHub, Email, Phone, Instagram, Twitter, Facebook, YouTube, VK.com, WhatsApp, Website, B17)
   //       "value": "https://t.me/username",  // Required: URL or contact value
   //       "description": "Personal Account"  // Optional: Short description/label
   //     },
@@ -232,42 +246,19 @@ const LandingPage = () => {
           }
         }
 
-        // Load contact links if available
-        if (data.contact && Array.isArray(data.contact)) {
-          setContactLinks(data.contact);
-        } else {
-          // Fallback to stub data if no contact data
-          setContactLinks([
-            {
-              platform: 'Telegram',
-              value: 'https://t.me/example',
-              description: 'Telegram',
-            },
-            {
-              platform: 'LinkedIn',
-              value: 'https://www.linkedin.com/in/example',
-              description: 'LinkedIn',
-            },
-            {
-              platform: 'GitHub',
-              value: 'https://github.com/example',
-              description: 'GitHub',
-            },
-            {
-              platform: 'Email',
-              value: 'mailto:contact@example.com',
-              description: 'Email',
-            },
-          ]);
-        }
+        setContactLinks(contactLinksFromWelcome(data));
       } catch (error) {
-        // Don't set error if request was aborted
-        if (
+        const isCancellationError =
           error.name === 'AbortError' ||
           error.name === 'CanceledError' ||
           error.code === 'ERR_CANCELED' ||
-          (error.message && error.message.includes('canceled'))
-        ) {
+          (error.message && error.message.includes('canceled'));
+
+        // If the request was cancelled because the component is unmounting, just bail.
+        if (isCancellationError) {
+          if (!isMounted) return;
+          // Component is still mounted; prevent the page from staying blank.
+          setHeroImagesReady(true);
           return;
         }
 
@@ -280,10 +271,11 @@ const LandingPage = () => {
         } else if (error.message) {
           errorMessage = error.message;
         }
+
         setWelcomeError(errorMessage);
-        if (isMounted) {
-          setHeroImagesReady(true);
-        }
+        // Backend /welcome failed => show maintenance instead of empty landing page.
+        setHeroImagesReady(true);
+        navigate('/maintenance', { replace: true });
       } finally {
         if (isMounted) {
           setWelcomeLoading(false);
@@ -461,6 +453,32 @@ const LandingPage = () => {
   const heroMobileImage = welcomeMobileImageUrl || welcomeRightImageUrl;
 
   const isPageReady = !welcomeLoading && heroImagesReady;
+
+  // Hash scroll must run after full content exists. AppLayout used to scroll at 100ms,
+  // but #contact (and other sections) are not mounted until isPageReady — so direct
+  // /#section loads on slow networks never scrolled.
+  useEffect(() => {
+    if (!isPageReady || !location.hash) return;
+    const sectionId = location.hash.slice(1);
+    if (!sectionId) return;
+
+    let timeoutId;
+    const rafId = requestAnimationFrame(() => {
+      timeoutId = window.setTimeout(() => {
+        const el = document.getElementById(sectionId);
+        if (el) {
+          el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }
+      }, 0);
+    });
+
+    return () => {
+      cancelAnimationFrame(rafId);
+      if (timeoutId != null) clearTimeout(timeoutId);
+    };
+  }, [isPageReady, location.hash]);
+
+  const landingFooterLinks = parseFooterLinksFromWelcome(welcomeData);
 
   if (!isPageReady) {
     return <Box sx={{ minHeight: '100vh', bgcolor: '#ffffff' }} />;
@@ -692,9 +710,52 @@ const LandingPage = () => {
       >
         <Container maxWidth="lg">
           <Grid container spacing={0} sx={{ alignItems: 'center' }}>
-            {/* Left Column - Text Content */}
-            <Grid item xs={12} md={6} sx={{ px: { xs: 2, sm: 4, md: 6 }, py: { xs: 4, md: 6 } }}>
-              <Box sx={{ maxWidth: '600px' }}>
+            {/* Image column (left on md+; below text on xs) */}
+            <Grid item xs={12} md={6} sx={{ position: 'relative', height: { xs: '400px', md: '600px' }, order: { xs: 2, md: 1 } }}>
+              <Box
+                sx={{
+                  width: '100%',
+                  height: '100%',
+                  background: aboutImageUrl ? 'transparent' : 'linear-gradient(135deg, #E3F2FD 0%, #BBDEFB 50%, #90CAF9 100%)',
+                  position: 'relative',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  overflow: 'hidden',
+                }}
+              >
+                {aboutImageUrl ? (
+                  <Box
+                    component="img"
+                    src={aboutImageUrl}
+                    alt={t('landing.about.alt')}
+                    sx={{
+                      width: '100%',
+                      height: '100%',
+                      objectFit: 'cover',
+                    }}
+                  />
+                ) : (
+                  <Avatar
+                    sx={{
+                      width: { xs: 200, sm: 300, md: 400 },
+                      height: { xs: 200, sm: 300, md: 400 },
+                      bgcolor: 'primary.main',
+                      fontSize: { xs: '4rem', md: '6rem' },
+                      fontWeight: 600,
+                    }}
+                  >
+                    {aboutMeData && typeof aboutMeData === 'object' && aboutMeData.name
+                      ? aboutMeData.name.charAt(0).toUpperCase()
+                      : 'A'}
+                  </Avatar>
+                )}
+              </Box>
+            </Grid>
+
+            {/* Text + buttons column (right on md+; first on xs) */}
+            <Grid item xs={12} md={6} sx={{ px: { xs: 2, sm: 4, md: 6 }, py: { xs: 4, md: 6 }, order: { xs: 1, md: 2 } }}>
+              <Box sx={{ maxWidth: '600px', mx: { xs: 'auto', md: 0 } }}>
                 {/* Header with line above */}
                 <Box sx={{ mb: 3 }}>
                   <Divider
@@ -814,49 +875,6 @@ const LandingPage = () => {
                 </Box>
               </Box>
             </Grid>
-
-            {/* Right Column - Image */}
-            <Grid item xs={12} md={6} sx={{ position: 'relative', height: { xs: '400px', md: '600px' } }}>
-              <Box
-                sx={{
-                  width: '100%',
-                  height: '100%',
-                  background: aboutImageUrl ? 'transparent' : 'linear-gradient(135deg, #E3F2FD 0%, #BBDEFB 50%, #90CAF9 100%)',
-                  position: 'relative',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  overflow: 'hidden',
-                }}
-              >
-                {aboutImageUrl ? (
-                  <Box
-                    component="img"
-                    src={aboutImageUrl}
-                    alt={t('landing.about.alt')}
-                    sx={{
-                      width: '100%',
-                      height: '100%',
-                      objectFit: 'cover',
-                    }}
-                  />
-                ) : (
-                  <Avatar
-                    sx={{
-                      width: { xs: 200, sm: 300, md: 400 },
-                      height: { xs: 200, sm: 300, md: 400 },
-                      bgcolor: 'primary.main',
-                      fontSize: { xs: '4rem', md: '6rem' },
-                      fontWeight: 600,
-                    }}
-                  >
-                    {aboutMeData && typeof aboutMeData === 'object' && aboutMeData.name
-                      ? aboutMeData.name.charAt(0).toUpperCase()
-                      : 'A'}
-                  </Avatar>
-                )}
-              </Box>
-            </Grid>
           </Grid>
         </Container>
       </Box>
@@ -874,49 +892,8 @@ const LandingPage = () => {
       >
         <Container maxWidth="lg">
           <Grid container spacing={0} sx={{ alignItems: 'center' }}>
-            {/* Left Column - Image */}
-            <Grid item xs={12} md={6} sx={{ position: 'relative', height: { xs: '300px', md: '400px' }, order: { xs: 2, md: 1 } }}>
-              <Box
-                sx={{
-                  width: '100%',
-                  height: '100%',
-                  background: educationImageUrl ? 'transparent' : 'linear-gradient(135deg, #E3F2FD 0%, #BBDEFB 50%, #90CAF9 100%)',
-                  position: 'relative',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  overflow: 'hidden',
-                }}
-              >
-                {educationImageUrl ? (
-                  <Box
-                    component="img"
-                    src={educationImageUrl}
-                    alt="Education"
-                    sx={{
-                      width: '100%',
-                      height: '100%',
-                      objectFit: 'cover',
-                    }}
-                  />
-                ) : (
-                  <Avatar
-                    sx={{
-                      width: { xs: 150, sm: 200, md: 250 },
-                      height: { xs: 150, sm: 200, md: 250 },
-                      bgcolor: 'primary.main',
-                      fontSize: { xs: '3rem', md: '4rem' },
-                      fontWeight: 600,
-                    }}
-                  >
-                    E
-                  </Avatar>
-                )}
-              </Box>
-            </Grid>
-
-            {/* Right Column - Text Content */}
-            <Grid item xs={12} md={6} sx={{ px: { xs: 2, sm: 4, md: 6 }, py: { xs: 4, md: 6 }, order: { xs: 1, md: 2 } }}>
+            {/* Text column (left on md+; first on xs) */}
+            <Grid item xs={12} md={6} sx={{ px: { xs: 2, sm: 4, md: 6 }, py: { xs: 4, md: 6 }, order: { xs: 1, md: 1 } }}>
               <Box sx={{ maxWidth: '600px', mx: { xs: 'auto', md: 0 } }}>
                 {/* Header with line above */}
                 <Box sx={{ mb: 3 }}>
@@ -978,6 +955,47 @@ const LandingPage = () => {
                   >
                     Content will be provided soon.
                   </Typography>
+                )}
+              </Box>
+            </Grid>
+
+            {/* Image column (right on md+; below text on xs) */}
+            <Grid item xs={12} md={6} sx={{ position: 'relative', height: { xs: '300px', md: '400px' }, order: { xs: 2, md: 2 } }}>
+              <Box
+                sx={{
+                  width: '100%',
+                  height: '100%',
+                  background: educationImageUrl ? 'transparent' : 'linear-gradient(135deg, #E3F2FD 0%, #BBDEFB 50%, #90CAF9 100%)',
+                  position: 'relative',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  overflow: 'hidden',
+                }}
+              >
+                {educationImageUrl ? (
+                  <Box
+                    component="img"
+                    src={educationImageUrl}
+                    alt="Education"
+                    sx={{
+                      width: '100%',
+                      height: '100%',
+                      objectFit: 'cover',
+                    }}
+                  />
+                ) : (
+                  <Avatar
+                    sx={{
+                      width: { xs: 150, sm: 200, md: 250 },
+                      height: { xs: 150, sm: 200, md: 250 },
+                      bgcolor: 'primary.main',
+                      fontSize: { xs: '3rem', md: '4rem' },
+                      fontWeight: 600,
+                    }}
+                  >
+                    E
+                  </Avatar>
                 )}
               </Box>
             </Grid>
@@ -1880,173 +1898,83 @@ const LandingPage = () => {
             {t('landing.contact.followDescription')}
           </Typography>
 
-          {/* Social Links */}
-          <Box
-            sx={{
-              display: 'flex',
-              justifyContent: 'center',
-              alignItems: 'center',
-              flexWrap: 'wrap',
-              gap: { xs: 2, sm: 3, md: 4 },
-            }}
-          >
-            {contactLinks.map((link, index) => {
-              // Map platform name to icon component
-              const getIcon = (platform) => {
-                const platformLower = (platform || '').toLowerCase();
-                switch (platformLower) {
-                  case 'telegram':
-                    return <TelegramIcon sx={{ fontSize: { xs: 32, md: 40 } }} />;
-                  case 'linkedin':
-                    return <LinkedInIcon sx={{ fontSize: { xs: 32, md: 40 } }} />;
-                  case 'github':
-                    return <GitHubIcon sx={{ fontSize: { xs: 32, md: 40 } }} />;
-                  case 'email':
-                    return <EmailIcon sx={{ fontSize: { xs: 32, md: 40 } }} />;
-                  case 'phone':
-                    return <PhoneIcon sx={{ fontSize: { xs: 32, md: 40 } }} />;
-                  case 'instagram':
-                    return <InstagramIcon sx={{ fontSize: { xs: 32, md: 40 } }} />;
-                  case 'twitter':
-                    return <TwitterIcon sx={{ fontSize: { xs: 32, md: 40 } }} />;
-                  case 'facebook':
-                    return <FacebookIcon sx={{ fontSize: { xs: 32, md: 40 } }} />;
-                  case 'youtube':
-                    return <YouTubeIcon sx={{ fontSize: { xs: 32, md: 40 } }} />;
-                  case 'whatsapp':
-                    return (
-                      <Box
-                        component="img"
-                        src="https://upload.wikimedia.org/wikipedia/commons/6/6b/WhatsApp.svg"
-                        alt="WhatsApp"
-                        sx={{
-                          width: { xs: 32, md: 40 },
-                          height: { xs: 32, md: 40 },
-                          objectFit: 'contain',
-                          filter: 'brightness(0) invert(1)',
-                        }}
-                        onError={(e) => {
-                          // Fallback: show text if image fails to load
-                          e.target.style.display = 'none';
-                          const parent = e.target.parentElement;
-                          if (parent && !parent.querySelector('.whatsapp-fallback')) {
-                            const fallback = document.createElement('span');
-                            fallback.className = 'whatsapp-fallback';
-                            fallback.textContent = 'WA';
-                            fallback.style.cssText = 'font-size: 18px; font-weight: bold; color: white; display: flex; align-items: center; justify-content: center;';
-                            parent.appendChild(fallback);
-                          }
-                        }}
-                      />
-                    );
-                  case 'website':
-                    return <LanguageIcon sx={{ fontSize: { xs: 32, md: 40 } }} />;
-                  case 'b17':
-                    return (
-                      <Box
-                        component="img"
-                        src="https://www.b17.ru/favicon.ico"
-                        alt="B17"
-                        sx={{
-                          width: { xs: 32, md: 40 },
-                          height: { xs: 32, md: 40 },
-                          objectFit: 'contain',
-                          filter: 'brightness(0) invert(1)',
-                        }}
-                        onError={(e) => {
-                          // Fallback: show text if image fails to load
-                          e.target.style.display = 'none';
-                          const parent = e.target.parentElement;
-                          if (parent && !parent.querySelector('.b17-fallback')) {
-                            const fallback = document.createElement('span');
-                            fallback.className = 'b17-fallback';
-                            fallback.textContent = 'B17';
-                            fallback.style.cssText = 'font-size: 18px; font-weight: bold; color: white; display: flex; align-items: center; justify-content: center;';
-                            parent.appendChild(fallback);
-                          }
-                        }}
-                      />
-                    );
-                  default:
-                    return <LanguageIcon sx={{ fontSize: { xs: 32, md: 40 } }} />;
-                }
-              };
+          <ContactLinksGrid links={contactLinks} />
 
-              // Get display label
-              const getLabel = (link) => {
-                if (link.description) {
-                  return link.description;
-                }
-                return link.platform || 'Link';
-              };
-
-              return (
-                <Box
-                  key={index}
-                  component="a"
-                  href={link.value}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  sx={{
-                    display: 'flex',
-                    flexDirection: 'column',
-                    alignItems: 'center',
-                    justifyContent: 'flex-start',
-                    textDecoration: 'none',
-                    color: 'white',
-                    transition: 'all 0.3s ease-in-out',
-                    width: { xs: 80, sm: 100, md: 120 },
-                    minHeight: { xs: 100, md: 110 },
-                    '&:hover': {
-                      transform: 'translateY(-4px)',
-                      opacity: 0.8,
-                    },
-                  }}
-                >
+          {(() => {
+            const legalText =
+              welcomeData?.extendedParameters?.footerMessage &&
+              String(welcomeData.extendedParameters.footerMessage).trim();
+            const hasLegal = Boolean(legalText);
+            const hasLinks = landingFooterLinks.length > 0;
+            if (!hasLegal && !hasLinks) return null;
+            return (
+              <Box
+                sx={{
+                  mt: { xs: 4, md: 6 },
+                  pt: { xs: 3, md: 4 },
+                  borderTop: '1px solid',
+                  borderColor: 'rgba(255, 255, 255, 0.25)',
+                  maxWidth: 900,
+                  mx: 'auto',
+                }}
+              >
+                {hasLegal && (
+                  <Typography
+                    variant="body2"
+                    component="div"
+                    align="center"
+                    sx={{
+                      opacity: 0.85,
+                      fontSize: { xs: '0.75rem', md: '0.8rem' },
+                      lineHeight: 1.7,
+                      whiteSpace: 'pre-wrap',
+                      wordBreak: 'break-word',
+                    }}
+                  >
+                    {legalText}
+                  </Typography>
+                )}
+                {hasLinks && (
                   <Box
                     sx={{
                       display: 'flex',
-                      alignItems: 'center',
+                      flexWrap: 'wrap',
                       justifyContent: 'center',
-                      width: { xs: 56, md: 72 },
-                      height: { xs: 56, md: 72 },
-                      borderRadius: '50%',
-                      bgcolor: 'rgba(255, 255, 255, 0.1)',
-                      mb: 1.5,
-                      flexShrink: 0,
-                      transition: 'all 0.3s ease-in-out',
-                      '&:hover': {
-                        bgcolor: 'rgba(255, 255, 255, 0.2)',
-                        transform: 'scale(1.1)',
-                      },
+                      alignItems: 'center',
+                      gap: { xs: 1, sm: 1.5 },
+                      ...(hasLegal
+                        ? { mt: { xs: 1, md: 1.25 } }
+                        : {}),
                     }}
                   >
-                    {getIcon(link.platform)}
+                    {landingFooterLinks.map((item, index) => (
+                      <Link
+                        key={`${item.linkUrl}-${index}`}
+                        href={normalizeFooterHref(item.linkUrl)}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        underline="hover"
+                        sx={{
+                          color: 'inherit',
+                          fontSize: { xs: '0.65rem', md: '0.7rem' },
+                          fontWeight: 500,
+                          letterSpacing: 'normal',
+                          textTransform: 'none',
+                          py: 0.25,
+                          px: 0.5,
+                          minHeight: 'auto',
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                        }}
+                      >
+                        {item.linkDisplayName}
+                      </Link>
+                    ))}
                   </Box>
-                  <Typography
-                    variant="caption"
-                    sx={{
-                      fontSize: { xs: '0.75rem', md: '0.875rem' },
-                      textAlign: 'center',
-                      opacity: 0.9,
-                      width: '100%',
-                      minHeight: { xs: '2.5em', md: '2.5em' },
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      lineHeight: 1.3,
-                      wordBreak: 'break-word',
-                      hyphens: 'auto',
-                    }}
-                  >
-                    {getLabel(link)}
-                  </Typography>
-                </Box>
-              );
-            })}
-          </Box>
-
-
+                )}
+              </Box>
+            );
+          })()}
         </Container>
       </Box>
     </Box>

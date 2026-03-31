@@ -9,7 +9,7 @@ import { getToken, hasSessionHint, refreshAccessToken } from '../utils/api';
  * - If no token but session hints exist (page reload) → attempts /refresh first.
  * - If still no token → redirects to /.
  *
- * Public routes: / and /blog/**
+ * Public routes: /, /blog/**, /reset-password (and other routes declared without this guard in App.jsx).
  * Everything else must be wrapped with <PrivateRoute>.
  */
 const PrivateRoute = ({ children }) => {

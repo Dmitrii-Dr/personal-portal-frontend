@@ -125,6 +125,9 @@ const AppLayout = ({ children }) => {
       return;
     }
 
+    let isMounted = true;
+    const controller = new AbortController();
+
     const checkMaintenanceStatus = async () => {
       try {
         // Ensure admin tokens restored before deciding on maintenance redirect.
@@ -133,11 +136,19 @@ const AppLayout = ({ children }) => {
           token = await refreshAccessToken();
         }
         const isAdminUser = !!token && hasAdminRole(token);
-        if (isAdminUser) {
+        // Admins skip inactive→maintenance redirects on public routes, but on /maintenance
+        // they should still leave when the site is active (same as non-admin visitors).
+        if (isAdminUser && location.pathname !== '/maintenance') {
           return;
         }
 
-        const data = await getPublicWelcome({ timeout: 10000 });
+        const data = await getPublicWelcome({
+          timeout: 10000,
+          force: location.pathname === '/maintenance',
+          signal: controller.signal,
+        });
+        if (!isMounted) return;
+
         if (data && data.isActive === false && location.pathname !== '/maintenance') {
           navigate('/maintenance', { replace: true });
           return;
@@ -146,11 +157,23 @@ const AppLayout = ({ children }) => {
           navigate('/', { replace: true });
         }
       } catch (error) {
+        if (
+          error.name === 'AbortError' ||
+          error.name === 'CanceledError' ||
+          error.code === 'ERR_CANCELED'
+        ) {
+          return;
+        }
         console.error('Error checking maintenance status:', error);
       }
     };
 
     checkMaintenanceStatus();
+
+    return () => {
+      isMounted = false;
+      controller.abort();
+    };
   }, [isAdminRoute, location.pathname, navigate]);
 
   // Handle scroll to change header background
@@ -378,35 +401,13 @@ const AppLayout = ({ children }) => {
         });
       }
     } else {
-      // Navigate to landing page with hash, then scroll
+      // LandingPage scrolls to #section once content is ready (see LandingPage hash effect).
       navigate(`/#${sectionId}`);
-      setTimeout(() => {
-        const element = document.getElementById(sectionId);
-        if (element) {
-          element.scrollIntoView({
-            behavior: 'smooth',
-            block: 'start',
-          });
-        }
-      }, 100);
     }
   };
 
-  // Handle scroll to section from URL hash
-  useEffect(() => {
-    if (isLandingPage && location.hash) {
-      const sectionId = location.hash.substring(1);
-      setTimeout(() => {
-        const element = document.getElementById(sectionId);
-        if (element) {
-          element.scrollIntoView({
-            behavior: 'smooth',
-            block: 'start',
-          });
-        }
-      }, 100);
-    }
-  }, [isLandingPage, location.hash]);
+  // Hash → section scroll for /#about etc. is handled in LandingPage after isPageReady,
+  // when section nodes exist (see LandingPage.jsx).
 
   // Handle login modal
   const handleLoginClick = () => {
@@ -1129,7 +1130,12 @@ const AppLayout = ({ children }) => {
                     </ListItemIcon>
                     <ListItemText>{t('userMenu.observability')}</ListItemText>
                   </MenuItem>
-                  <MenuItem onClick={() => handleUserMenuClick('/admin/sba')}>
+                  <MenuItem
+                    onClick={() => {
+                      handleUserMenuClose();
+                      window.open(`${window.location.origin}/admin/sba`, '_blank', 'noopener,noreferrer');
+                    }}
+                  >
                     <ListItemIcon>
                       <PersonalVideoIcon fontSize="small" />
                     </ListItemIcon>

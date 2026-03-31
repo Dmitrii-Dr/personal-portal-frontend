@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import {
   Box,
   Typography,
@@ -11,8 +12,10 @@ import {
   CircularProgress,
   Link as MuiLink,
 } from '@mui/material';
+import { getPasswordComplexityErrorMessage } from '../utils/passwordValidation';
 
 const ResetPasswordPage = () => {
+  const { t } = useTranslation();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const token = searchParams.get('token');
@@ -33,9 +36,9 @@ const ResetPasswordPage = () => {
 
   useEffect(() => {
     if (!token) {
-      setSubmitError('Invalid or missing reset token. Please request a new password reset link.');
+      setSubmitError(t('auth.resetPasswordInvalidToken'));
     }
-  }, [token]);
+  }, [token, t]);
 
   const validateEmail = (email) => {
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -67,26 +70,29 @@ const ResetPasswordPage = () => {
     let isValid = true;
 
     if (!formData.email.trim()) {
-      newErrors.email = 'Email is required';
+      newErrors.email = t('auth.emailRequired');
       isValid = false;
     } else if (!validateEmail(formData.email)) {
-      newErrors.email = 'Email must be valid';
+      newErrors.email = t('auth.emailInvalid');
       isValid = false;
     }
 
     if (!formData.newPassword.trim()) {
-      newErrors.newPassword = 'New password is required';
+      newErrors.newPassword = t('auth.passwordRequired');
       isValid = false;
-    } else if (formData.newPassword.length < 6) {
-      newErrors.newPassword = 'Password must be at least 6 characters long';
-      isValid = false;
+    } else {
+      const passwordError = getPasswordComplexityErrorMessage(t, formData.newPassword);
+      if (passwordError) {
+        newErrors.newPassword = passwordError;
+        isValid = false;
+      }
     }
 
     if (!formData.confirmPassword.trim()) {
-      newErrors.confirmPassword = 'Please confirm your password';
+      newErrors.confirmPassword = t('auth.confirmPasswordRequired');
       isValid = false;
     } else if (formData.newPassword !== formData.confirmPassword) {
-      newErrors.confirmPassword = 'Passwords do not match';
+      newErrors.confirmPassword = t('auth.passwordsDoNotMatch');
       isValid = false;
     }
 
@@ -100,7 +106,7 @@ const ResetPasswordPage = () => {
     setSuccess(false);
 
     if (!token) {
-      setSubmitError('Invalid or missing reset token. Please request a new password reset link.');
+      setSubmitError(t('auth.resetPasswordInvalidToken'));
       return;
     }
 
@@ -133,12 +139,15 @@ const ResetPasswordPage = () => {
         const errorData = await response.json().catch(() => ({}));
         throw new Error(
           errorData.message ||
-          `Failed to reset password: ${response.status} ${response.statusText}`
+          t('auth.resetPasswordFailedWithStatus', {
+            status: response.status,
+            statusText: response.statusText,
+          })
         );
       }
     } catch (error) {
       console.error('Error resetting password:', error);
-      setSubmitError(error.message || 'Failed to reset password. Please try again.');
+      setSubmitError(error.message || t('auth.resetPasswordFailed'));
     } finally {
       setLoading(false);
     }
@@ -156,15 +165,15 @@ const ResetPasswordPage = () => {
       <Card sx={{ maxWidth: 500, width: '100%', mx: { xs: 2, sm: 0 }, boxShadow: { xs: 0, sm: 1 } }}>
         <CardContent sx={{ p: { xs: 2, sm: 4 } }}>
           <Typography variant="h4" component="h1" gutterBottom align="center">
-            Reset Password
+            {t('auth.resetPasswordTitle')}
           </Typography>
           <Typography variant="body2" color="text.secondary" align="center" sx={{ mb: 3 }}>
-            Enter your email and new password below
+            {t('auth.resetPasswordDescription')}
           </Typography>
 
           {success && (
             <Alert severity="success" sx={{ mb: 2 }}>
-              Password has been reset successfully! Redirecting to login page...
+              {t('auth.resetPasswordSuccess')}
             </Alert>
           )}
 
@@ -176,7 +185,7 @@ const ResetPasswordPage = () => {
 
           {!token && (
             <Alert severity="warning" sx={{ mb: 2 }}>
-              No reset token found in the URL. Please use the link from your email.
+              {t('auth.resetPasswordNoTokenInUrl')}
             </Alert>
           )}
 
@@ -185,7 +194,7 @@ const ResetPasswordPage = () => {
               fullWidth
               id="email"
               name="email"
-              label="Email"
+              label={t('auth.email')}
               type="email"
               value={formData.email}
               onChange={handleChange}
@@ -201,12 +210,23 @@ const ResetPasswordPage = () => {
               fullWidth
               id="newPassword"
               name="newPassword"
-              label="New Password"
+              label={t('auth.newPasswordField')}
               type="password"
               value={formData.newPassword}
               onChange={handleChange}
               error={!!errors.newPassword}
-              helperText={errors.newPassword}
+              helperText={
+                errors.newPassword || (
+                  <Typography
+                    component="span"
+                    variant="caption"
+                    color="text.secondary"
+                    sx={{ fontSize: '0.7rem', lineHeight: 1.35, display: 'block' }}
+                  >
+                    {t('auth.passwordRequirementsHint')}
+                  </Typography>
+                )
+              }
               margin="normal"
               required
               autoComplete="new-password"
@@ -217,7 +237,7 @@ const ResetPasswordPage = () => {
               fullWidth
               id="confirmPassword"
               name="confirmPassword"
-              label="Confirm New Password"
+              label={t('auth.confirmNewPassword')}
               type="password"
               value={formData.confirmPassword}
               onChange={handleChange}
@@ -240,18 +260,18 @@ const ResetPasswordPage = () => {
               {loading ? (
                 <>
                   <CircularProgress size={20} sx={{ mr: 1 }} />
-                  Resetting Password...
+                  {t('auth.resetPasswordSubmitting')}
                 </>
               ) : (
-                'Reset Password'
+                t('auth.resetPasswordSubmit')
               )}
             </Button>
 
             <Box sx={{ textAlign: 'center' }}>
               <Typography variant="body2">
-                Remember your password?{' '}
+                {t('auth.resetPasswordRememberQuestion')}{' '}
                 <MuiLink component={Link} to="/login">
-                  Sign in
+                  {t('auth.signIn')}
                 </MuiLink>
               </Typography>
             </Box>

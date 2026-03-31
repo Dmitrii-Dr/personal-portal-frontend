@@ -1,5 +1,5 @@
-import React, { useState, useEffect, useLayoutEffect } from 'react';
-import { BrowserRouter as Router, Routes, Route, useNavigate, useLocation } from 'react-router-dom';
+import React, { useState, useEffect, useLayoutEffect, useRef } from 'react';
+import { BrowserRouter as Router, Routes, Route, Navigate, useNavigate, useLocation } from 'react-router-dom';
 import i18n from './i18n/i18n';
 import AppLayout from './components/AppLayout';
 import LandingPage from './pages/LandingPage';
@@ -141,6 +141,11 @@ const createAppTheme = (mainThemeColor) => createTheme({
     MuiTab: {
       defaultProps: {
         disableRipple: true,
+      },
+      styleOverrides: {
+        root: {
+          textTransform: 'none',
+        },
       },
     },
     // MuiChip doesn't support disableRipple prop
@@ -664,12 +669,23 @@ function UrlLanguageSync() {
   return null;
 }
 
-// Vite proxies /admin/sba to Spring Boot Admin; a full document load is required. Client-side
-// navigation would otherwise match /admin/* and render the SPA shell with no SBA content.
+// Spring Boot Admin is served by the backend under /admin/sba (proxied in dev/nginx). Open it in a
+// new tab and leave this SPA route immediately so a misconfigured proxy cannot trap the shell in a
+// reload loop (SPA index + /admin/sba route + reload).
 function SpringBootAdminProxyEntry() {
+  const navigate = useNavigate();
+  const didOpenRef = useRef(false);
+
   useLayoutEffect(() => {
-    window.location.reload();
-  }, []);
+    if (didOpenRef.current) return;
+    didOpenRef.current = true;
+
+    const sbaUrl = `${window.location.origin}/admin/sba`;
+    window.open(sbaUrl, '_blank', 'noopener,noreferrer');
+
+    navigate('/admin/dashboard', { replace: true });
+  }, [navigate]);
+
   return null;
 }
 
@@ -707,7 +723,11 @@ function AppInner() {
             <Route path="/blog" element={<BlogPage />} />
             <Route path="/blog/:articleId" element={<ArticlePage />} />
             <Route path="/about-me" element={<AboutMePage />} />
+            <Route path="/agreement/:slug" element={<AgreementPage />} />
+            {/* Email-friendly URL: same as opening / and scrolling to #contact */}
+            <Route path="/contacts" element={<Navigate to="/#contact" replace />} />
             <Route path="/maintenance" element={<MaintenancePage />} />
+            <Route path="/reset-password" element={<ResetPasswordPage />} />
             {/* /admin is the admin login page — keep public */}
             <Route path="/admin" element={<AdminPage />} />
             <Route path="/admin/sba/*" element={<SpringBootAdminProxyEntry />} />
@@ -716,8 +736,6 @@ function AppInner() {
             <Route path="/booking" element={<PrivateRoute><BookingPage /></PrivateRoute>} />
             <Route path="/login" element={<PrivateRoute><LoginPage /></PrivateRoute>} />
             <Route path="/signup" element={<PrivateRoute><SignUpPage /></PrivateRoute>} />
-            <Route path="/agreement/:slug" element={<PrivateRoute><AgreementPage /></PrivateRoute>} />
-            <Route path="/reset-password" element={<PrivateRoute><ResetPasswordPage /></PrivateRoute>} />
             <Route path="/verify-account" element={<PrivateRoute><AccountVerificationPage /></PrivateRoute>} />
             <Route path="/profile" element={<PrivateRoute><ProfilePage /></PrivateRoute>} />
 
@@ -734,10 +752,12 @@ function AppInner() {
                     <Route path="profile" element={<AdminProfilePage />} />
                     <Route path="observability" element={<AdminObservabilityPage />} />
                     <Route path="session/configuration" element={<SessionsConfigurationPage />} />
+                    <Route path="*" element={<Navigate to="/admin/dashboard" replace />} />
                   </Routes>
                 </AdminRoute>
               }
             />
+            <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </AppLayout>
     </>

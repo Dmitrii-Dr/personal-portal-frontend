@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import apiClient, { getToken } from '../utils/api';
+import apiClient, { getToken, getPublicWelcome } from '../utils/api';
 import {
   Card,
   CardContent,
@@ -25,6 +25,7 @@ const BlogPage = () => {
   const [error, setError] = useState(null);
   const [activeTab, setActiveTab] = useState(0);
   const [hasToken, setHasToken] = useState(!!getToken());
+  const [hasPrivateArticles, setHasPrivateArticles] = useState(false);
 
   // Keep track of auth state to show/hide Private tab
   useEffect(() => {
@@ -52,6 +53,53 @@ const BlogPage = () => {
     };
   }, [activeTab]);
 
+  // Whether to show the private-articles tab (authenticated users only, and ≥1 private article)
+  useEffect(() => {
+    let isMounted = true;
+    const controller = new AbortController();
+
+    if (!hasToken) {
+      setHasPrivateArticles(false);
+      return () => {
+        isMounted = false;
+        controller.abort();
+      };
+    }
+
+    const fetchPrivateArticlePresence = async () => {
+      try {
+        const response = await apiClient.get('/api/v1/articles', {
+          signal: controller.signal,
+          timeout: 10000,
+        });
+        if (!isMounted) return;
+        const list = Array.isArray(response.data) ? response.data : [];
+        setHasPrivateArticles(list.length > 0);
+      } catch (err) {
+        if (err.name === 'AbortError' || err.name === 'CanceledError' || err.code === 'ERR_CANCELED') {
+          return;
+        }
+        console.error('Error checking private articles:', err);
+        if (isMounted) {
+          setHasPrivateArticles(false);
+        }
+      }
+    };
+
+    fetchPrivateArticlePresence();
+
+    return () => {
+      isMounted = false;
+      controller.abort();
+    };
+  }, [hasToken]);
+
+  useEffect(() => {
+    if (!hasPrivateArticles && activeTab === 1) {
+      setActiveTab(0);
+    }
+  }, [hasPrivateArticles, activeTab]);
+
   useEffect(() => {
     let isMounted = true;
     const controller = new AbortController();
@@ -61,12 +109,11 @@ const BlogPage = () => {
         setLoading(true);
         setError(null);
 
-        // Use different endpoint based on active tab
-        // Tab 0 = Public articles, Tab 1 = Private articles (only with auth)
+        // Use different endpoint based on effective tab (private tab hidden ⇒ always public list)
+        const privateTabVisible = hasToken && hasPrivateArticles;
+        const effectiveTab = privateTabVisible && activeTab === 1 ? 1 : 0;
         const endpoint =
-          activeTab === 0 || !hasToken
-            ? '/api/v1/public/articles'
-            : '/api/v1/articles';
+          effectiveTab === 0 ? '/api/v1/public/articles' : '/api/v1/articles';
 
         // Add timeout and signal to cancel request if component unmounts
         const response = await apiClient.get(endpoint, {
@@ -74,10 +121,32 @@ const BlogPage = () => {
           timeout: 10000, // 10 second timeout
         });
 
-        if (isMounted) {
-          setArticles(Array.isArray(response.data) ? response.data : []);
-          setLoading(false);
+        if (!isMounted) return;
+
+        let list = Array.isArray(response.data) ? response.data : [];
+
+        let excludeId = null;
+        try {
+          const welcomeData = await getPublicWelcome({ timeout: 10000 });
+          const raw = welcomeData?.extendedParameters?.moreAboutMeArticleId;
+          if (raw != null && String(raw).trim() !== '') {
+            excludeId = String(raw).trim();
+          }
+        } catch (welcomeErr) {
+          console.warn('BlogPage: getPublicWelcome failed; not filtering more-about-me article', welcomeErr);
         }
+
+        if (!isMounted) return;
+
+        if (excludeId) {
+          const ex = excludeId.toLowerCase();
+          list = list.filter(
+            (a) => !a.articleId || String(a.articleId).toLowerCase() !== ex
+          );
+        }
+
+        setArticles(list);
+        setLoading(false);
       } catch (err) {
         // Don't set error if request was aborted (component unmounted)
         if (err.name === 'AbortError' || err.name === 'CanceledError' || err.code === 'ERR_CANCELED') {
@@ -113,7 +182,7 @@ const BlogPage = () => {
       isMounted = false;
       controller.abort();
     };
-  }, [activeTab, hasToken]);
+  }, [activeTab, hasToken, hasPrivateArticles]);
 
   const handleTabChange = (event, newValue) => {
     setActiveTab(newValue);
@@ -167,9 +236,15 @@ const BlogPage = () => {
         </Typography>
       </Box>
 
-      <Tabs value={activeTab} onChange={handleTabChange} sx={{ mb: 3 }}>
+      <Tabs
+        value={hasToken && hasPrivateArticles ? activeTab : 0}
+        onChange={handleTabChange}
+        sx={{ mb: 3 }}
+      >
         <Tab label={t('pages.blog.publicArticles')} />
-        {hasToken && <Tab label={t('pages.blog.privateArticles')} />}
+        {hasToken && hasPrivateArticles && (
+          <Tab label={t('pages.blog.privateArticles')} />
+        )}
       </Tabs>
 
       {loading ? (

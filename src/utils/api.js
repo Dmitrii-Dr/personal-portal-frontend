@@ -175,7 +175,7 @@ let _welcomeCache = null;
 let _welcomeCacheTime = 0;
 const WELCOME_CACHE_TTL_MS = 30000;
 
-export const getPublicWelcome = ({ timeout, force = false } = {}) => {
+export const getPublicWelcome = ({ timeout, force = false, signal } = {}) => {
   const now = Date.now();
   if (!force && _welcomeCache && now - _welcomeCacheTime < WELCOME_CACHE_TTL_MS) {
     return Promise.resolve(_welcomeCache);
@@ -196,6 +196,7 @@ export const getPublicWelcome = ({ timeout, force = false } = {}) => {
     return apiClient.get('/api/v1/public/welcome', {
       timeout,
       headers,
+      signal,
     });
   })()
     .then((response) => {

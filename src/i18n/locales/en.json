@@ -33,6 +33,10 @@
     "title": "We’ll be back soon",
     "message": "Sorry for the inconvenience. We’re doing some maintenance right now, and everything will be available again shortly. Thank you for your patience."
   },
+  "agreementPage": {
+    "loading": "Loading document...",
+    "noSuchDocument": "There is no such document."
+  },
   "navigation": {
     "home": "Main",
     "about": "About me",
@@ -67,12 +71,32 @@
     "sendResetLink": "Send Reset Link",
     "backToLogin": "Back to Login",
     "passwordResetSent": "Password reset email has been sent. Please check your inbox.",
+    "resetPasswordTitle": "Reset password",
+    "resetPasswordDescription": "Enter your email and a new password below.",
+    "resetPasswordSuccess": "Your password has been reset. Redirecting to sign in…",
+    "resetPasswordInvalidToken": "Invalid or missing reset link. Request a new password reset email.",
+    "resetPasswordNoTokenInUrl": "This page needs the link from your email. Open the reset link we sent you.",
+    "newPasswordField": "New password",
+    "confirmNewPassword": "Confirm new password",
+    "newPasswordRequired": "New password is required",
+    "resetPasswordSubmit": "Reset password",
+    "resetPasswordSubmitting": "Resetting password…",
+    "resetPasswordRememberQuestion": "Remember your password?",
+    "resetPasswordFailed": "Could not reset password. Please try again.",
+    "resetPasswordFailedWithStatus": "Could not reset password ({{status}} {{statusText}}). Please try again.",
     "dontHaveAccount": "Don't have an account?",
     "alreadyHaveAccount": "Already have an account?",
     "emailRequired": "Email is required",
     "emailInvalid": "Email must be valid",
     "passwordRequired": "Password is required",
     "passwordMinLength": "Password must be at least 6 characters",
+    "passwordLength": "Password must be 8–72 characters",
+    "passwordNoWhitespace": "Password must not contain whitespace",
+    "passwordMustContainUppercase": "Password must contain at least 1 uppercase letter",
+    "passwordMustContainLowercase": "Password must contain at least 1 lowercase letter",
+    "passwordMustContainDigit": "Password must contain at least 1 digit",
+    "passwordInvalid": "Password is invalid",
+    "passwordRequirementsHint": "8–72 characters, upper & lowercase, a digit, no spaces.",
     "confirmPasswordRequired": "Please confirm your password",
     "passwordsDoNotMatch": "Passwords do not match",
     "firstNameMaxLength": "First name must be at most 100 characters",
@@ -303,7 +327,14 @@
     "article": {
       "backToBlog": "Back to Blog",
       "published": "Published",
-      "tags": "Tags"
+      "tags": "Tags",
+      "notFound": "Article not found.",
+      "noContent": "No content available."
+    },
+    "aboutMe": {
+      "backToHome": "Back to Home",
+      "notConfigured": "This page is not configured yet.",
+      "loadError": "Failed to load content. Please try again later."
     },
     "errorBoundary": {
       "unexpectedError": "An unexpected error occurred",
@@ -503,6 +534,20 @@
       "alreadySelected": "Already selected",
       "preview": "Preview:",
       "contactLinks": "Contact Links",
+      "footerLegalTitle": "Legal & billing info (footer)",
+      "footerLegalDescription": "Optional text shown at the bottom of the landing page (e.g. public billing details, legal entity).",
+      "footerLegalLabel": "Footer text",
+      "footerLegalPlaceholder": "e.g. Sole proprietor Ivanov I.I., INN …",
+      "footerLinksTitle": "Agreements & policies (footer links)",
+      "footerLinksDescription": "Named links shown below the legal text on the landing page (e.g. Privacy policy, Terms). Saved with Save Changes.",
+      "addFooterLink": "Add link",
+      "footerLinkDisplayName": "Display name",
+      "footerLinkDisplayNamePlaceholder": "e.g. Privacy policy",
+      "footerLinkUrl": "URL",
+      "footerLinkUrlPlaceholder": "https://…",
+      "noFooterLinks": "No agreement links yet. Add a display name and URL above.",
+      "footerLinksBothRequired": "Please enter both display name and URL.",
+      "deleteFooterLink": "Remove link",
       "contactLinksDescription": "Manage your social media and contact links that appear in the footer of the landing page. You can add multiple links for the same platform (e.g., personal Telegram and channel).",
       "editContactLink": "Edit Contact Link",
       "addNewContactLink": "Add New Contact Link",
@@ -528,6 +573,8 @@
       "pleaseSelectImageFile": "Please select an image file",
       "failedToLoadWelcomeData": "Failed to load welcome data",
       "invalidArticleIds": "Invalid article ID(s) found: {{ids}}. These articles are not available and will be cleared.",
+      "invalidMoreAboutMeArticleId": "The \"More about me\" article ({{id}}) is no longer available. The selection was cleared.",
+      "moreAboutMeTitle": "More about me",
       "failedToLoadArticles": "Failed to load articles",
       "selectFromGallery": "Select from Gallery",
       "selectImageFromGallery": "Select Image from Gallery",
@@ -928,7 +975,9 @@
     "contact": {
       "title": "CONTACT ME",
       "connectWithMe": "Connect With Me",
-      "followDescription": "Follow me on social media or reach out directly"
+      "followDescription": "Follow me on social media or reach out directly",
+      "footerLegalHeading": "Legal information",
+      "footerLinksHeading": "Documents"
     },
     "booking": {
       "title": "Book a Session",

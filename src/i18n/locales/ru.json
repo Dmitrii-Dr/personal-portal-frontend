@@ -33,6 +33,10 @@
     "title": "Мы скоро вернёмся",
     "message": "Извините за неудобства. Сейчас мы проводим технические работы, и всё будет доступно в ближайшее время. Спасибо за ваше терпение."
   },
+  "agreementPage": {
+    "loading": "Загрузка документа...",
+    "noSuchDocument": "Такого документа не существует."
+  },
   "navigation": {
     "home": "Главная",
     "about": "Работа со мной",
@@ -67,12 +71,32 @@
     "sendResetLink": "Отправить ссылку",
     "backToLogin": "Вернуться к входу",
     "passwordResetSent": "Ссылка для сброса пароля отправлена. Проверьте вашу почту.",
+    "resetPasswordTitle": "Сброс пароля",
+    "resetPasswordDescription": "Введите email и новый пароль.",
+    "resetPasswordSuccess": "Пароль успешно изменён. Переход на страницу входа…",
+    "resetPasswordInvalidToken": "Ссылка для сброса недействительна или отсутствует. Запросите новое письмо со ссылкой.",
+    "resetPasswordNoTokenInUrl": "В ссылке нет ключа сброса. Откройте страницу по ссылке из письма.",
+    "newPasswordField": "Новый пароль",
+    "confirmNewPassword": "Подтвердите новый пароль",
+    "newPasswordRequired": "Введите новый пароль",
+    "resetPasswordSubmit": "Установить новый пароль",
+    "resetPasswordSubmitting": "Сохранение пароля…",
+    "resetPasswordRememberQuestion": "Вспомнили пароль?",
+    "resetPasswordFailed": "Не удалось сбросить пароль. Попробуйте снова.",
+    "resetPasswordFailedWithStatus": "Не удалось сбросить пароль ({{status}} {{statusText}}). Попробуйте снова.",
     "dontHaveAccount": "Нет аккаунта?",
     "alreadyHaveAccount": "Уже есть аккаунт?",
     "emailRequired": "Email обязателен",
     "emailInvalid": "Email должен быть действительным",
     "passwordRequired": "Пароль обязателен",
     "passwordMinLength": "Пароль должен содержать минимум 6 символов",
+    "passwordLength": "Пароль должен быть длиной 8–72 символа",
+    "passwordNoWhitespace": "Пароль не должен содержать пробелы",
+    "passwordMustContainUppercase": "Пароль должен содержать минимум 1 заглавную букву",
+    "passwordMustContainLowercase": "Пароль должен содержать минимум 1 строчную букву",
+    "passwordMustContainDigit": "Пароль должен содержать минимум 1 цифру",
+    "passwordInvalid": "Недопустимый пароль",
+    "passwordRequirementsHint": "Трбования к паролю: Не менее 8 символов, 1 заглавная, 1 цифра",
     "confirmPasswordRequired": "Подтвердите пароль",
     "passwordsDoNotMatch": "Пароли не совпадают",
     "firstNameMaxLength": "Имя должно содержать не более 100 символов",
@@ -302,13 +326,20 @@
       "filterByTag": "Фильтр по тегу",
       "allTags": "Все теги",
       "publicArticles": "Публичные статьи",
-      "privateArticles": "Приватные статьи",
+      "privateArticles": "Статьи для вас",
       "untitled": "Без названия"
     },
     "article": {
       "backToBlog": "Вернуться к блогу",
       "published": "Опубликовано",
-      "tags": "Теги"
+      "tags": "Теги",
+      "notFound": "Статья не найдена.",
+      "noContent": "Содержимое отсутствует."
+    },
+    "aboutMe": {
+      "backToHome": "На главную",
+      "notConfigured": "Эта страница ещё не настроена.",
+      "loadError": "Не удалось загрузить содержимое. Попробуйте позже."
     },
     "errorBoundary": {
       "unexpectedError": "Произошла неожиданная ошибка",
@@ -508,6 +539,20 @@
       "alreadySelected": "Уже выбрано",
       "preview": "Предпросмотр:",
       "contactLinks": "Контактные ссылки",
+      "footerLegalTitle": "Юридическая и платёжная информация (футер)",
+      "footerLegalDescription": "Необязательный текст внизу главной страницы (например, реквизиты ИП/ООО). Сохраняется кнопкой «Сохранить изменения».",
+      "footerLegalLabel": "Текст в футере",
+      "footerLegalPlaceholder": "Например: ИП Иванов И.И., ИНН …",
+      "footerLinksTitle": "Соглашения и документы (ссылки в футере)",
+      "footerLinksDescription": "Cсылки в конце страницы. (например, Политика конфиденциальности, Оферта).",
+      "addFooterLink": "Добавить ссылку",
+      "footerLinkDisplayName": "Название",
+      "footerLinkDisplayNamePlaceholder": "Например: Политика конфиденциальности",
+      "footerLinkUrl": "URL",
+      "footerLinkUrlPlaceholder": "https://…",
+      "noFooterLinks": "Ссылок пока нет. Укажите название и URL выше.",
+      "footerLinksBothRequired": "Укажите и название, и URL.",
+      "deleteFooterLink": "Удалить ссылку",
       "contactLinksDescription": "Управляйте ссылками на социальные сети и контакты, которые отображаются в футере главной страницы. Вы можете добавить несколько ссылок для одной платформы (например, личный Telegram и канал).",
       "editContactLink": "Редактировать контактную ссылку",
       "addNewContactLink": "Добавить новую контактную ссылку",
@@ -533,6 +578,8 @@
       "pleaseSelectImageFile": "Пожалуйста, выберите файл изображения",
       "failedToLoadWelcomeData": "Не удалось загрузить данные приветствия",
       "invalidArticleIds": "Найдены недействительные ID статей: {{ids}}. Эти статьи недоступны и будут удалены.",
+      "invalidMoreAboutMeArticleId": "Статья «Больше обо мне» ({{id}}) больше недоступна. Выбор сброшен.",
+      "moreAboutMeTitle": "Больше о терапии",
       "failedToLoadArticles": "Не удалось загрузить статьи",
       "selectFromGallery": "Выбрать из галереи",
       "selectImageFromGallery": "Выбрать изображение из галереи",
@@ -896,7 +943,7 @@
     },
     "about": {
       "title": "Работа со мной",
-      "readMore": "Больше обо мне",
+      "readMore": "Больше о терапии",
       "freeConsultation": "Консультация",
       "contentSoon": "Содержимое будет предоставлено в ближайшее время.",
       "alt": "Работа со мной"
@@ -930,7 +977,9 @@
     "contact": {
       "title": "СВЯЖИТЕСЬ СО МНОЙ",
       "connectWithMe": "Связаться со мной",
-      "followDescription": "Вы можете подписаться на меня в социальных сетях или написать мне напрямую"
+      "followDescription": "Вы можете подписаться на меня в социальных сетях или написать мне напрямую",
+      "footerLegalHeading": "Юридическая информация",
+      "footerLinksHeading": "Документы"
     },
     "booking": {
       "title": "Записаться на сессию",

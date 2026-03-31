@@ -36,18 +36,9 @@ import CloudUploadIcon from '@mui/icons-material/CloudUpload';
 import DeleteIcon from '@mui/icons-material/Delete';
 import AddIcon from '@mui/icons-material/Add';
 import EditIcon from '@mui/icons-material/Edit';
-import TelegramIcon from '@mui/icons-material/Telegram';
-import LinkedInIcon from '@mui/icons-material/LinkedIn';
-import GitHubIcon from '@mui/icons-material/GitHub';
-import EmailIcon from '@mui/icons-material/Email';
-import LanguageIcon from '@mui/icons-material/Language';
-import PhoneIcon from '@mui/icons-material/Phone';
-import InstagramIcon from '@mui/icons-material/Instagram';
-import TwitterIcon from '@mui/icons-material/Twitter';
-import FacebookIcon from '@mui/icons-material/Facebook';
-import YouTubeIcon from '@mui/icons-material/YouTube';
 import PhotoLibraryIcon from '@mui/icons-material/PhotoLibrary';
 import CloseIcon from '@mui/icons-material/Close';
+import { ContactPlatformIcon } from '../components/icons';
 
 const AdminHomePage = () => {
   const { t } = useTranslation();
@@ -69,6 +60,8 @@ const AdminHomePage = () => {
   const [loadingArticles, setLoadingArticles] = useState(false);
   const [articlesError, setArticlesError] = useState(null);
   const [invalidArticleIdsError, setInvalidArticleIdsError] = useState(null);
+  const [moreAboutMeArticleId, setMoreAboutMeArticleId] = useState('');
+  const [invalidMoreAboutMeArticleIdError, setInvalidMoreAboutMeArticleIdError] = useState(null);
 
   // Media IDs state
   const [welcomeRightMediaId, setWelcomeRightMediaId] = useState(null);
@@ -84,6 +77,11 @@ const AdminHomePage = () => {
   const [welcomeButtonColour, setWelcomeButtonColour] = useState('#ffffff');
   const [welcomeButtonTextColour, setWelcomeButtonTextColour] = useState('#2C5F5F');
   const [mainThemeColourHex, setMainThemeColourHex] = useState('#2C5F5F');
+  /** Legal / billing text shown in landing footer (stored in extendedParameters.footerMessage) */
+  const [footerMessage, setFooterMessage] = useState('');
+  /** Agreement / policy links in landing footer (extendedParameters.footerLinks) */
+  const [footerLinks, setFooterLinks] = useState([]);
+  const [newFooterLink, setNewFooterLink] = useState({ linkDisplayName: '', linkUrl: '' });
 
   // Image upload states
   const [uploadingWelcomeRightImage, setUploadingWelcomeRightImage] = useState(false);
@@ -102,7 +100,7 @@ const AdminHomePage = () => {
   const [reviewImageUrls, setReviewImageUrls] = useState([]);
 
   // Contact links state
-  // Supported platforms: Telegram, LinkedIn, GitHub, Email, Phone, Instagram, Twitter, Facebook, YouTube, WhatsApp, Website, B17
+  // Supported platforms: Telegram, LinkedIn, GitHub, Email, Phone, Instagram, Twitter, Facebook, YouTube, VK.com, WhatsApp, Website, B17
   // Expected backend format in /welcome response:
   // {
   //   "contact": [
@@ -145,6 +143,7 @@ const AdminHomePage = () => {
     'Twitter',
     'Facebook',
     'YouTube',
+    'VK.com',
     'WhatsApp',
     'Website',
     'B17',
@@ -192,6 +191,20 @@ const AdminHomePage = () => {
         setWelcomeButtonColour(ep.welcomeBookSessionButtonColourHex || '#ffffff');
         setWelcomeButtonTextColour(ep.welcomeBookSessionButtonTextColourHex || '#2C5F5F');
         setMainThemeColourHex(ep.mainThemeColourHex || '#2C5F5F');
+        setMoreAboutMeArticleId(ep.moreAboutMeArticleId || '');
+        setFooterMessage(typeof ep.footerMessage === 'string' ? ep.footerMessage : '');
+        if (Array.isArray(ep.footerLinks)) {
+          setFooterLinks(
+            ep.footerLinks
+              .filter((item) => item && typeof item === 'object')
+              .map((item) => ({
+                linkDisplayName: typeof item.linkDisplayName === 'string' ? item.linkDisplayName : '',
+                linkUrl: typeof item.linkUrl === 'string' ? item.linkUrl : '',
+              }))
+          );
+        } else {
+          setFooterLinks([]);
+        }
 
         // Load contact links if available
         if (data.contact && Array.isArray(data.contact)) {
@@ -309,6 +322,35 @@ const AdminHomePage = () => {
       return currentArticleIds;
     });
   }, [loading, loadingArticles, welcomeData, availableArticles]);
+
+  // Validate moreAboutMeArticleId against available articles (extendedParameters)
+  useEffect(() => {
+    if (loading || loadingArticles || !welcomeData || articlesError) {
+      return;
+    }
+    if (!moreAboutMeArticleId) {
+      return;
+    }
+    const availableIds = new Set(availableArticles.map((article) => article.articleId));
+    if (!availableIds.has(moreAboutMeArticleId)) {
+      const invalidId = moreAboutMeArticleId;
+      setInvalidMoreAboutMeArticleIdError(
+        t('admin.home.invalidMoreAboutMeArticleId', { id: invalidId })
+      );
+      console.warn('Invalid moreAboutMeArticleId detected and cleared:', invalidId);
+      setMoreAboutMeArticleId('');
+    } else {
+      setInvalidMoreAboutMeArticleIdError(null);
+    }
+  }, [
+    loading,
+    loadingArticles,
+    welcomeData,
+    availableArticles,
+    articlesError,
+    moreAboutMeArticleId,
+    t,
+  ]);
 
   // Load image from mediaId with caching
   const loadImage = async (mediaId, type) => {
@@ -778,6 +820,22 @@ const AdminHomePage = () => {
     });
   };
 
+  const handleAddFooterLink = () => {
+    const name = newFooterLink.linkDisplayName.trim();
+    const url = newFooterLink.linkUrl.trim();
+    if (!name || !url) {
+      setError(t('admin.home.footerLinksBothRequired'));
+      return;
+    }
+    setFooterLinks([...footerLinks, { linkDisplayName: name, linkUrl: url }]);
+    setNewFooterLink({ linkDisplayName: '', linkUrl: '' });
+    setError(null);
+  };
+
+  const handleDeleteFooterLink = (index) => {
+    setFooterLinks(footerLinks.filter((_, i) => i !== index));
+  };
+
   // Save welcome data
   const handleSaveWelcome = async () => {
     setSaving(true);
@@ -804,14 +862,39 @@ const AdminHomePage = () => {
           isActive: isSiteActive,
           contact: formatContactForBackend(),
           // Merge colour keys into any existing extendedParameters — do NOT wipe other keys
-          extendedParameters: {
-            ...(welcomeData?.extendedParameters || {}),
-            welcomeLeftColourHex: welcomeLeftColour,
-            welcomeRightColourHex: welcomeRightColour,
-            welcomeBookSessionButtonColourHex: welcomeButtonColour,
-            welcomeBookSessionButtonTextColourHex: welcomeButtonTextColour,
-            mainThemeColourHex: mainThemeColourHex,
-          },
+          extendedParameters: (() => {
+            const ep = {
+              ...(welcomeData?.extendedParameters || {}),
+              welcomeLeftColourHex: welcomeLeftColour,
+              welcomeRightColourHex: welcomeRightColour,
+              welcomeBookSessionButtonColourHex: welcomeButtonColour,
+              welcomeBookSessionButtonTextColourHex: welcomeButtonTextColour,
+              mainThemeColourHex: mainThemeColourHex,
+            };
+            if (moreAboutMeArticleId) {
+              ep.moreAboutMeArticleId = moreAboutMeArticleId;
+            } else {
+              delete ep.moreAboutMeArticleId;
+            }
+            const trimmedFooter = typeof footerMessage === 'string' ? footerMessage.trim() : '';
+            if (trimmedFooter) {
+              ep.footerMessage = trimmedFooter;
+            } else {
+              delete ep.footerMessage;
+            }
+            const normalizedFooterLinks = footerLinks
+              .map((item) => ({
+                linkDisplayName: (item.linkDisplayName || '').trim(),
+                linkUrl: (item.linkUrl || '').trim(),
+              }))
+              .filter((item) => item.linkDisplayName && item.linkUrl);
+            if (normalizedFooterLinks.length > 0) {
+              ep.footerLinks = normalizedFooterLinks;
+            } else {
+              delete ep.footerLinks;
+            }
+            return ep;
+          })(),
         }),
       });
 
@@ -1708,6 +1791,15 @@ const AdminHomePage = () => {
               {invalidArticleIdsError}
             </Alert>
           )}
+          {invalidMoreAboutMeArticleIdError && (
+            <Alert
+              severity="warning"
+              sx={{ mb: 3 }}
+              onClose={() => setInvalidMoreAboutMeArticleIdError(null)}
+            >
+              {invalidMoreAboutMeArticleIdError}
+            </Alert>
+          )}
 
           {loadingArticles ? (
             <Box sx={{ display: 'flex', justifyContent: 'center', py: 4 }}>
@@ -1719,79 +1811,142 @@ const AdminHomePage = () => {
             </Alert>
           ) : (
             <Grid container spacing={3}>
-              {[0, 1, 2].map((index) => (
-                <Grid item xs={12} md={4} key={index}>
-                  <Card sx={{ height: '100%' }}>
-                    <CardContent>
-                      <Typography variant="h6" gutterBottom>
-                        {t('admin.home.article')} {index + 1}
-                      </Typography>
-                      <FormControl fullWidth sx={{ mt: 2 }}>
-                        <InputLabel>{t('admin.home.selectArticle')}</InputLabel>
-                        <Select
-                          value={welcomeArticleIds[index] || ''}
-                          label={t('admin.home.selectArticle')}
-                          onChange={(e) => {
-                            const newArticleIds = [...welcomeArticleIds];
-                            if (e.target.value) {
-                              newArticleIds[index] = e.target.value;
-                            } else {
-                              newArticleIds.splice(index, 1);
-                            }
-                            // Keep only first 3 items
-                            setWelcomeArticleIds(newArticleIds.slice(0, 3));
-                          }}
-                        >
-                          <MenuItem value="">
-                            <em>{t('admin.home.none')}</em>
-                          </MenuItem>
-                          {availableArticles.map((article) => {
-                            // Don't show articles that are already selected in other slots
-                            const isSelected = welcomeArticleIds.includes(article.articleId) && welcomeArticleIds[index] !== article.articleId;
-                            return (
-                              <MenuItem
-                                key={article.articleId}
-                                value={article.articleId}
-                                disabled={isSelected}
-                              >
-                                {article.title || t('pages.article.untitled')}
-                                {isSelected && ` (${t('admin.home.alreadySelected')})`}
+              <Grid item xs={12} md={8}>
+                <Grid container spacing={3}>
+                  {[0, 1, 2].map((index) => (
+                    <Grid item xs={12} md={4} key={index}>
+                      <Card sx={{ height: '100%' }}>
+                        <CardContent>
+                          <Typography variant="h6" gutterBottom>
+                            {t('admin.home.article')} {index + 1}
+                          </Typography>
+                          <FormControl fullWidth sx={{ mt: 2 }}>
+                            <InputLabel>{t('admin.home.selectArticle')}</InputLabel>
+                            <Select
+                              value={welcomeArticleIds[index] || ''}
+                              label={t('admin.home.selectArticle')}
+                              onChange={(e) => {
+                                const newArticleIds = [...welcomeArticleIds];
+                                if (e.target.value) {
+                                  newArticleIds[index] = e.target.value;
+                                } else {
+                                  newArticleIds.splice(index, 1);
+                                }
+                                // Keep only first 3 items
+                                setWelcomeArticleIds(newArticleIds.slice(0, 3));
+                              }}
+                            >
+                              <MenuItem value="">
+                                <em>{t('admin.home.none')}</em>
                               </MenuItem>
-                            );
-                          })}
-                        </Select>
-                      </FormControl>
-                      {welcomeArticleIds[index] && (
-                        <Box sx={{ mt: 2 }}>
-                          {(() => {
-                            const selectedArticle = availableArticles.find(
-                              (a) => a.articleId === welcomeArticleIds[index]
-                            );
-                            if (selectedArticle) {
-                              const stripHtml = (html) => {
-                                if (!html) return '';
-                                return html.replace(/<[^>]*>/g, '').replace(/\s+/g, ' ').trim();
-                              };
-                              const preview = stripHtml(selectedArticle.content || '').substring(0, 150);
-                              return (
-                                <>
-                                  <Typography variant="subtitle2" color="text.secondary" gutterBottom>
-                                    {t('admin.home.preview')}
-                                  </Typography>
-                                  <Typography variant="body2" sx={{ fontStyle: 'italic', color: 'text.secondary' }}>
-                                    {preview}...
-                                  </Typography>
-                                </>
-                              );
-                            }
-                            return null;
-                          })()}
-                        </Box>
-                      )}
-                    </CardContent>
-                  </Card>
+                              {availableArticles.map((article) => {
+                                // Don't show articles that are already selected in other slots
+                                const isSelected = welcomeArticleIds.includes(article.articleId) && welcomeArticleIds[index] !== article.articleId;
+                                return (
+                                  <MenuItem
+                                    key={article.articleId}
+                                    value={article.articleId}
+                                    disabled={isSelected}
+                                  >
+                                    {article.title || t('pages.article.untitled')}
+                                    {isSelected && ` (${t('admin.home.alreadySelected')})`}
+                                  </MenuItem>
+                                );
+                              })}
+                            </Select>
+                          </FormControl>
+                          {welcomeArticleIds[index] && (
+                            <Box sx={{ mt: 2 }}>
+                              {(() => {
+                                const selectedArticle = availableArticles.find(
+                                  (a) => a.articleId === welcomeArticleIds[index]
+                                );
+                                if (selectedArticle) {
+                                  const stripHtml = (html) => {
+                                    if (!html) return '';
+                                    return html.replace(/<[^>]*>/g, '').replace(/\s+/g, ' ').trim();
+                                  };
+                                  const preview = stripHtml(selectedArticle.content || '').substring(0, 150);
+                                  return (
+                                    <>
+                                      <Typography variant="subtitle2" color="text.secondary" gutterBottom>
+                                        {t('admin.home.preview')}
+                                      </Typography>
+                                      <Typography variant="body2" sx={{ fontStyle: 'italic', color: 'text.secondary' }}>
+                                        {preview}...
+                                      </Typography>
+                                    </>
+                                  );
+                                }
+                                return null;
+                              })()}
+                            </Box>
+                          )}
+                        </CardContent>
+                      </Card>
+                    </Grid>
+                  ))}
                 </Grid>
-              ))}
+              </Grid>
+              <Grid item xs={12} md={4}>
+                <Card sx={{ height: '100%' }}>
+                  <CardContent>
+                    <Typography variant="h6" gutterBottom>
+                      {t('admin.home.moreAboutMeTitle')}
+                    </Typography>
+                    <FormControl fullWidth sx={{ mt: 2 }}>
+                      <InputLabel>{t('admin.home.selectArticle')}</InputLabel>
+                      <Select
+                        value={moreAboutMeArticleId || ''}
+                        label={t('admin.home.selectArticle')}
+                        onChange={(e) => {
+                          const v = e.target.value || '';
+                          setMoreAboutMeArticleId(v);
+                          if (!v) {
+                            setInvalidMoreAboutMeArticleIdError(null);
+                          }
+                        }}
+                      >
+                        <MenuItem value="">
+                          <em>{t('admin.home.none')}</em>
+                        </MenuItem>
+                        {availableArticles.map((article) => (
+                          <MenuItem key={article.articleId} value={article.articleId}>
+                            {article.title || t('pages.article.untitled')}
+                          </MenuItem>
+                        ))}
+                      </Select>
+                    </FormControl>
+                    {moreAboutMeArticleId && (
+                      <Box sx={{ mt: 2 }}>
+                        {(() => {
+                          const selectedArticle = availableArticles.find(
+                            (a) => a.articleId === moreAboutMeArticleId
+                          );
+                          if (selectedArticle) {
+                            const stripHtml = (html) => {
+                              if (!html) return '';
+                              return html.replace(/<[^>]*>/g, '').replace(/\s+/g, ' ').trim();
+                            };
+                            const preview = stripHtml(selectedArticle.content || '').substring(0, 150);
+                            return (
+                              <>
+                                <Typography variant="subtitle2" color="text.secondary" gutterBottom>
+                                  {t('admin.home.preview')}
+                                </Typography>
+                                <Typography variant="body2" sx={{ fontStyle: 'italic', color: 'text.secondary' }}>
+                                  {preview}...
+                                </Typography>
+                              </>
+                            );
+                          }
+                          return null;
+                        })()}
+                      </Box>
+                    )}
+                  </CardContent>
+                </Card>
+              </Grid>
             </Grid>
           )}
         </Container>
@@ -1855,6 +2010,12 @@ const AdminHomePage = () => {
                       onChange={(e) =>
                         setNewContactLink({ ...newContactLink, platform: e.target.value })
                       }
+                      renderValue={(value) => (
+                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                          <ContactPlatformIcon platform={value} fontSize={20} />
+                          {value}
+                        </Box>
+                      )}
                       sx={{
                         color: 'white',
                         '& .MuiOutlinedInput-notchedOutline': {
@@ -1873,7 +2034,10 @@ const AdminHomePage = () => {
                     >
                       {supportedPlatforms.map((platform) => (
                         <MenuItem key={platform} value={platform}>
-                          {platform}
+                          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                            <ContactPlatformIcon platform={platform} fontSize={20} />
+                            {platform}
+                          </Box>
                         </MenuItem>
                       ))}
                     </Select>
@@ -2026,88 +2190,6 @@ const AdminHomePage = () => {
               }}
             >
               {contactLinks.map((link, index) => {
-                // Map platform name to icon component
-                const getIcon = (platform) => {
-                  const platformLower = (platform || '').toLowerCase();
-                  switch (platformLower) {
-                    case 'telegram':
-                      return <TelegramIcon sx={{ fontSize: { xs: 32, md: 40 } }} />;
-                    case 'linkedin':
-                      return <LinkedInIcon sx={{ fontSize: { xs: 32, md: 40 } }} />;
-                    case 'github':
-                      return <GitHubIcon sx={{ fontSize: { xs: 32, md: 40 } }} />;
-                    case 'email':
-                      return <EmailIcon sx={{ fontSize: { xs: 32, md: 40 } }} />;
-                    case 'phone':
-                      return <PhoneIcon sx={{ fontSize: { xs: 32, md: 40 } }} />;
-                    case 'instagram':
-                      return <InstagramIcon sx={{ fontSize: { xs: 32, md: 40 } }} />;
-                    case 'twitter':
-                      return <TwitterIcon sx={{ fontSize: { xs: 32, md: 40 } }} />;
-                    case 'facebook':
-                      return <FacebookIcon sx={{ fontSize: { xs: 32, md: 40 } }} />;
-                    case 'youtube':
-                      return <YouTubeIcon sx={{ fontSize: { xs: 32, md: 40 } }} />;
-                    case 'whatsapp':
-                      return (
-                        <Box
-                          component="img"
-                          src="https://upload.wikimedia.org/wikipedia/commons/6/6b/WhatsApp.svg"
-                          alt="WhatsApp"
-                          sx={{
-                            width: { xs: 32, md: 40 },
-                            height: { xs: 32, md: 40 },
-                            objectFit: 'contain',
-                            filter: 'brightness(0) invert(1)',
-                          }}
-                          onError={(e) => {
-                            // Fallback: show text if image fails to load
-                            e.target.style.display = 'none';
-                            const parent = e.target.parentElement;
-                            if (parent && !parent.querySelector('.whatsapp-fallback')) {
-                              const fallback = document.createElement('span');
-                              fallback.className = 'whatsapp-fallback';
-                              fallback.textContent = 'WA';
-                              fallback.style.cssText = 'font-size: 18px; font-weight: bold; color: white; display: flex; align-items: center; justify-content: center;';
-                              parent.appendChild(fallback);
-                            }
-                          }}
-                        />
-                      );
-                    case 'website':
-                      return <LanguageIcon sx={{ fontSize: { xs: 32, md: 40 } }} />;
-                    case 'b17':
-                      return (
-                        <Box
-                          component="img"
-                          src="https://www.b17.ru/favicon.ico"
-                          alt="B17"
-                          sx={{
-                            width: { xs: 32, md: 40 },
-                            height: { xs: 32, md: 40 },
-                            objectFit: 'contain',
-                            filter: 'brightness(0) invert(1)',
-                          }}
-                          onError={(e) => {
-                            // Fallback: show text if image fails to load
-                            e.target.style.display = 'none';
-                            const parent = e.target.parentElement;
-                            if (parent && !parent.querySelector('.b17-fallback')) {
-                              const fallback = document.createElement('span');
-                              fallback.className = 'b17-fallback';
-                              fallback.textContent = 'B17';
-                              fallback.style.cssText = 'font-size: 18px; font-weight: bold; color: white; display: flex; align-items: center; justify-content: center;';
-                              parent.appendChild(fallback);
-                            }
-                          }}
-                        />
-                      );
-                    default:
-                      return <LanguageIcon sx={{ fontSize: { xs: 32, md: 40 } }} />;
-                  }
-                };
-
-                // Get display label
                 const getLabel = (link) => {
                   if (link.description) {
                     return link.description;
@@ -2155,7 +2237,7 @@ const AdminHomePage = () => {
                         },
                       }}
                     >
-                      {getIcon(link.platform)}
+                      <ContactPlatformIcon platform={link.platform} fontSize={{ xs: 32, md: 40 }} />
 
                       {/* Edit/Delete Buttons Overlay */}
                       <Box
@@ -2264,6 +2346,207 @@ const AdminHomePage = () => {
             >
               <Typography variant="body2">
                 {t('admin.home.noContactLinks')}
+              </Typography>
+            </Paper>
+          )}
+        </Container>
+      </Box>
+
+      {/* Legal / public info footer (landing page) */}
+      <Box
+        component="section"
+        sx={{
+          py: { xs: 4, md: 6 },
+          bgcolor: 'background.paper',
+          borderBottom: 1,
+          borderColor: 'divider',
+        }}
+      >
+        <Container maxWidth="lg">
+          <Box sx={{ mb: 3 }}>
+            <Divider
+              sx={{
+                width: '60px',
+                height: '2px',
+                bgcolor: 'black',
+                mb: 2,
+              }}
+            />
+            <Typography
+              variant="h2"
+              component="h2"
+              sx={{
+                fontSize: { xs: '1.25rem', sm: '1.5rem', md: '1.75rem' },
+                fontWeight: 700,
+                color: 'black',
+                letterSpacing: '0.05em',
+                textTransform: 'uppercase',
+                fontFamily: 'sans-serif',
+                mb: 1,
+              }}
+            >
+              {t('admin.home.footerLegalTitle')}
+            </Typography>
+            <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+              {t('admin.home.footerLegalDescription')}
+            </Typography>
+          </Box>
+          <TextField
+            fullWidth
+            multiline
+            minRows={4}
+            label={t('admin.home.footerLegalLabel')}
+            value={footerMessage}
+            onChange={(e) => setFooterMessage(e.target.value)}
+            placeholder={t('admin.home.footerLegalPlaceholder')}
+            sx={{
+              '& .MuiInputBase-input': {
+                fontSize: { xs: '0.95rem', md: '1rem' },
+                lineHeight: 1.8,
+                fontFamily: 'sans-serif',
+              },
+            }}
+          />
+        </Container>
+      </Box>
+
+      {/* Footer agreement / policy links (landing page) */}
+      <Box
+        component="section"
+        sx={{
+          py: { xs: 4, md: 6 },
+          bgcolor: 'background.paper',
+          borderBottom: 1,
+          borderColor: 'divider',
+        }}
+      >
+        <Container maxWidth="lg">
+          <Box sx={{ mb: 3 }}>
+            <Divider
+              sx={{
+                width: '60px',
+                height: '2px',
+                bgcolor: 'black',
+                mb: 2,
+              }}
+            />
+            <Typography
+              variant="h2"
+              component="h2"
+              sx={{
+                fontSize: { xs: '1.25rem', sm: '1.5rem', md: '1.75rem' },
+                fontWeight: 700,
+                color: 'black',
+                letterSpacing: '0.05em',
+                textTransform: 'uppercase',
+                fontFamily: 'sans-serif',
+                mb: 1,
+              }}
+            >
+              {t('admin.home.footerLinksTitle')}
+            </Typography>
+            <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+              {t('admin.home.footerLinksDescription')}
+            </Typography>
+          </Box>
+
+          <Card sx={{ mb: 3, border: '1px solid', borderColor: 'divider' }}>
+            <CardContent>
+              <Typography variant="subtitle2" color="text.secondary" sx={{ mb: 2 }}>
+                {t('admin.home.addFooterLink')}
+              </Typography>
+              <Grid container spacing={2} alignItems="flex-end">
+                <Grid item xs={12} sm={4}>
+                  <TextField
+                    fullWidth
+                    size="medium"
+                    label={t('admin.home.footerLinkDisplayName')}
+                    value={newFooterLink.linkDisplayName}
+                    onChange={(e) =>
+                      setNewFooterLink({ ...newFooterLink, linkDisplayName: e.target.value })
+                    }
+                    placeholder={t('admin.home.footerLinkDisplayNamePlaceholder')}
+                  />
+                </Grid>
+                <Grid item xs={12} sm={4}>
+                  <TextField
+                    fullWidth
+                    size="medium"
+                    label={t('admin.home.footerLinkUrl')}
+                    value={newFooterLink.linkUrl}
+                    onChange={(e) =>
+                      setNewFooterLink({ ...newFooterLink, linkUrl: e.target.value })
+                    }
+                    placeholder={t('admin.home.footerLinkUrlPlaceholder')}
+                  />
+                </Grid>
+                <Grid item xs={12} sm={4}>
+                  <Button
+                    variant="contained"
+                    startIcon={<AddIcon />}
+                    onClick={handleAddFooterLink}
+                    fullWidth
+                    sx={{
+                      textTransform: 'none',
+                      height: 56,
+                      minHeight: 56,
+                      boxSizing: 'border-box',
+                    }}
+                  >
+                    {t('admin.home.add')}
+                  </Button>
+                </Grid>
+              </Grid>
+            </CardContent>
+          </Card>
+
+          {footerLinks.length > 0 ? (
+            <Stack spacing={1}>
+              {footerLinks.map((link, index) => (
+                <Paper
+                  key={index}
+                  elevation={0}
+                  sx={{
+                    p: 2,
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    gap: 2,
+                    flexWrap: 'wrap',
+                    border: '1px solid',
+                    borderColor: 'divider',
+                  }}
+                >
+                  <Box sx={{ minWidth: 0, flex: 1 }}>
+                    <Typography variant="subtitle1" fontWeight={600} noWrap title={link.linkDisplayName}>
+                      {link.linkDisplayName}
+                    </Typography>
+                    <Typography variant="caption" color="text.secondary" sx={{ wordBreak: 'break-all' }}>
+                      {link.linkUrl}
+                    </Typography>
+                  </Box>
+                  <IconButton
+                    size="small"
+                    onClick={() => handleDeleteFooterLink(index)}
+                    aria-label={t('admin.home.deleteFooterLink')}
+                  >
+                    <DeleteIcon fontSize="small" color="error" />
+                  </IconButton>
+                </Paper>
+              ))}
+            </Stack>
+          ) : (
+            <Paper
+              sx={{
+                p: 3,
+                textAlign: 'center',
+                bgcolor: 'grey.50',
+                border: '2px dashed',
+                borderColor: 'grey.300',
+              }}
+            >
+              <Typography variant="body2" color="text.secondary">
+                {t('admin.home.noFooterLinks')}
               </Typography>
             </Paper>
           )}

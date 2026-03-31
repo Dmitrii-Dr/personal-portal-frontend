@@ -1,67 +1,81 @@
 import React, { useState, useEffect } from 'react';
 import { useParams } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { Box, Typography, Container, Paper, CircularProgress, Alert } from '@mui/material';
 
 const AgreementPage = () => {
     const { slug } = useParams();
+    const { t } = useTranslation();
     const [agreement, setAgreement] = useState(null);
     const [loading, setLoading] = useState(true);
-    const [error, setError] = useState('');
+    const [hasLoadError, setHasLoadError] = useState(false);
 
     useEffect(() => {
+        let isMounted = true;
+        const controller = new AbortController();
+
         const fetchAgreement = async () => {
             if (!slug) {
-                setError('Agreement not found');
+                if (!isMounted) return;
+                setHasLoadError(true);
                 setLoading(false);
                 return;
             }
 
             try {
+                if (!isMounted) return;
                 setLoading(true);
-                setError('');
+                setHasLoadError(false);
+                setAgreement(null);
 
-                const response = await fetch(`/api/v1/public/agreements/slug/${slug}`);
+                const response = await fetch(`/api/v1/public/agreements/slug/${slug}`, {
+                    signal: controller.signal,
+                });
 
                 if (!response.ok) {
-                    if (response.status === 404) {
-                        throw new Error('Agreement not found');
-                    }
-                    throw new Error(`Failed to load agreement: ${response.status}`);
+                    throw new Error('Failed to load agreement');
                 }
 
                 const data = await response.json();
+                if (!isMounted) return;
                 setAgreement(data);
             } catch (err) {
+                if (err.name === 'AbortError' || err.name === 'CanceledError' || err.code === 'ERR_CANCELED') {
+                    return;
+                }
                 console.error('Error fetching agreement:', err);
-                setError(err.message || 'Failed to load agreement');
+                if (!isMounted) return;
+                setHasLoadError(true);
             } finally {
-                setLoading(false);
+                if (isMounted) {
+                    setLoading(false);
+                }
             }
         };
 
         fetchAgreement();
+
+        return () => {
+            isMounted = false;
+            controller.abort();
+        };
     }, [slug]);
 
     if (loading) {
         return (
-            <Container maxWidth="md" sx={{ py: 4, display: 'flex', justifyContent: 'center' }}>
+            <Container maxWidth="md" sx={{ py: 4, display: 'flex', justifyContent: 'center', alignItems: 'center', flexDirection: 'column', gap: 2 }}>
                 <CircularProgress />
+                <Typography variant="body2" color="text.secondary">
+                    {t('agreementPage.loading')}
+                </Typography>
             </Container>
         );
     }
 
-    if (error) {
+    if (hasLoadError || !agreement) {
         return (
             <Container maxWidth="md" sx={{ py: 4 }}>
-                <Alert severity="error">{error}</Alert>
-            </Container>
-        );
-    }
-
-    if (!agreement) {
-        return (
-            <Container maxWidth="md" sx={{ py: 4 }}>
-                <Alert severity="warning">Agreement not found</Alert>
+                <Alert severity="warning">{t('agreementPage.noSuchDocument')}</Alert>
             </Container>
         );
     }
