@@ -206,6 +206,9 @@ const AccountVerificationPage = () => {
                         <Typography variant="body2" color="text.secondary" align="center" sx={{ mb: 3 }}>
                             {t('auth.verifyAccountDescription')}{email ? ` ${email}` : ''}
                         </Typography>
+                        <Typography variant="body2" color="text.secondary" align="center" sx={{ mb: 2 }}>
+                            {t('auth.checkSpamFolder')}
+                        </Typography>
 
                         {submitError && (
                             <Alert severity="error" sx={{ mb: 2 }}>
