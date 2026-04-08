@@ -132,7 +132,8 @@
     "noEmailProvided": "No email found. Please log in again.",
     "resendCode": "Send code again",
     "resendCodeIn": "Send again in {{seconds}}s",
-    "codeSentAgain": "A new verification code has been sent to your email."
+    "codeSentAgain": "A new verification code has been sent to your email.",
+    "checkSpamFolder": "If you don't see the email, please check your spam or junk folder."
   },
   "userMenu": {
     "myProfile": "My Profile",
