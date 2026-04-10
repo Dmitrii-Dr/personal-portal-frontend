@@ -493,7 +493,7 @@ const LandingPage = () => {
         component="section"
         sx={{
           paddingTop: '64px',
-          minHeight: '100vh',
+          minHeight: { xs: 'calc(64px + ((100vh - 64px) * 0.85))', md: '100vh' },
           display: 'flex',
           alignItems: 'stretch',
           position: 'relative',
@@ -509,7 +509,7 @@ const LandingPage = () => {
           <Box
             sx={{
               width: '100%',
-              height: 'calc(100vh - 64px)',
+              height: 'calc((100vh - 64px) * 0.85)',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
@@ -669,11 +669,12 @@ const LandingPage = () => {
       {isMobileImage && (
         <Box
           sx={{
-            py: { xs: 3, sm: 3 },
+            minHeight: 'calc((100vh - 64px) * 0.15)',
             px: 2,
             display: 'flex',
             justifyContent: 'center',
             alignItems: 'center',
+            boxSizing: 'border-box',
             backgroundColor: 'background.default',
           }}
         >
