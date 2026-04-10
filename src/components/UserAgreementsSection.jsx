@@ -18,7 +18,6 @@ import {
     TextField,
     CircularProgress,
     Alert,
-    Chip,
     Tooltip,
     useMediaQuery,
     useTheme,
@@ -29,6 +28,9 @@ import DeleteIcon from '@mui/icons-material/Delete';
 import CloseIcon from '@mui/icons-material/Close';
 import { fetchWithAuth } from '../utils/api';
 import dayjs from 'dayjs';
+import RichDocEditorField from './blog-editor/RichDocEditorField';
+import { isDocNonEmpty } from './blog-editor/schema';
+import { contentToEditorString, agreementContentPreview } from './blog-editor/contentUtils';
 
 const UserAgreementsSection = () => {
     const { t } = useTranslation();
@@ -39,6 +41,7 @@ const UserAgreementsSection = () => {
     const [error, setError] = useState(null);
     const [dialogOpen, setDialogOpen] = useState(false);
     const [editingAgreement, setEditingAgreement] = useState(null);
+    const [agreementEditorKey, setAgreementEditorKey] = useState(0);
     const [formData, setFormData] = useState({
         name: '',
         slug: '',
@@ -52,20 +55,16 @@ const UserAgreementsSection = () => {
         return regex.test(slug);
     };
 
-    useEffect(() => {
-        fetchAgreements();
-    }, []);
-
-    const fetchAgreements = async () => {
+    const reloadAgreements = async () => {
         setLoading(true);
+        setError(null);
         try {
             const response = await fetchWithAuth('/api/v1/admin/agreements');
-            if (response.ok) {
-                const data = await response.json();
-                setAgreements(Array.isArray(data) ? data : []);
-            } else {
+            if (!response.ok) {
                 throw new Error('Failed to fetch agreements');
             }
+            const data = await response.json();
+            setAgreements(Array.isArray(data) ? data : []);
         } catch (err) {
             setError(err.message);
         } finally {
@@ -73,13 +72,51 @@ const UserAgreementsSection = () => {
         }
     };
 
+    useEffect(() => {
+        let isMounted = true;
+        const controller = new AbortController();
+
+        (async () => {
+            setLoading(true);
+            setError(null);
+            try {
+                const response = await fetchWithAuth('/api/v1/admin/agreements', {
+                    signal: controller.signal,
+                });
+                if (!isMounted) return;
+                if (!response.ok) {
+                    throw new Error('Failed to fetch agreements');
+                }
+                const data = await response.json();
+                if (!isMounted) return;
+                setAgreements(Array.isArray(data) ? data : []);
+            } catch (err) {
+                if (err.name === 'AbortError' || err.name === 'CanceledError' || err.code === 'ERR_CANCELED') {
+                    return;
+                }
+                if (!isMounted) return;
+                setError(err.message);
+            } finally {
+                if (isMounted) {
+                    setLoading(false);
+                }
+            }
+        })();
+
+        return () => {
+            isMounted = false;
+            controller.abort();
+        };
+    }, []);
+
     const handleOpenDialog = (agreement = null) => {
+        setAgreementEditorKey((k) => k + 1);
         if (agreement) {
             setEditingAgreement(agreement);
             setFormData({
                 name: agreement.name || '',
                 slug: agreement.slug || '',
-                content: agreement.content || '',
+                content: contentToEditorString(agreement.content),
             });
         } else {
             setEditingAgreement(null);
@@ -101,8 +138,12 @@ const UserAgreementsSection = () => {
         setSlugError('');
     };
 
+    const handleContentChange = (newContent) => {
+        setFormData((prev) => ({ ...prev, content: newContent }));
+    };
+
     const handleSave = async () => {
-        if (!formData.name.trim() || !formData.slug.trim() || !formData.content.trim()) {
+        if (!formData.name.trim() || !formData.slug.trim() || !isDocNonEmpty(formData.content)) {
             return;
         }
 
@@ -130,7 +171,7 @@ const UserAgreementsSection = () => {
                 throw new Error('Failed to save agreement');
             }
 
-            await fetchAgreements();
+            await reloadAgreements();
             handleCloseDialog();
         } catch (err) {
             setError(err.message);
@@ -153,11 +194,17 @@ const UserAgreementsSection = () => {
                 throw new Error('Failed to delete agreement');
             }
 
-            await fetchAgreements();
+            await reloadAgreements();
         } catch (err) {
             setError(err.message);
         }
     };
+
+    const saveDisabled =
+        saveLoading ||
+        !formData.name.trim() ||
+        !formData.slug.trim() ||
+        !isDocNonEmpty(formData.content);
 
     return (
         <Card>
@@ -186,15 +233,19 @@ const UserAgreementsSection = () => {
                     </Box>
                 ) : agreements.length > 0 ? (
                     <List>
-                        {agreements.map((agreement) => (
+                        {agreements.map((agreement) => {
+                            const preview = agreementContentPreview(agreement.content);
+                            return (
                             <ListItem key={agreement.id} divider>
                                 <ListItemText
                                     primary={agreement.name}
                                     secondary={
                                         <Box component="span" sx={{ display: 'flex', flexDirection: 'column', gap: 0.5 }}>
-                                            <Typography variant="body2" color="text.secondary" noWrap>
-                                                {agreement.content.substring(0, 100)}...
-                                            </Typography>
+                                            {preview ? (
+                                                <Typography variant="body2" color="text.secondary" noWrap>
+                                                    {preview}
+                                                </Typography>
+                                            ) : null}
                                             <Typography variant="caption" color="text.secondary">
                                                 {t('admin.sessionConfiguration.userAgreements.lastUpdated', { date: dayjs(agreement.updatedAt).format('MMM D, YYYY HH:mm') })}
                                                 • {t('admin.sessionConfiguration.userAgreements.version', { version: agreement.version })}
@@ -211,7 +262,8 @@ const UserAgreementsSection = () => {
                                     </IconButton>
                                 </ListItemSecondaryAction>
                             </ListItem>
-                        ))}
+                            );
+                        })}
                     </List>
                 ) : (
                     <Typography variant="body2" color="text.secondary">
@@ -251,16 +303,15 @@ const UserAgreementsSection = () => {
                             helperText={slugError}
                             required
                         />
-                        <TextField
-                            margin="dense"
-                            label={t('admin.sessionConfiguration.userAgreements.content')}
-                            fullWidth
-                            multiline
-                            rows={10}
-                            value={formData.content}
-                            onChange={(e) => setFormData({ ...formData, content: e.target.value })}
-                            required
-                        />
+                        <Box sx={{ mt: 2 }}>
+                            <RichDocEditorField
+                                label={t('admin.sessionConfiguration.userAgreements.content')}
+                                value={formData.content}
+                                onChange={handleContentChange}
+                                disabled={saveLoading}
+                                editorKey={`agreement-${editingAgreement?.id ?? 'new'}-${agreementEditorKey}`}
+                            />
+                        </Box>
                     </DialogContent>
                     <DialogActions
                         disableSpacing
@@ -275,7 +326,7 @@ const UserAgreementsSection = () => {
                         <Button
                             onClick={handleSave}
                             variant="contained"
-                            disabled={saveLoading || !formData.name.trim() || !formData.slug.trim() || !formData.content.trim()}
+                            disabled={saveDisabled}
                             fullWidth={isMobile}
                             sx={{ width: isMobile ? '100%' : 'auto' }}
                         >

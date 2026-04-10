@@ -2,6 +2,34 @@ import React, { useState, useEffect } from 'react';
 import { useParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { Box, Typography, Container, Paper, CircularProgress, Alert } from '@mui/material';
+import BlogDocumentViewer from '../components/blog-editor/BlogDocumentViewer';
+
+const isJsonContent = (content) => {
+    if (!content || typeof content !== 'string') return false;
+    return content.trimStart().startsWith('{');
+};
+
+function renderAgreementBody(content) {
+    if (isJsonContent(content)) {
+        try {
+            JSON.parse(content);
+            return <BlogDocumentViewer content={content} />;
+        } catch {
+            return (
+                <Alert severity="warning">
+                    Unable to render agreement content (invalid format).
+                </Alert>
+            );
+        }
+    }
+    return (
+        <Typography
+            component="div"
+            sx={{ whiteSpace: 'pre-wrap' }}
+            dangerouslySetInnerHTML={{ __html: content }}
+        />
+    );
+}
 
 const AgreementPage = () => {
     const { slug } = useParams();
@@ -86,13 +114,7 @@ const AgreementPage = () => {
                 <Typography variant="h4" component="h1" gutterBottom>
                     {agreement.name}
                 </Typography>
-                <Box sx={{ mt: 2 }}>
-                    <Typography
-                        component="div"
-                        sx={{ whiteSpace: 'pre-wrap' }}
-                        dangerouslySetInnerHTML={{ __html: agreement.content }}
-                    />
-                </Box>
+                <Box sx={{ mt: 2 }}>{renderAgreementBody(agreement.content)}</Box>
             </Paper>
         </Container>
     );
