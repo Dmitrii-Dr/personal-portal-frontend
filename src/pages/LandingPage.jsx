@@ -81,9 +81,13 @@ const areAllPricesZero = (prices) => {
   return priceValues.length > 0 && priceValues.every(price => price === 0 || price === null || price === undefined);
 };
 
-/** Portrait viewport w/h; ~2/3 ≈ 0.667; band includes typical 9:16 (~0.56). Outside → scroll mode. */
-const MOBILE_HERO_ASPECT_MIN = 0.52;
-const MOBILE_HERO_ASPECT_MAX = 0.78;
+/**
+ * Portrait viewport w/h (width/innerHeight). ~2/3 ≈ 0.667; 9:16 ≈ 0.56.
+ * Wide band = fill (cover); scroll only for clearly odd sizes (e.g. split view, very squat or very ribbon).
+ * Standalone PWA on iPhone reports taller viewport → smaller r; keep MIN low enough to stay fill.
+ */
+const MOBILE_HERO_ASPECT_MIN = 0.36;
+const MOBILE_HERO_ASPECT_MAX = 0.92;
 
 function isNearTwoThreeViewport() {
   if (typeof window === 'undefined') return true;
