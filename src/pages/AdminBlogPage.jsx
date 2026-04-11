@@ -112,6 +112,8 @@ const AdminBlogPage = () => {
   });
   const [createTagIds, setCreateTagIds] = useState([]);
   const [createExcerptTouched, setCreateExcerptTouched] = useState(false);
+  /** Bumps each time the create dialog opens so Milkdown remounts with a clean empty doc. */
+  const [createEditorKey, setCreateEditorKey] = useState(0);
 
   // ── Misc ─────────────────────────────────────────────────────────────────
   const [snackbarOpen, setSnackbarOpen] = useState(false);
@@ -370,6 +372,7 @@ const AdminBlogPage = () => {
   // ─── Create dialog ───────────────────────────────────────────────────────
   const handleAddPostOpen = () => {
     setAddPostOpen(true);
+    setCreateEditorKey((k) => k + 1);
     setCreateArticleData({ title: '', slug: '', content: '', excerpt: '', status: 'DRAFT' });
     setCreateError('');
     setSelectedUserIds([]);
@@ -866,7 +869,7 @@ const AdminBlogPage = () => {
                 value={createArticleData.content}
                 onChange={handleCreateContentChange}
                 disabled={creating}
-                editorKey="admin-blog-new"
+                editorKey={`admin-blog-new-${createEditorKey}`}
               />
             </Grid>
             {renderExcerptField(

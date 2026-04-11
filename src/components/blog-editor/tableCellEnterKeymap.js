@@ -20,11 +20,48 @@ export const tableCellEnterLineBreakKeymap = $useKeymap('tableCellEnterLineBreak
       const { selection, schema } = state;
       if (!(selection instanceof TextSelection)) return false;
 
-      const hardbreak = schema.nodes.hardbreak;
+      const hardbreak = schema.nodes.hardbreak || schema.nodes.hard_break;
       if (!hardbreak) return false;
 
       dispatch?.(state.tr.replaceSelectionWith(hardbreak.create()).scrollIntoView());
       return true;
+    },
+  },
+  NormalEnterSplitsBlock: {
+    // Fires before GFM/commonmark Enter handlers (higher priority number = runs first).
+    // Explicitly splits into a paragraph to prevent inheriting fence/code_block type
+    // from the current node — the root cause of the "gray container on Enter" bug.
+    priority: 120,
+    shortcuts: 'Enter',
+    command: () => (state, dispatch) => {
+      if (isInTable(state)) return false;
+      if (!(state.selection instanceof TextSelection)) return false;
+
+      const { $from, empty } = state.selection;
+      if (!empty) return false;
+
+      const parentName = $from.parent.type.name;
+      // Let default handlers deal with Enter inside intentional code blocks.
+      if (parentName === 'code_block' || parentName === 'fence') return false;
+      if (!$from.parent.isTextblock) return false;
+
+      const paragraphType = state.schema.nodes.paragraph;
+      if (!paragraphType) return false;
+
+      try {
+        // Passing [{ type: paragraphType }] as typesAfter forces the new block to
+        // always be a paragraph regardless of what the current node's type is.
+        const tr = state.tr
+          .split(state.selection.from, 1, [{ type: paragraphType }])
+          .scrollIntoView();
+        if (tr.docChanged) {
+          dispatch?.(tr);
+          return true;
+        }
+      } catch {
+        // Fall through to default handlers.
+      }
+      return false;
     },
   },
 });

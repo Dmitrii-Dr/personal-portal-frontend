@@ -26,6 +26,7 @@ function applyContainerStyle(container, attrs) {
 function createImageNodeView(editable) {
   return (node, view, getPos) => {
     const { mediaId, width, height, alignment } = node.attrs;
+    let currentMediaId = mediaId;
 
     // Outer container
     const dom = document.createElement('figure');
@@ -48,6 +49,7 @@ function createImageNodeView(editable) {
     if (alignment === 'center') {
       img.style.margin = '0 auto';
     }
+    img.draggable = false;
 
     // Loading placeholder
     const placeholder = document.createElement('div');
@@ -78,6 +80,7 @@ function createImageNodeView(editable) {
 
     // Edit-mode controls overlay
     let controlsEl = null;
+    let resizeHandleEl = null;
     if (editable) {
       controlsEl = document.createElement('div');
       controlsEl.style.cssText =
@@ -114,11 +117,60 @@ function createImageNodeView(editable) {
 
       dom.appendChild(controlsEl);
 
+      // Bottom-right drag handle to resize image width.
+      resizeHandleEl = document.createElement('div');
+      resizeHandleEl.className = 'image-node-resize-handle';
+      resizeHandleEl.title = 'Resize image';
+      resizeHandleEl.style.cssText =
+        'position:absolute;right:6px;bottom:6px;width:14px;height:14px;border-radius:3px;background:rgba(0,0,0,0.55);border:1px solid rgba(255,255,255,0.85);cursor:nwse-resize;display:none;z-index:11;';
+
+      resizeHandleEl.addEventListener('mousedown', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        const pos = typeof getPos === 'function' ? getPos() : null;
+        if (pos === null || pos === undefined) return;
+
+        const startX = e.clientX;
+        const renderedWidth = img.getBoundingClientRect().width || 320;
+        const startWidth = Math.round(node.attrs.width || renderedWidth);
+        const minWidth = 120;
+        const maxWidth = 1200;
+        let latestWidth = startWidth;
+
+        const onMouseMove = (moveEvent) => {
+          const delta = moveEvent.clientX - startX;
+          const nextWidth = Math.max(minWidth, Math.min(maxWidth, Math.round(startWidth + delta)));
+          latestWidth = nextWidth;
+          img.style.width = `${nextWidth}px`;
+          img.style.height = '';
+        };
+
+        const onMouseUp = () => {
+          window.removeEventListener('mousemove', onMouseMove);
+          window.removeEventListener('mouseup', onMouseUp);
+          const nodeAtPos = view.state.doc.nodeAt(pos);
+          if (!nodeAtPos || nodeAtPos.type.name !== 'customImage') return;
+          const tr = view.state.tr.setNodeMarkup(pos, undefined, {
+            ...nodeAtPos.attrs,
+            width: latestWidth,
+            height: null,
+          });
+          view.dispatch(tr);
+        };
+
+        window.addEventListener('mousemove', onMouseMove);
+        window.addEventListener('mouseup', onMouseUp);
+      });
+
+      dom.appendChild(resizeHandleEl);
+
       dom.addEventListener('mouseenter', () => {
         if (controlsEl) controlsEl.style.display = 'flex';
+        if (resizeHandleEl) resizeHandleEl.style.display = 'block';
       });
       dom.addEventListener('mouseleave', () => {
         if (controlsEl) controlsEl.style.display = 'none';
+        if (resizeHandleEl) resizeHandleEl.style.display = 'none';
       });
     }
 
@@ -138,7 +190,8 @@ function createImageNodeView(editable) {
           img.style.margin = newAlign === 'center' ? '0 auto' : '0';
         }
         // Reload image if mediaId changed
-        if (newMediaId !== mediaId && newMediaId) {
+        if (newMediaId !== currentMediaId && newMediaId) {
+          currentMediaId = newMediaId;
           cancelled = true;
           cancelled = false;
           const newPlaceholder = document.createElement('div');

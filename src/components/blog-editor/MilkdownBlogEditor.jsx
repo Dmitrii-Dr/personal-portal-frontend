@@ -58,10 +58,12 @@ function normalizeInitialValue(value) {
 const jsonChangePlugin = (onChangeRef, isFirstDocUpdateRef, initialSnapshotRef) =>
   new Plugin({
     view(editorView) {
+      console.log('[MilkdownEditor] initial doc:', JSON.stringify(editorView.state.doc.toJSON()));
       return {
         update(view, prevState) {
           if (prevState.doc.eq(view.state.doc)) return;
           const json = JSON.stringify(view.state.doc.toJSON());
+          console.log('[MilkdownEditor] doc changed:', json);
           // Ignore only the very first empty emission when initial content is non-empty.
           if (isFirstDocUpdateRef.current) {
             isFirstDocUpdateRef.current = false;

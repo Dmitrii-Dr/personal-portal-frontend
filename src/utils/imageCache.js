@@ -6,6 +6,9 @@ const DB_NAME = 'image_cache_db';
 const DB_VERSION = 1;
 const STORE_NAME = 'images';
 
+/** Plain-object record version for IndexedDB (Blob put is flaky on some mobile WebKit). */
+const STORED_IMAGE_V = 1;
+
 // In-memory cache for current session (stores object URLs)
 const memoryCache = new Map();
 
@@ -45,6 +48,25 @@ const initDB = () => {
 };
 
 /**
+ * @param {unknown} raw
+ * @returns {Blob|null}
+ */
+const normalizeStoredEntryToBlob = (raw) => {
+  if (!raw) return null;
+  if (raw instanceof Blob) return raw;
+  if (
+    typeof raw === 'object' &&
+    raw !== null &&
+    raw.v === STORED_IMAGE_V &&
+    raw.buffer instanceof ArrayBuffer
+  ) {
+    const type = typeof raw.type === 'string' && raw.type ? raw.type : 'application/octet-stream';
+    return new Blob([raw.buffer], { type });
+  }
+  return null;
+};
+
+/**
  * Get blob from IndexedDB
  * @param {string} mediaId - The media ID
  * @returns {Promise<Blob|null>}
@@ -52,49 +74,81 @@ const initDB = () => {
 const getBlobFromDB = async (mediaId) => {
   try {
     const db = await initDB();
-    return new Promise((resolve, reject) => {
+    const raw = await new Promise((resolve, reject) => {
       const transaction = db.transaction([STORE_NAME], 'readonly');
       const store = transaction.objectStore(STORE_NAME);
       const request = store.get(mediaId);
 
       request.onsuccess = () => {
-        resolve(request.result || null);
+        resolve(request.result ?? null);
       };
 
       request.onerror = () => {
         reject(request.error);
       };
     });
+
+    const blob = normalizeStoredEntryToBlob(raw);
+    if (blob) return blob;
+
+    if (raw != null) {
+      try {
+        const transaction = db.transaction([STORE_NAME], 'readwrite');
+        transaction.objectStore(STORE_NAME).delete(mediaId);
+      } catch {
+        // ignore
+      }
+    }
+    return null;
   } catch (error) {
-    console.error('Error reading from IndexedDB:', error);
+    console.warn('Error reading from IndexedDB:', error);
     return null;
   }
 };
 
 /**
- * Store blob in IndexedDB
+ * Store image bytes in IndexedDB (best-effort; never throws).
+ * Uses ArrayBuffer + MIME type because raw Blob puts fail on some mobile browsers.
  * @param {string} mediaId - The media ID
  * @param {Blob} blob - The blob to store
  */
 const storeBlobInDB = async (mediaId, blob) => {
+  let payload;
+  try {
+    const buffer = await blob.arrayBuffer();
+    payload = {
+      v: STORED_IMAGE_V,
+      type: blob.type || 'application/octet-stream',
+      buffer,
+    };
+  } catch (error) {
+    console.warn('IndexedDB image cache: could not read blob for storage:', error);
+    return;
+  }
+
   try {
     const db = await initDB();
-    return new Promise((resolve, reject) => {
+    await new Promise((resolve) => {
       const transaction = db.transaction([STORE_NAME], 'readwrite');
       const store = transaction.objectStore(STORE_NAME);
-      const request = store.put(blob, mediaId);
+      const request = store.put(payload, mediaId);
 
-      request.onsuccess = () => {
+      request.onsuccess = () => resolve();
+
+      request.onerror = () => {
+        console.warn('IndexedDB image cache put failed:', request.error);
         resolve();
       };
 
-      request.onerror = () => {
-        reject(request.error);
+      transaction.onerror = () => {
+        console.warn('IndexedDB image cache transaction failed:', transaction.error);
+        resolve();
       };
+
+      transaction.onabort = () => resolve();
     });
   } catch (error) {
-    console.error('Error writing to IndexedDB:', error);
-    // Don't throw - caching failure shouldn't break the app
+    console.warn('IndexedDB image cache write failed:', error);
   }
 };
 

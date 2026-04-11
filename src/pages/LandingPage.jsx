@@ -41,6 +41,7 @@ import ContactLinksGrid from '../components/ContactLinksGrid';
 import BookingPageContent from './BookingPage';
 import { loadImageWithCache } from '../utils/imageCache';
 import { useResponsiveLayout } from '../utils/useResponsiveLayout';
+import LandingPageLoader from '../components/landing/LandingPageLoader';
 
 /** Ensure external footer URLs open correctly (prepend https if scheme missing). */
 function normalizeFooterHref(url) {
@@ -80,6 +81,20 @@ const areAllPricesZero = (prices) => {
   return priceValues.length > 0 && priceValues.every(price => price === 0 || price === null || price === undefined);
 };
 
+/** Portrait viewport w/h; ~2/3 ≈ 0.667; band includes typical 9:16 (~0.56). Outside → scroll mode. */
+const MOBILE_HERO_ASPECT_MIN = 0.52;
+const MOBILE_HERO_ASPECT_MAX = 0.78;
+
+function isNearTwoThreeViewport() {
+  if (typeof window === 'undefined') return true;
+  const vv = window.visualViewport;
+  const w = vv ? vv.width : window.innerWidth;
+  const h = vv ? vv.height : window.innerHeight;
+  if (!h) return true;
+  const r = w / h;
+  return r >= MOBILE_HERO_ASPECT_MIN && r <= MOBILE_HERO_ASPECT_MAX;
+}
+
 const LandingPage = () => {
   const { t } = useTranslation();
   const navigate = useNavigate();
@@ -100,6 +115,10 @@ const LandingPage = () => {
   const [welcomeLoading, setWelcomeLoading] = useState(true);
   const [welcomeError, setWelcomeError] = useState(null);
   const [heroImagesReady, setHeroImagesReady] = useState(false);
+  /** Mobile: true = fill #hero with cover; false = horizontal scroll (viewport aspect outside 2:3 band). */
+  const [heroViewportFillMode, setHeroViewportFillMode] = useState(true);
+  /** Scroll mode: min width for inner track = max(band width, (2/3)*band height). */
+  const [scrollTrackMinWidthPx, setScrollTrackMinWidthPx] = useState(0);
 
   // Image URLs state
   const [welcomeRightImageUrl, setWelcomeRightImageUrl] = useState(null);
@@ -478,74 +497,254 @@ const LandingPage = () => {
     };
   }, [isPageReady, location.hash]);
 
+  useEffect(() => {
+    if (!isMobileImage) return;
+    const update = () => setHeroViewportFillMode(isNearTwoThreeViewport());
+    update();
+    window.addEventListener('resize', update);
+    const vv = window.visualViewport;
+    if (vv) {
+      vv.addEventListener('resize', update);
+      vv.addEventListener('scroll', update);
+    }
+    return () => {
+      window.removeEventListener('resize', update);
+      if (vv) {
+        vv.removeEventListener('resize', update);
+        vv.removeEventListener('scroll', update);
+      }
+    };
+  }, [isMobileImage]);
+
+  useEffect(() => {
+    if (!isMobileImage || heroViewportFillMode || !isPageReady) return;
+    const node = heroRef.current;
+    if (!node) return;
+    const apply = () => {
+      const { clientWidth, clientHeight } = node;
+      const twoThreeWidthAtFullHeight = (clientHeight * 2) / 3;
+      setScrollTrackMinWidthPx(Math.max(clientWidth, twoThreeWidthAtFullHeight));
+    };
+    apply();
+    const ro = new ResizeObserver(apply);
+    ro.observe(node);
+    return () => ro.disconnect();
+  }, [isMobileImage, heroViewportFillMode, isPageReady]);
+
   const landingFooterLinks = parseFooterLinksFromWelcome(welcomeData);
 
   if (!isPageReady) {
-    return <Box sx={{ minHeight: '100vh', bgcolor: '#ffffff' }} />;
+    return <LandingPageLoader />;
   }
 
   return (
     <Box sx={{ bgcolor: heroRightColour }}>
-      {/* Hero Section */}
-      <Box
-        ref={heroRef}
-        id="hero"
-        component="section"
-        sx={{
-          paddingTop: '64px',
-          minHeight: { xs: 'calc(64px + ((100vh - 64px) * 0.85))', md: '100vh' },
-          display: 'flex',
-          alignItems: 'stretch',
-          position: 'relative',
-          overflow: 'hidden',
-          width: '100%',
-          marginTop: 0,
-          // Hard split: left half matches left frame, right half matches right frame
-          background: `linear-gradient(to right, ${heroLeftColour} 50%, ${heroRightColour} 50%)`,
-        }}
-      >
-        {/* ─── Mobile layout ─── */}
-        {isMobileImage ? (
+      {/* Hero: desktop = single section; mobile = viewport strip 85% #hero + 15% #hero-book-cta */}
+      {isMobileImage ? (
+        <Box
+          sx={{
+            height: '100dvh',
+            maxHeight: '100dvh',
+            minHeight: '100vh',
+            paddingTop: '64px',
+            boxSizing: 'border-box',
+            display: 'flex',
+            flexDirection: 'column',
+            overflow: 'hidden',
+            width: '100%',
+            position: 'relative',
+          }}
+        >
           <Box
+            ref={heroRef}
+            component="section"
+            id="hero"
             sx={{
-              width: '100%',
-              height: 'calc((100vh - 64px) * 0.85)',
+              flex: '0 0 85%',
+              flexGrow: 0,
+              flexShrink: 0,
+              flexBasis: '85%',
+              minHeight: 0,
+              maxHeight: '85%',
               display: 'flex',
-              alignItems: 'center',
+              flexDirection: 'column',
+              alignItems: 'stretch',
+              justifyContent: 'flex-start',
+              overflowX: heroViewportFillMode ? 'hidden' : 'auto',
+              overflowY: 'hidden',
+              WebkitOverflowScrolling: heroViewportFillMode ? undefined : 'touch',
+              width: '100%',
+              background: `linear-gradient(to right, ${heroLeftColour} 50%, ${heroRightColour} 50%)`,
+            }}
+          >
+            {heroViewportFillMode ? (
+              /* Fill band: cover entire #hero area (viewport aspect near 2:3) */
+              <Box
+                sx={{
+                  flex: 1,
+                  minHeight: 0,
+                  width: '100%',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  boxSizing: 'border-box',
+                  px: { xs: 0, sm: 2 },
+                }}
+              >
+                <Box
+                  sx={{
+                    flex: 1,
+                    minHeight: 0,
+                    width: '100%',
+                    position: 'relative',
+                    overflow: 'hidden',
+                    backgroundColor: heroRightColour,
+                  }}
+                >
+                  {heroMobileImage ? (
+                    <Box
+                      component="img"
+                      src={heroMobileImage}
+                      alt="Hero"
+                      sx={{
+                        position: 'absolute',
+                        inset: 0,
+                        width: '100%',
+                        height: '100%',
+                        objectFit: 'cover',
+                        objectPosition: 'center top',
+                        zIndex: 1,
+                      }}
+                    />
+                  ) : (
+                    <Box
+                      sx={{
+                        position: 'absolute',
+                        inset: 0,
+                        background: (theme) =>
+                          `linear-gradient(135deg, ${theme.palette.primary.main} 0%, ${theme.palette.primary.dark} 100%)`,
+                      }}
+                    />
+                  )}
+                </Box>
+              </Box>
+            ) : (
+              /* Anomaly aspect: horizontal scroll; track minWidth = max(band w, (2/3)*band h) */
+              <Box
+                sx={{
+                  flex: 1,
+                  minHeight: 0,
+                  width: '100%',
+                  height: '100%',
+                  boxSizing: 'border-box',
+                  px: { xs: 0, sm: 2 },
+                  display: 'flex',
+                  flexDirection: 'column',
+                }}
+              >
+                <Box
+                  sx={{
+                    height: '100%',
+                    minHeight: 0,
+                    minWidth: scrollTrackMinWidthPx > 0 ? `${scrollTrackMinWidthPx}px` : '100%',
+                    position: 'relative',
+                    flexShrink: 0,
+                    alignSelf: 'flex-start',
+                    backgroundColor: heroRightColour,
+                  }}
+                >
+                  {heroMobileImage ? (
+                    <Box
+                      component="img"
+                      src={heroMobileImage}
+                      alt="Hero"
+                      sx={{
+                        position: 'absolute',
+                        inset: 0,
+                        width: '100%',
+                        height: '100%',
+                        objectFit: 'cover',
+                        objectPosition: 'center top',
+                        zIndex: 1,
+                      }}
+                    />
+                  ) : (
+                    <Box
+                      sx={{
+                        position: 'absolute',
+                        inset: 0,
+                        background: (theme) =>
+                          `linear-gradient(135deg, ${theme.palette.primary.main} 0%, ${theme.palette.primary.dark} 100%)`,
+                      }}
+                    />
+                  )}
+                </Box>
+              </Box>
+            )}
+          </Box>
+          <Box
+            component="section"
+            id="hero-book-cta"
+            sx={{
+              flex: '0 0 15%',
+              flexGrow: 0,
+              flexShrink: 0,
+              flexBasis: '15%',
+              minHeight: 0,
+              maxHeight: '15%',
+              width: '100%',
+              display: 'flex',
               justifyContent: 'center',
-              position: 'relative',
+              alignItems: 'center',
+              py: { xs: 0.5, sm: 1 },
+              px: { xs: 0, sm: 2 },
+              boxSizing: 'border-box',
+              bgcolor: 'background.default',
               overflow: 'hidden',
             }}
           >
-            {/* Mobile photo – fills the frame, ratio preserved by cover */}
-            {heroMobileImage ? (
-              <Box
-                component="img"
-                src={heroMobileImage}
-                alt="Hero"
-                sx={{
-                  position: 'absolute',
-                  inset: 0,
-                  width: '100%',
-                  height: '100%',
-                  objectFit: 'cover',
-                  objectPosition: 'center top',
-                  zIndex: 1,
-                }}
-              />
-            ) : (
-              <Box
-                sx={{
-                  position: 'absolute',
-                  inset: 0,
-                  background: (theme) => `linear-gradient(135deg, ${theme.palette.primary.main} 0%, ${theme.palette.primary.dark} 100%)`,
-                }}
-              />
-            )}
+            <Button
+              variant="contained"
+              onClick={() => scrollToSection(servicesRef)}
+              sx={{
+                px: { xs: 4, sm: 6 },
+                py: { xs: 1, sm: 1.4 },
+                fontSize: { xs: '0.9rem', sm: '1.05rem' },
+                borderRadius: 999,
+                textTransform: 'none',
+                fontWeight: 600,
+                boxShadow: 4,
+                bgcolor: heroButtonColour,
+                color: heroButtonTextColour,
+                maxWidth: '100%',
+                '&:hover': {
+                  bgcolor: heroButtonColour,
+                  filter: 'brightness(0.95)',
+                },
+              }}
+            >
+              {t('landing.hero.bookSession')}
+            </Button>
           </Box>
-        ) : (
-          /* ─── Desktop layout: two side-by-side frames ─── */
-          /* Outer box: full-width, teal bg fills sides beyond 1920px */
+        </Box>
+      ) : (
+        <Box
+          ref={heroRef}
+          id="hero"
+          component="section"
+          sx={{
+            paddingTop: '64px',
+            minHeight: '100vh',
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'stretch',
+            position: 'relative',
+            overflow: 'hidden',
+            width: '100%',
+            marginTop: 0,
+            background: `linear-gradient(to right, ${heroLeftColour} 50%, ${heroRightColour} 50%)`,
+          }}
+        >
+          {/* ─── Desktop layout: two side-by-side frames ─── */}
           <Box
             sx={{
               width: '100%',
@@ -565,14 +764,17 @@ const LandingPage = () => {
                 display: 'flex',
                 flexDirection: 'row',
                 alignItems: 'stretch',
+                justifyContent: 'center',
               }}
             >
               {/* LEFT FRAME – background image when set, with Book a Session button centered */}
               <Box
                 sx={{
-                  flex: '0 0 50%',
-                  width: '50%',
-                  height: '100%',
+                  flex: '0 0 auto',
+                  width: 'min(50%, calc((100vh - 64px) * 5 / 6))',
+                  height: 'auto',
+                  aspectRatio: '5 / 6',
+                  marginRight: '50px',
                   position: 'relative',
                   display: 'flex',
                   alignItems: 'center',
@@ -626,9 +828,11 @@ const LandingPage = () => {
               {/* RIGHT FRAME – personal photo (welcomeRightMediaId) */}
               <Box
                 sx={{
-                  flex: '0 0 50%',
-                  width: '50%',
-                  height: '100%',
+                  flex: '0 0 auto',
+                  width: 'min(50%, calc((100vh - 64px) * 5 / 6))',
+                  height: 'auto',
+                  aspectRatio: '5 / 6',
+                  marginLeft: '50px',
                   position: 'relative',
                   overflow: 'hidden',
                   background: heroRightColour,
@@ -662,38 +866,6 @@ const LandingPage = () => {
               </Box>
             </Box>
           </Box>
-        )}
-      </Box>
-
-      {/* Primary Book a Session CTA section for mobile, placed after hero images */}
-      {isMobileImage && (
-        <Box
-          sx={{
-            minHeight: 'calc((100vh - 64px) * 0.15)',
-            px: 2,
-            display: 'flex',
-            justifyContent: 'center',
-            alignItems: 'center',
-            boxSizing: 'border-box',
-            backgroundColor: 'background.default',
-          }}
-        >
-          <Button
-            variant="contained"
-            color="primary"
-            onClick={() => scrollToSection(servicesRef)}
-            sx={{
-              px: { xs: 4, sm: 6 },
-              py: { xs: 1.4, sm: 1.4 },
-              fontSize: { xs: '0.95rem', sm: '1.05rem' },
-              borderRadius: 999,
-              textTransform: 'none',
-              fontWeight: 600,
-              boxShadow: 4,
-            }}
-          >
-            {t('landing.hero.bookSession')}
-          </Button>
         </Box>
       )}
 
