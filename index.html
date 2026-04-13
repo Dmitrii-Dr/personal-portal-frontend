@@ -3,6 +3,18 @@
 
 <head>
   <meta charset="UTF-8" />
+  <script>
+    (function () {
+      /* Warm visit in this tab: skip #initial-app-loader on first paint (key set in main.jsx). */
+      try {
+        if (sessionStorage.getItem('__portalShellBooted') === '1') {
+          document.documentElement.classList.add('portal-shell-skip');
+        }
+      } catch (e) {}
+    })();
+  </script>
+
+  <link rel="preload" href="/loader-psi.svg" as="image" type="image/svg+xml" />
 
   <!-- Favicon – best-practice multi-format set -->
   <link rel="icon" type="image/png" sizes="32x32" href="/favicon/favicon-32x32.png?v=3" />
@@ -24,10 +36,17 @@
     }
 
     /*
-      Pre-React shell loader: shown until the JS bundle runs and React mounts.
-      Vector ψ: /loader-psi.svg — keep in sync with LandingPageLoader.jsx.
+      Pre-React shell loader: sibling of #root. Dismissed in main.jsx (opacity 0, then remove next frame).
+      Mark: single img public/loader-psi.svg (teal circle + ψ) — same file as LandingPageLoader.jsx.
     */
+    html.portal-shell-skip #initial-app-loader {
+      display: none !important;
+    }
+
     #initial-app-loader {
+      position: fixed;
+      inset: 0;
+      z-index: 10000;
       min-height: 100vh;
       width: 100%;
       margin: 0;
@@ -57,37 +76,32 @@
     #initial-app-loader .initial-app-loader__coin {
       width: 96px;
       height: 96px;
-      border-radius: 50%;
-      background-color: #2c5f5f;
-      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.12);
       transform-style: preserve-3d;
       display: flex;
       align-items: center;
       justify-content: center;
       user-select: none;
-      opacity: 0;
-      transition: opacity 0.2s ease-out;
-      animation: none;
-    }
-
-    #initial-app-loader .initial-app-loader__coin.initial-app-loader__coin--ready {
-      opacity: 1;
+      will-change: transform;
       animation: initial-app-loader-coin-y 1.35s linear infinite;
+      animation-fill-mode: both;
+      /* animation-delay set inline to match LandingPageLoader (phase sync with performance.now() % 1350) */
     }
 
-    #initial-app-loader .initial-app-loader__psi {
-      width: 56px;
-      height: 56px;
+    #initial-app-loader .initial-app-loader__mark {
+      width: 96px;
+      height: 96px;
       display: block;
+      border-radius: 50%;
+      filter: drop-shadow(0 2px 8px rgba(0, 0, 0, 0.12));
     }
 
     @keyframes initial-app-loader-coin-y {
       from {
-        transform: rotateY(0deg);
+        transform: rotateY(0deg) translateZ(0.1px);
       }
 
       to {
-        transform: rotateY(360deg);
+        transform: rotateY(360deg) translateZ(0.1px);
       }
     }
 
@@ -97,24 +111,24 @@
       font-size: 0.875rem;
       font-weight: 500;
       letter-spacing: 0.02em;
+      line-height: 1.43;
       color: rgba(0, 0, 0, 0.6);
     }
   </style>
 </head>
 
 <body>
-  <div id="root">
-    <div id="initial-app-loader" role="status" aria-busy="true" aria-live="polite">
-      <div class="initial-app-loader__inner">
-        <div class="initial-app-loader__perspective" aria-hidden="true">
-          <div class="initial-app-loader__coin">
-            <img class="initial-app-loader__psi" src="/loader-psi.svg" width="56" height="56" alt="" />
-          </div>
+  <div id="initial-app-loader" role="status" aria-busy="true" aria-live="polite">
+    <div class="initial-app-loader__inner">
+      <div class="initial-app-loader__perspective" aria-hidden="true">
+        <div class="initial-app-loader__coin">
+          <img class="initial-app-loader__mark" src="/loader-psi.svg" width="96" height="96" alt="" />
         </div>
-        <p id="initial-app-loader-label" class="initial-app-loader__label">Loading…</p>
       </div>
+      <p id="initial-app-loader-label" class="initial-app-loader__label">Loading…</p>
     </div>
   </div>
+  <div id="root"></div>
   <script>
     (function () {
       /* Only source for loader copy — React reads window.__portalLoadingLabel (see LandingPageLoader.jsx). */
@@ -137,16 +151,11 @@
       var label = document.getElementById('initial-app-loader-label');
       if (label) label.textContent = resolvedLoading;
 
+      /* Same phase rule as LandingPageLoader.jsx — avoids static frame + spin reset at React handoff */
+      var COIN_FLIP_MS = 1350;
       var coin = document.querySelector('.initial-app-loader__coin');
-      var img = document.querySelector('.initial-app-loader__psi');
-      if (!coin || !img) return;
-      function showCoin() {
-        coin.classList.add('initial-app-loader__coin--ready');
-      }
-      if (img.complete && img.naturalWidth > 0) showCoin();
-      else {
-        img.addEventListener('load', showCoin);
-        img.addEventListener('error', showCoin);
+      if (coin) {
+        coin.style.animationDelay = '-' + (performance.now() % COIN_FLIP_MS) + 'ms';
       }
     })();
   </script>

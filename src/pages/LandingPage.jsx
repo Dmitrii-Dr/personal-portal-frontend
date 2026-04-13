@@ -29,6 +29,7 @@ import {
   Menu,
   Tooltip,
   Link,
+  Fade,
 } from '@mui/material';
 import CloseIcon from '@mui/icons-material/Close';
 import ArrowBackIosIcon from '@mui/icons-material/ArrowBackIos';
@@ -89,6 +90,15 @@ const areAllPricesZero = (prices) => {
 const MOBILE_HERO_ASPECT_MIN = 0.36;
 const MOBILE_HERO_ASPECT_MAX = 0.92;
 
+/** Minimum time the landing loader stays visible after mount (ms), even if data is ready sooner. */
+const MIN_LANDING_LOADER_MS = 1500;
+
+/** Must match `PORTAL_SHELL_BOOTED_SESSION_KEY` in main.jsx / index.html — set after first shell dismiss. */
+const PORTAL_SHELL_BOOTED_SESSION_KEY = '__portalShellBooted';
+
+/** Set when landing first reached displayReady in this tab — suppresses full-screen coin loader on return to `/`. */
+const LANDING_VISITED_SESSION_KEY = '__portalLandingVisited';
+
 function isNearTwoThreeViewport() {
   if (typeof window === 'undefined') return true;
   const vv = window.visualViewport;
@@ -119,6 +129,28 @@ const LandingPage = () => {
   const [welcomeLoading, setWelcomeLoading] = useState(true);
   const [welcomeError, setWelcomeError] = useState(null);
   const [heroImagesReady, setHeroImagesReady] = useState(false);
+  const landingLoaderStartedAtRef = useRef(performance.now());
+  /** False after first successful boot in this tab → skip MIN_LANDING_LOADER_MS on warm reloads. */
+  const applyMinLandingLoaderMsRef = useRef(
+    (() => {
+      try {
+        return sessionStorage.getItem(PORTAL_SHELL_BOOTED_SESSION_KEY) !== '1';
+      } catch {
+        return true;
+      }
+    })()
+  );
+  /** First visit to `/` in this tab: show LandingPageLoader; later client navigations use a plain hold screen. */
+  const showFullScreenLandingLoaderRef = useRef(
+    (() => {
+      try {
+        return sessionStorage.getItem(LANDING_VISITED_SESSION_KEY) !== '1';
+      } catch {
+        return true;
+      }
+    })()
+  );
+  const [displayReady, setDisplayReady] = useState(false);
   /** Mobile: true = fill #hero with cover; false = horizontal scroll (viewport aspect outside 2:3 band). */
   const [heroViewportFillMode, setHeroViewportFillMode] = useState(true);
   /** Scroll mode: min width for inner track = max(band width, (2/3)*band height). */
@@ -477,11 +509,35 @@ const LandingPage = () => {
 
   const isPageReady = !welcomeLoading && heroImagesReady;
 
+  useEffect(() => {
+    if (!isPageReady) {
+      setDisplayReady(false);
+      return;
+    }
+    if (!applyMinLandingLoaderMsRef.current) {
+      setDisplayReady(true);
+      return;
+    }
+    const elapsed = performance.now() - landingLoaderStartedAtRef.current;
+    const remaining = Math.max(0, MIN_LANDING_LOADER_MS - elapsed);
+    const id = window.setTimeout(() => setDisplayReady(true), remaining);
+    return () => clearTimeout(id);
+  }, [isPageReady]);
+
+  useEffect(() => {
+    if (!displayReady) return;
+    try {
+      sessionStorage.setItem(LANDING_VISITED_SESSION_KEY, '1');
+    } catch {
+      /* ignore quota / private mode */
+    }
+  }, [displayReady]);
+
   // Hash scroll must run after full content exists. AppLayout used to scroll at 100ms,
-  // but #contact (and other sections) are not mounted until isPageReady — so direct
+  // but #contact (and other sections) are not mounted until displayReady — so direct
   // /#section loads on slow networks never scrolled.
   useEffect(() => {
-    if (!isPageReady || !location.hash) return;
+    if (!displayReady || !location.hash) return;
     const sectionId = location.hash.slice(1);
     if (!sectionId) return;
 
@@ -499,7 +555,7 @@ const LandingPage = () => {
       cancelAnimationFrame(rafId);
       if (timeoutId != null) clearTimeout(timeoutId);
     };
-  }, [isPageReady, location.hash]);
+  }, [displayReady, location.hash]);
 
   useEffect(() => {
     if (!isMobileImage) return;
@@ -521,7 +577,7 @@ const LandingPage = () => {
   }, [isMobileImage]);
 
   useEffect(() => {
-    if (!isMobileImage || heroViewportFillMode || !isPageReady) return;
+    if (!isMobileImage || heroViewportFillMode || !displayReady) return;
     const node = heroRef.current;
     if (!node) return;
     const apply = () => {
@@ -533,15 +589,13 @@ const LandingPage = () => {
     const ro = new ResizeObserver(apply);
     ro.observe(node);
     return () => ro.disconnect();
-  }, [isMobileImage, heroViewportFillMode, isPageReady]);
+  }, [isMobileImage, heroViewportFillMode, displayReady]);
 
   const landingFooterLinks = parseFooterLinksFromWelcome(welcomeData);
 
-  if (!isPageReady) {
-    return <LandingPageLoader />;
-  }
-
   return (
+    <>
+      {displayReady && (
     <Box sx={{ bgcolor: heroRightColour }}>
       {/* Hero: desktop = single section; mobile = viewport strip 85% #hero + 15% #hero-book-cta */}
       {isMobileImage ? (
@@ -2155,6 +2209,34 @@ const LandingPage = () => {
         </Container>
       </Box>
     </Box>
+      )}
+      {!displayReady &&
+        (showFullScreenLandingLoaderRef.current ? (
+          <Fade in={!displayReady} timeout={420} unmountOnExit appear={false}>
+            <Box
+              sx={{
+                position: 'fixed',
+                inset: 0,
+                zIndex: (theme) => theme.zIndex.modal + 2,
+              }}
+            >
+              <LandingPageLoader />
+            </Box>
+          </Fade>
+        ) : (
+          <Box
+            aria-hidden
+            sx={{
+              position: 'fixed',
+              inset: 0,
+              zIndex: (theme) => theme.zIndex.modal + 2,
+              minHeight: '100vh',
+              width: '100%',
+              bgcolor: '#F0F7F7',
+            }}
+          />
+        ))}
+    </>
   );
 };
 

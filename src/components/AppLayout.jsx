@@ -406,7 +406,7 @@ const AppLayout = ({ children }) => {
     }
   };
 
-  // Hash → section scroll for /#about etc. is handled in LandingPage after isPageReady,
+  // Hash → section scroll for /#about etc. is handled in LandingPage after displayReady,
   // when section nodes exist (see LandingPage.jsx).
 
   // Handle login modal
