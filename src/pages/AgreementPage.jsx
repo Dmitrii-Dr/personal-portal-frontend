@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { Box, Typography, Container, Paper, CircularProgress, Alert } from '@mui/material';
+import { Box, Typography, CircularProgress, Alert } from '@mui/material';
 import BlogDocumentViewer from '../components/blog-editor/BlogDocumentViewer';
 
 const isJsonContent = (content) => {
@@ -25,7 +25,11 @@ function renderAgreementBody(content) {
     return (
         <Typography
             component="div"
-            sx={{ whiteSpace: 'pre-wrap' }}
+            sx={{
+                whiteSpace: 'pre-wrap',
+                wordBreak: 'break-word',
+                overflowWrap: 'anywhere',
+            }}
             dangerouslySetInnerHTML={{ __html: content }}
         />
     );
@@ -91,32 +95,47 @@ const AgreementPage = () => {
 
     if (loading) {
         return (
-            <Container maxWidth="md" sx={{ py: 4, display: 'flex', justifyContent: 'center', alignItems: 'center', flexDirection: 'column', gap: 2 }}>
+            <Box sx={{ py: { xs: 1, sm: 2 }, display: 'flex', justifyContent: 'center', alignItems: 'center', flexDirection: 'column', gap: 2, minHeight: '35vh' }}>
                 <CircularProgress />
                 <Typography variant="body2" color="text.secondary">
                     {t('agreementPage.loading')}
                 </Typography>
-            </Container>
+            </Box>
         );
     }
 
     if (hasLoadError || !agreement) {
         return (
-            <Container maxWidth="md" sx={{ py: 4 }}>
+            <Box sx={{ py: { xs: 1, sm: 2 }, maxWidth: 800, mx: 'auto' }}>
                 <Alert severity="warning">{t('agreementPage.noSuchDocument')}</Alert>
-            </Container>
+            </Box>
         );
     }
 
     return (
-        <Container maxWidth="md" sx={{ py: 4 }}>
-            <Paper sx={{ p: 4 }}>
-                <Typography variant="h4" component="h1" gutterBottom>
-                    {agreement.name}
-                </Typography>
-                <Box sx={{ mt: 2 }}>{renderAgreementBody(agreement.content)}</Box>
-            </Paper>
-        </Container>
+        <Box sx={{ py: { xs: 1, sm: 2 }, maxWidth: 800, mx: 'auto' }}>
+            <Typography variant="h4" component="h1" gutterBottom sx={{ mb: 2 }}>
+                {agreement.name}
+            </Typography>
+            <Box
+                sx={{
+                    '& img': {
+                        maxWidth: '100%',
+                        height: 'auto',
+                    },
+                    '& table': {
+                        display: 'block',
+                        width: '100%',
+                        overflowX: 'auto',
+                    },
+                    '& pre': {
+                        overflow: 'auto',
+                    },
+                }}
+            >
+                {renderAgreementBody(agreement.content)}
+            </Box>
+        </Box>
     );
 };
 

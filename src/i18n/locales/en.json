@@ -486,6 +486,7 @@
       "status": "Status",
       "clientName": "Client Name",
       "email": "Email",
+      "phoneNumber": "Phone Number",
       "endTime": "End Time",
       "createdAt": "Created At",
       "duration": "Duration",

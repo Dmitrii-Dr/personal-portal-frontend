@@ -1840,6 +1840,14 @@ const BookingsManagement = () => {
                     </Grid>
                     <Grid item xs={12} sm={6}>
                       <Typography variant="body2" color="text.secondary">
+                        {t('admin.bookingsManagement.phoneNumber')}
+                      </Typography>
+                      <Typography variant="body1" gutterBottom>
+                        {selectedBookingInfo.clientPhoneNumber || 'N/A'}
+                      </Typography>
+                    </Grid>
+                    <Grid item xs={12} sm={6}>
+                      <Typography variant="body2" color="text.secondary">
                         {t('admin.bookingsManagement.endTime')}
                       </Typography>
                       <Typography variant="body1" gutterBottom>
