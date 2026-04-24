@@ -1,4 +1,4 @@
-import React, { useRef, useState, useEffect, useMemo } from 'react';
+import React, { useRef, useState, useEffect, useLayoutEffect, useMemo, useCallback } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import {
@@ -34,6 +34,8 @@ import {
 import CloseIcon from '@mui/icons-material/Close';
 import ArrowBackIosIcon from '@mui/icons-material/ArrowBackIos';
 import ArrowForwardIosIcon from '@mui/icons-material/ArrowForwardIos';
+import KeyboardArrowLeftRoundedIcon from '@mui/icons-material/KeyboardArrowLeftRounded';
+import KeyboardArrowRightRoundedIcon from '@mui/icons-material/KeyboardArrowRightRounded';
 import KeyboardArrowDownIcon from '@mui/icons-material/KeyboardArrowDown';
 import dayjs from 'dayjs';
 import axios from 'axios';
@@ -182,9 +184,11 @@ const LandingPage = () => {
   const [reviewCarouselIndex, setReviewCarouselIndex] = useState(0);
   const imagesToShow = isMobile ? 1 : 3;
   const showArrows = reviewMediaIds.length > imagesToShow;
-  const [sessionTypesCarouselIndex, setSessionTypesCarouselIndex] = useState(0);
   const mobileServicesScrollRef = useRef(null);
   const [mobileServicesAtBottom, setMobileServicesAtBottom] = useState(false);
+  const desktopServicesScrollRef = useRef(null);
+  const [desktopServicesCanScrollLeft, setDesktopServicesCanScrollLeft] = useState(false);
+  const [desktopServicesCanScrollRight, setDesktopServicesCanScrollRight] = useState(false);
   const educationRef = useRef(null);
 
   // Session types state
@@ -233,6 +237,70 @@ const LandingPage = () => {
       return 0;
     });
   }, [sessionTypes, welcomeData]);
+
+  const updateDesktopServicesScrollState = useCallback(() => {
+    const el = desktopServicesScrollRef.current;
+    if (!el) {
+      setDesktopServicesCanScrollLeft(false);
+      setDesktopServicesCanScrollRight(false);
+      return;
+    }
+
+    const maxScrollLeft = el.scrollWidth - el.clientWidth;
+    setDesktopServicesCanScrollLeft(el.scrollLeft > 4);
+    setDesktopServicesCanScrollRight(maxScrollLeft - el.scrollLeft > 4);
+  }, []);
+
+  // Ref callback: fires the moment the scroll container is attached to the DOM.
+  // This guarantees measurement happens as soon as the element exists, regardless
+  // of async session-type loading — no effect dependency timing issues.
+  const desktopScrollRefCallback = useCallback((el) => {
+    desktopServicesScrollRef.current = el;
+    if (!el) {
+      setDesktopServicesCanScrollLeft(false);
+      setDesktopServicesCanScrollRight(false);
+      return;
+    }
+    const maxScrollLeft = el.scrollWidth - el.clientWidth;
+    setDesktopServicesCanScrollLeft(el.scrollLeft > 4);
+    setDesktopServicesCanScrollRight(maxScrollLeft - el.scrollLeft > 4);
+  }, []);
+
+  const scrollDesktopServices = useCallback((direction) => {
+    const el = desktopServicesScrollRef.current;
+    if (!el) return;
+    const cardWidth = 364 + 24; // card width + gap
+    el.scrollBy({ left: direction * cardWidth, behavior: 'smooth' });
+  }, []);
+
+  const desktopScrollHintDoneRef = useRef(false);
+
+  // Resize handler only — initial measurement is handled by desktopScrollRefCallback.
+  useLayoutEffect(() => {
+    if (isMobile) return undefined;
+
+    window.addEventListener('resize', updateDesktopServicesScrollState);
+    return () => {
+      window.removeEventListener('resize', updateDesktopServicesScrollState);
+    };
+  }, [isMobile, updateDesktopServicesScrollState]);
+
+  useEffect(() => {
+    if (isMobile || orderedSessionTypes.length <= 1 || desktopScrollHintDoneRef.current) return;
+    const el = desktopServicesScrollRef.current;
+    if (!el) return;
+    const maxScrollLeft = el.scrollWidth - el.clientWidth;
+    if (maxScrollLeft <= 4) return;
+    desktopScrollHintDoneRef.current = true;
+    const t1 = setTimeout(() => {
+      el.scrollBy({ left: 72, behavior: 'smooth' });
+      const t2 = setTimeout(() => {
+        el.scrollBy({ left: -72, behavior: 'smooth' });
+      }, 650);
+      return () => clearTimeout(t2);
+    }, 900);
+    return () => clearTimeout(t1);
+  }, [isMobile, orderedSessionTypes.length]);
 
   // Blog articles state
   const [blogArticles, setBlogArticles] = useState([]);
@@ -1423,28 +1491,58 @@ const LandingPage = () => {
                       {orderedSessionTypes.map((sessionType) => (
                         <Grid item xs={12} key={sessionType.id || sessionType.sessionTypeId} sx={{ display: 'flex' }}>
                           <Card sx={{ width: '100%', display: 'flex', flexDirection: 'column' }}>
-                            <CardContent sx={{ flexGrow: 1, display: 'flex', flexDirection: 'column', p: 1.5, minHeight: 170, position: 'relative' }}>
-                              <Box sx={{ mb: 0.75, pr: 16 }}>
+                            <CardContent
+                              sx={{
+                                flexGrow: 1,
+                                display: 'flex',
+                                flexDirection: 'column',
+                                p: 1.5,
+                                minHeight: { xs: 150, sm: 170 },
+                              }}
+                            >
+                              <Box sx={{ mb: 0.5 }}>
                                 <Typography
                                   variant="body1"
                                   component="h3"
-                                  sx={{ fontWeight: 600, lineHeight: 1.4 }}
+                                  sx={{
+                                    fontWeight: 600,
+                                    lineHeight: 1.35,
+                                    fontSize: {
+                                      xs: truncateText(sessionType.name, 100).length > 70
+                                        ? 'clamp(0.86rem, 2.8vw, 1rem)'
+                                        : 'clamp(0.94rem, 3.3vw, 1.08rem)',
+                                      sm: '1rem',
+                                    },
+                                    overflowWrap: 'anywhere',
+                                  }}
                                 >
-                                  {sessionType.name}
+                                  {truncateText(sessionType.name, 100)}
                                 </Typography>
                               </Box>
-                              <Box
-                                sx={{
-                                  position: 'absolute',
-                                  bottom: 8,
-                                  right: 12,
-                                  display: 'flex',
-                                  flexDirection: 'row',
-                                  alignItems: 'flex-end',
-                                  gap: 0.5,
-                                  zIndex: 1,
-                                }}
-                              >
+                              <Box sx={{ minHeight: 48, mb: 0.75 }}>
+                                <Typography
+                                  variant="body2"
+                                  color="text.secondary"
+                                  sx={{
+                                    lineHeight: 1.35,
+                                    fontSize: {
+                                      xs: truncateText(sessionType.description, 100).length > 85
+                                        ? 'clamp(0.8rem, 2.6vw, 0.9rem)'
+                                        : 'clamp(0.86rem, 3vw, 0.96rem)',
+                                      sm: '0.875rem',
+                                    },
+                                    overflowWrap: 'anywhere',
+                                  }}
+                                >
+                                  {truncateText(sessionType.description, 100)}
+                                </Typography>
+                              </Box>
+                            </CardContent>
+                            <CardActions
+                              disableSpacing
+                              sx={{ p: 1.25, pt: 0.25, flexDirection: 'column', alignItems: 'stretch', gap: 0.75 }}
+                            >
+                              <Box sx={{ width: '100%', display: 'flex', flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'flex-end', gap: 0.5 }}>
                                 <Chip
                                   label={`${sessionType.durationMinutes || 60} ${t('landing.booking.min')}`}
                                   size="small"
@@ -1456,27 +1554,10 @@ const LandingPage = () => {
                                   size="small"
                                   variant="outlined"
                                   color="primary"
-                                  label={`${t('pages.booking.price')}: ${getCompactSessionPrice(sessionType)}`}
-                                  sx={{ flexShrink: 0, '& .MuiChip-label': { fontWeight: 700 } }}
+                                  label={getCompactSessionPrice(sessionType)}
+                                  sx={{ flexShrink: 0, mr: 0.5, '& .MuiChip-label': { fontWeight: 700 } }}
                                 />
                               </Box>
-                              <Box sx={{ minHeight: 48, mb: 0.75, pr: 16 }}>
-                                <Typography
-                                  variant="body2"
-                                  color="text.secondary"
-                                  sx={{
-                                    lineHeight: 1.35,
-                                    display: '-webkit-box',
-                                    WebkitLineClamp: 2,
-                                    WebkitBoxOrient: 'vertical',
-                                    overflow: 'hidden',
-                                  }}
-                                >
-                                  {truncateText(sessionType.description, 150)}
-                                </Typography>
-                              </Box>
-                            </CardContent>
-                            <CardActions sx={{ p: 1.25, pt: 0.25 }}>
                               <Button
                                 variant="contained"
                                 fullWidth
@@ -1488,7 +1569,7 @@ const LandingPage = () => {
                                   setSelectedSessionType(sessionType);
                                   setBookingDialogOpen(true);
                                 }}
-                                sx={{ textTransform: 'none', py: 1 }}
+                                sx={{ textTransform: 'none', py: 1, width: '100%', mx: 0 }}
                               >
                                 {t('landing.services.bookNow')}
                               </Button>
@@ -1521,172 +1602,233 @@ const LandingPage = () => {
                   )}
                 </Box>
               ) : (
-                /* Desktop: carousel showing 3 cards at a time with arrows */
-                <Box
-                  sx={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    gap: 2,
-                    position: 'relative',
-                  }}
-                >
-                  {/* Left Arrow */}
-                  {orderedSessionTypes.length > 3 && (
-                    <IconButton
-                      onClick={() => {
-                        setSessionTypesCarouselIndex((prev) => Math.max(0, prev - 1));
-                      }}
-                      disabled={sessionTypesCarouselIndex === 0}
-                      sx={{
-                        position: 'absolute',
-                        left: -40,
-                        zIndex: 2,
-                        bgcolor: 'white',
-                        boxShadow: 2,
-                        width: 40,
-                        height: 40,
-                        padding: 1,
-                        borderRadius: '50%',
-                        '&:hover': { bgcolor: 'grey.100' },
-                        '&.Mui-disabled': { bgcolor: 'grey.200', opacity: 0.5 },
-                      }}
-                    >
-                      <ArrowBackIosIcon sx={{ ml: 0.5, fontSize: 20 }} />
-                    </IconButton>
-                  )}
-
-                  {/* Session Types Container */}
+                /* Desktop: single-row horizontal scrolling list */
+                <Box sx={{ position: 'relative', width: '100%', mt: 2 }}>
                   <Box
+                    ref={desktopScrollRefCallback}
+                    onScroll={updateDesktopServicesScrollState}
                     sx={{
-                      display: 'flex',
-                      gap: 3,
-                      overflow: 'hidden',
                       width: '100%',
-                      justifyContent: 'center',
-                      maxWidth: '1200px',
+                      overflowX: 'auto',
+                      overflowY: 'hidden',
+                      pb: 1,
+                      scrollBehavior: 'smooth',
+                      scrollSnapType: 'x mandatory',
+                      '&::-webkit-scrollbar': { display: 'none' },
+                      msOverflowStyle: 'none',
+                      scrollbarWidth: 'none',
                     }}
                   >
-                    <Grid container spacing={3} sx={{ mt: 2, width: '100%', display: 'flex' }}>
-                      {Array.from({ length: Math.min(3, orderedSessionTypes.length) }).map((_, frameIndex) => {
-                        const sessionTypeIndex = sessionTypesCarouselIndex + frameIndex;
-                        const sessionType = orderedSessionTypes[sessionTypeIndex];
-
-                        if (!sessionType) return null;
-
-                        return (
-                          <Grid item xs={12} md={4} key={sessionType.id || sessionType.sessionTypeId} sx={{ display: 'flex' }}>
-                            <Card
-                              sx={{
-                                width: '100%',
-                                minHeight: '230px',
-                                display: 'flex',
-                                flexDirection: 'column',
-                                transition: 'transform 0.2s ease-in-out, box-shadow 0.2s ease-in-out',
-                                '&:hover': {
-                                  transform: 'translateY(-4px)',
-                                  boxShadow: 4,
-                                },
+                    <Box sx={{ display: 'flex', flexWrap: 'nowrap', gap: 3, minWidth: 'max-content' }}>
+                    {orderedSessionTypes.map((sessionType) => (
+                      <Card
+                        key={sessionType.id || sessionType.sessionTypeId}
+                        sx={{
+                          width: { md: 340, lg: 360 },
+                          minHeight: '230px',
+                          flex: '0 0 auto',
+                          display: 'flex',
+                          flexDirection: 'column',
+                          scrollSnapAlign: 'start',
+                          transition: 'transform 0.2s ease-in-out, box-shadow 0.2s ease-in-out',
+                          '&:hover': {
+                            transform: 'translateY(-4px)',
+                            boxShadow: 4,
+                          },
+                        }}
+                      >
+                          <CardContent sx={{ flexGrow: 1, display: 'flex', flexDirection: 'column', p: 2.5, minHeight: 170 }}>
+                            <Box sx={{ mb: 0.75 }}>
+                              <Typography
+                                variant="body1"
+                                component="h3"
+                                sx={{
+                                  fontWeight: 600,
+                                  lineHeight: 1.35,
+                                  fontSize: {
+                                    xs: truncateText(sessionType.name, 100).length > 70
+                                      ? 'clamp(0.86rem, 2.8vw, 1rem)'
+                                      : 'clamp(0.94rem, 3.3vw, 1.08rem)',
+                                    sm: truncateText(sessionType.name, 100).length > 70
+                                      ? 'clamp(0.9rem, 1.4vw, 1rem)'
+                                      : 'clamp(1rem, 1.8vw, 1.12rem)',
+                                  },
+                                  overflowWrap: 'anywhere',
+                                }}
+                              >
+                                {truncateText(sessionType.name, 100)}
+                              </Typography>
+                            </Box>
+                            <Box sx={{ minHeight: 48, mb: 0.75 }}>
+                              <Typography
+                                variant="body2"
+                                color="text.secondary"
+                                sx={{
+                                  lineHeight: 1.35,
+                                  fontSize: {
+                                    xs: truncateText(sessionType.description, 100).length > 85
+                                      ? 'clamp(0.8rem, 2.6vw, 0.9rem)'
+                                      : 'clamp(0.86rem, 3vw, 0.96rem)',
+                                    sm: truncateText(sessionType.description, 100).length > 85
+                                      ? 'clamp(0.82rem, 1.2vw, 0.92rem)'
+                                      : 'clamp(0.9rem, 1.5vw, 1rem)',
+                                  },
+                                  overflowWrap: 'anywhere',
+                                }}
+                              >
+                                {truncateText(sessionType.description, 100)}
+                              </Typography>
+                            </Box>
+                          </CardContent>
+                          <CardActions disableSpacing sx={{ p: 1.5, pt: 0, flexDirection: 'column', alignItems: 'stretch', gap: 0.75 }}>
+                            <Box sx={{ width: '100%', display: 'flex', flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'flex-end', gap: 0.5 }}>
+                              <Chip
+                                label={`${sessionType.durationMinutes || 60} ${t('landing.booking.min')}`}
+                                size="small"
+                                color="primary"
+                                variant="outlined"
+                                sx={{ flexShrink: 0, '& .MuiChip-label': { fontWeight: 700 } }}
+                              />
+                              <Chip
+                                size="small"
+                                variant="outlined"
+                                color="primary"
+                                label={getCompactSessionPrice(sessionType)}
+                                sx={{ flexShrink: 0, mr: 0.5, '& .MuiChip-label': { fontWeight: 700 } }}
+                              />
+                            </Box>
+                            <Button
+                              variant="contained"
+                              fullWidth
+                              color="primary"
+                              size="medium"
+                              onClick={() => {
+                                const sessionTypeId = sessionType.id || sessionType.sessionTypeId;
+                                setSelectedSessionTypeId(sessionTypeId);
+                                setSelectedSessionType(sessionType);
+                                setBookingDialogOpen(true);
                               }}
+                              sx={{ textTransform: 'none', width: '100%', mx: 0 }}
                             >
-                              <CardContent sx={{ flexGrow: 1, display: 'flex', flexDirection: 'column', p: 2.5 }}>
-                                <Box
-                                  sx={{
-                                    display: 'flex',
-                                    justifyContent: 'space-between',
-                                    alignItems: 'flex-start',
-                                    mb: 1.5,
-                                  }}
-                                >
-                                  <Typography
-                                    variant="subtitle1"
-                                    component="h3"
-                                    gutterBottom
-                                    sx={{ fontWeight: 600, lineHeight: 1.4, mb: 1, mr: 1 }}
-                                  >
-                                    {sessionType.name}
-                                  </Typography>
-                                  <Chip
-                                    label={`${sessionType.durationMinutes || 60} ${t('landing.booking.min')}`}
-                                    size="small"
-                                    color="primary"
-                                    variant="outlined"
-                                  />
-                                </Box>
-
-                                <Box sx={{ mb: 1, mt: 'auto' }}>
-                                  {sessionType.prices && areAllPricesZero(sessionType.prices) ? (
-                                    <Typography variant="h4" component="span" color="primary" sx={{ fontSize: '1.75rem' }}>
-                                      {t('landing.booking.free')}
-                                    </Typography>
-                                  ) : sessionType.prices && sessionType.prices[selectedCurrency] ? (
-                                    <Typography variant="h4" component="span" color="primary" sx={{ fontSize: '1.75rem' }}>
-                                      {sessionType.prices[selectedCurrency]} {getCurrencySymbol(selectedCurrency)}
-                                    </Typography>
-                                  ) : sessionType.prices && Object.keys(sessionType.prices).length > 0 ? (
-                                    <Typography variant="h6" component="span" color="text.secondary" sx={{ fontSize: '1rem' }}>
-                                      Price not available in {selectedCurrency}
-                                    </Typography>
-                                  ) : sessionType.price ? (
-                                    <Typography variant="h4" component="span" color="primary" sx={{ fontSize: '1.75rem' }}>
-                                      ${sessionType.price}
-                                    </Typography>
-                                  ) : (
-                                    <Typography variant="h6" component="span" color="text.secondary" sx={{ fontSize: '1rem' }}>
-                                      Price on request
-                                    </Typography>
-                                  )}
-                                </Box>
-                              </CardContent>
-                              <CardActions sx={{ p: 1.5, pt: 0 }}>
-                                <Button
-                                  variant="contained"
-                                  fullWidth
-                                  color="primary"
-                                  size="medium"
-                                  onClick={() => {
-                                    const sessionTypeId = sessionType.id || sessionType.sessionTypeId;
-                                    setSelectedSessionTypeId(sessionTypeId);
-                                    setSelectedSessionType(sessionType);
-                                    setBookingDialogOpen(true);
-                                  }}
-                                  sx={{ textTransform: 'none' }}
-                                >
-                                  {t('landing.services.bookNow')}
-                                </Button>
-                              </CardActions>
-                            </Card>
-                          </Grid>
-                        );
-                      })}
-                    </Grid>
+                              {t('landing.services.bookNow')}
+                            </Button>
+                          </CardActions>
+                      </Card>
+                    ))}
+                    </Box>
                   </Box>
-
-                  {/* Right Arrow */}
-                  {orderedSessionTypes.length > 3 && (
+                  {/* Left fade + scroll button */}
+                  <>
+                    {desktopServicesCanScrollLeft && (
+                      <Box
+                        sx={{
+                          position: 'absolute',
+                          top: 0,
+                          bottom: 8,
+                          left: 0,
+                          width: 88,
+                          background: 'linear-gradient(to right, rgba(240,247,247,0.97) 0%, rgba(240,247,247,0.7) 55%, transparent 100%)',
+                          pointerEvents: 'none',
+                          zIndex: 1,
+                        }}
+                      />
+                    )}
                     <IconButton
-                      onClick={() => {
-                        const maxIndex = orderedSessionTypes.length - 3;
-                        setSessionTypesCarouselIndex((prev) => Math.min(maxIndex, prev + 1));
-                      }}
-                      disabled={sessionTypesCarouselIndex >= orderedSessionTypes.length - 3}
+                      onClick={() => scrollDesktopServices(-1)}
+                      size="large"
+                      aria-label="scroll left"
+                      disabled={!desktopServicesCanScrollLeft}
                       sx={{
                         position: 'absolute',
-                        right: -40,
+                        top: '50%',
+                        left: -16,
+                        width: 48,
+                        height: 48,
+                        transform: 'translateY(-50%)',
                         zIndex: 2,
-                        bgcolor: 'white',
-                        boxShadow: 2,
-                        width: 40,
-                        height: 40,
-                        padding: 1,
-                        borderRadius: '50%',
-                        '&:hover': { bgcolor: 'grey.100' },
-                        '&.Mui-disabled': { bgcolor: 'grey.200', opacity: 0.5 },
+                        bgcolor: 'primary.main',
+                        color: 'primary.contrastText',
+                        boxShadow: '0 6px 18px rgba(0,0,0,0.28)',
+                        border: '1px solid',
+                        borderColor: 'primary.dark',
+                        '&:hover': {
+                          bgcolor: 'primary.dark',
+                          boxShadow: '0 10px 24px rgba(0,0,0,0.34)',
+                          transform: 'translateY(-50%) scale(1.1)',
+                        },
+                        '&:focus-visible': {
+                          outline: '3px solid',
+                          outlineColor: 'rgba(25,118,210,0.35)',
+                          outlineOffset: 2,
+                        },
+                        '&.Mui-disabled': {
+                          bgcolor: 'grey.300',
+                          color: 'grey.600',
+                          borderColor: 'grey.400',
+                          boxShadow: '0 2px 8px rgba(0,0,0,0.18)',
+                        },
+                        transition: 'transform 0.18s ease, box-shadow 0.18s ease',
                       }}
                     >
-                      <ArrowForwardIosIcon sx={{ fontSize: 20 }} />
+                      <KeyboardArrowLeftRoundedIcon sx={{ fontSize: 28 }} />
                     </IconButton>
-                  )}
+                  </>
+                  {/* Right fade + scroll button */}
+                  <>
+                    {desktopServicesCanScrollRight && (
+                      <Box
+                        sx={{
+                          position: 'absolute',
+                          top: 0,
+                          bottom: 8,
+                          right: 0,
+                          width: 88,
+                          background: 'linear-gradient(to left, rgba(240,247,247,0.97) 0%, rgba(240,247,247,0.7) 55%, transparent 100%)',
+                          pointerEvents: 'none',
+                          zIndex: 1,
+                        }}
+                      />
+                    )}
+                    <IconButton
+                      onClick={() => scrollDesktopServices(1)}
+                      size="large"
+                      aria-label="scroll right"
+                      disabled={!desktopServicesCanScrollRight}
+                      sx={{
+                        position: 'absolute',
+                        top: '50%',
+                        right: -16,
+                        width: 48,
+                        height: 48,
+                        transform: 'translateY(-50%)',
+                        zIndex: 2,
+                        bgcolor: 'primary.main',
+                        color: 'primary.contrastText',
+                        boxShadow: '0 6px 18px rgba(0,0,0,0.28)',
+                        border: '1px solid',
+                        borderColor: 'primary.dark',
+                        '&:hover': {
+                          bgcolor: 'primary.dark',
+                          boxShadow: '0 10px 24px rgba(0,0,0,0.34)',
+                          transform: 'translateY(-50%) scale(1.1)',
+                        },
+                        '&:focus-visible': {
+                          outline: '3px solid',
+                          outlineColor: 'rgba(25,118,210,0.35)',
+                          outlineOffset: 2,
+                        },
+                        '&.Mui-disabled': {
+                          bgcolor: 'grey.300',
+                          color: 'grey.600',
+                          borderColor: 'grey.400',
+                          boxShadow: '0 2px 8px rgba(0,0,0,0.18)',
+                        },
+                        transition: 'transform 0.18s ease, box-shadow 0.18s ease',
+                      }}
+                    >
+                      <KeyboardArrowRightRoundedIcon sx={{ fontSize: 28 }} />
+                    </IconButton>
+                  </>
                 </Box>
               )}
             </Box>
