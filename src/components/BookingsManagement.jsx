@@ -4,6 +4,9 @@ import i18n from '../i18n/i18n';
 import dayjs from 'dayjs';
 import utc from 'dayjs/plugin/utc';
 import timezone from 'dayjs/plugin/timezone';
+import updateLocale from 'dayjs/plugin/updateLocale';
+import 'dayjs/locale/en-gb';
+import 'dayjs/locale/ru';
 import { fetchAdminGroupedBookings, fetchWithAuth, getToken, fetchUserSettings } from '../utils/api';
 import apiClient from '../utils/api';
 import { getCachedSlots, setCachedSlots, invalidateCache, clearAllCache } from '../utils/bookingSlotCache';
@@ -11,6 +14,9 @@ import { getCachedSlots, setCachedSlots, invalidateCache, clearAllCache } from '
 // Extend dayjs with timezone support
 dayjs.extend(utc);
 dayjs.extend(timezone);
+dayjs.extend(updateLocale);
+dayjs.updateLocale('en-gb', { weekStart: 1 });
+dayjs.updateLocale('ru', { weekStart: 1 });
 
 const monthsGenitive = 'Января_Февраля_Марта_Апреля_Мая_Июня_Июля_Августа_Сентября_Октября_Ноября_Декабря'.split('_');
 import {
@@ -77,7 +83,7 @@ const STATUS_TRANSITIONS = {
 };
 
 const BookingsManagement = () => {
-  const { t } = useTranslation();
+  const { t, i18n: i18nInstance } = useTranslation();
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
   const [bookings, setBookings] = useState({
@@ -1359,7 +1365,7 @@ const BookingsManagement = () => {
   };
 
   return (
-    <LocalizationProvider dateAdapter={AdapterDayjs}>
+    <LocalizationProvider dateAdapter={AdapterDayjs} adapterLocale={i18nInstance.language?.startsWith('ru') ? 'ru' : 'en-gb'}>
       <Box>
         <Box sx={{ mb: '11px' }}>
           <Typography variant="h5" component="h2">

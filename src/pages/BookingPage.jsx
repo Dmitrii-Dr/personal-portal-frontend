@@ -310,7 +310,7 @@ const BookingPage = ({ sessionTypeId: propSessionTypeId, hideMyBookings = false 
   };
 
   // Fetch available slots for a given date
-  const fetchAvailableSlots = async (date) => {
+  const fetchAvailableSlots = useCallback(async (date) => {
     // Don't fetch if no session type is selected
     if (!sessionTypeId) {
       setLoading(false);
@@ -396,7 +396,7 @@ const BookingPage = ({ sessionTypeId: propSessionTypeId, hideMyBookings = false 
     } finally {
       setLoading(false);
     }
-  };
+  }, [sessionTypeId, userTimezone, selectedTimezone, hasToken, timezones, t]);
 
   // Fetch bookings grouped by status (reusable function)
   const fetchBookings = useCallback(async () => {
@@ -1114,8 +1114,10 @@ const BookingPage = ({ sessionTypeId: propSessionTypeId, hideMyBookings = false 
       return;
     }
 
-    // Mark as attempted
+    // Mark as attempted and block UI so the user cannot accidentally submit
+    // another booking while this one is in flight
     pendingBookingAttempted.current = true;
+    setSubmittingBooking(true);
 
     try {
       const pendingBooking = JSON.parse(pendingBookingStr);
@@ -1137,8 +1139,13 @@ const BookingPage = ({ sessionTypeId: propSessionTypeId, hideMyBookings = false 
       });
 
       if (response && response.status < 400) {
-        // Success - remove pending booking and refresh
+        // Success — close any open booking dialogs and clear selection so the user
+        // cannot accidentally confirm the same (or a different) slot a second time
         sessionStorage.removeItem(PENDING_BOOKING_KEY);
+        setOpenDialog(false);
+        setNewBookingDialogOpen(false);
+        setLoginRequiredDialogOpen(false);
+        setSelectedSlot(null);
         setSuccessMessage(t('pages.booking.bookingSuccess'));
         if (hasToken) {
           await fetchBookings();
@@ -1170,6 +1177,8 @@ const BookingPage = ({ sessionTypeId: propSessionTypeId, hideMyBookings = false 
       if (err.response && (err.response.status === 400 || err.response.status >= 500)) {
         setBookingError(t('pages.booking.bookingErrorRetry'));
       }
+    } finally {
+      setSubmittingBooking(false);
     }
   }, [hasToken, t, fetchBookings, fetchAvailableSlots]);
 
@@ -1908,7 +1917,7 @@ const BookingPage = ({ sessionTypeId: propSessionTypeId, hideMyBookings = false 
                 {(loading || availableSlots.length > 0) && (
                   !hasToken ? (
                     <FormControl sx={{ mb: 2, width: '100%' }}>
-                      <InputLabel>Timezone</InputLabel>
+                      <InputLabel>{t('pages.profile.timezone')}</InputLabel>
                       <Select
                         value={selectedTimezone || ''}
                         onChange={(e) => {
@@ -1918,7 +1927,7 @@ const BookingPage = ({ sessionTypeId: propSessionTypeId, hideMyBookings = false 
                             lastFetchedRef.current = { date: null, sessionTypeId: null };
                           }
                         }}
-                        label="Timezone"
+                        label={t('pages.profile.timezone')}
                       >
                         {timezonesLoading ? (
                           <MenuItem disabled>
@@ -2185,7 +2194,7 @@ const BookingPage = ({ sessionTypeId: propSessionTypeId, hideMyBookings = false 
                   {(loading || availableSlots.length > 0) && (
                     !hasToken ? (
                       <FormControl sx={{ mb: 2, width: '100%' }}>
-                        <InputLabel>Timezone</InputLabel>
+                        <InputLabel>{t('pages.profile.timezone')}</InputLabel>
                         <Select
                           value={selectedTimezone || ''}
                           onChange={(e) => {
@@ -2195,7 +2204,7 @@ const BookingPage = ({ sessionTypeId: propSessionTypeId, hideMyBookings = false 
                               lastFetchedRef.current = { date: null, sessionTypeId: null, timezone: null };
                             }
                           }}
-                          label="Timezone"
+                          label={t('pages.profile.timezone')}
                         >
                           {timezonesLoading ? (
                             <MenuItem disabled>

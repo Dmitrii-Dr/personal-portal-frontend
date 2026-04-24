@@ -48,18 +48,23 @@ import { DateCalendar } from '@mui/x-date-pickers/DateCalendar';
 import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
 import { AdapterDayjs } from '@mui/x-date-pickers/AdapterDayjs';
 import dayjs from 'dayjs';
+import updateLocale from 'dayjs/plugin/updateLocale';
 import 'dayjs/locale/en-gb';
 import 'dayjs/locale/ru';
+
+dayjs.extend(updateLocale);
+dayjs.updateLocale('en-gb', { weekStart: 1 });
+dayjs.updateLocale('ru', { weekStart: 1 });
 
 const AvailabilityRuleComponent = () => {
   const { t, i18n: i18nInstance } = useTranslation();
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
+  const dateAdapterLocale = i18nInstance.language?.startsWith('ru') ? 'ru' : 'en-gb';
 
   useEffect(() => {
-    const language = i18nInstance.language || 'en';
-    dayjs.locale(language.startsWith('ru') ? 'ru' : 'en-gb');
-  }, [i18nInstance.language]);
+    dayjs.locale(dateAdapterLocale);
+  }, [dateAdapterLocale]);
 
   const DAYS_OF_WEEK = [
     { value: 'MONDAY', label: t('admin.sessionConfiguration.availabilityRules.monday'), shortLabel: t('admin.sessionConfiguration.availabilityRules.mondayShort') },
@@ -595,7 +600,7 @@ const AvailabilityRuleComponent = () => {
             </Alert>
           )}
 
-          <LocalizationProvider dateAdapter={AdapterDayjs} adapterLocale={i18nInstance.language === 'ru' ? 'ru' : 'en-gb'}>
+          <LocalizationProvider dateAdapter={AdapterDayjs} adapterLocale={dateAdapterLocale}>
             <Grid container spacing={2} sx={{ mt: 1 }}>
               {/* Row 1: Rule Start Date and Rule End Date */}
               <Grid item xs={12} sm={6}>

@@ -93,6 +93,7 @@ const SignUpModal = ({ open, onClose, onSwitchToLogin }) => {
     email: '',
     password: '',
     confirmPassword: '',
+    agreements_all: '',
   });
   const [loading, setLoading] = useState(false);
   const [submitError, setSubmitError] = useState('');
@@ -210,18 +211,28 @@ const SignUpModal = ({ open, onClose, onSwitchToLogin }) => {
     setSubmitError('');
   };
 
-  const handleCheckboxChange = (e) => {
-    const { name, checked } = e.target;
-    setFormData((prev) => ({
-      ...prev,
-      [name]: checked,
-    }));
-    if (errors[name]) {
-      setErrors((prev) => ({
-        ...prev,
-        [name]: '',
-      }));
-    }
+  const handleAllAgreementsChange = (e) => {
+    const { checked } = e.target;
+
+    setFormData((prev) => {
+      const nextData = { ...prev };
+      if (Array.isArray(agreements)) {
+        agreements.forEach((agreement) => {
+          nextData[`agreed_${agreement.id}`] = checked;
+        });
+      }
+      return nextData;
+    });
+
+    setErrors((prev) => {
+      const nextErrors = { ...prev, agreements_all: '' };
+      if (Array.isArray(agreements)) {
+        agreements.forEach((agreement) => {
+          nextErrors[`agreed_${agreement.id}`] = '';
+        });
+      }
+      return nextErrors;
+    });
   };
 
 
@@ -234,6 +245,7 @@ const SignUpModal = ({ open, onClose, onSwitchToLogin }) => {
       email: '',
       password: '',
       confirmPassword: '',
+      agreements_all: '',
     };
     let isValid = true;
 
@@ -296,13 +308,11 @@ const SignUpModal = ({ open, onClose, onSwitchToLogin }) => {
 
     // Validate dynamic agreements
     if (Array.isArray(agreements)) {
-      agreements.forEach(agreement => {
-        const fieldName = `agreed_${agreement.id}`;
-        if (!formData[fieldName]) {
-          newErrors[fieldName] = t('auth.agreementRequired', `You must agree to ${agreement.name}`);
-          isValid = false;
-        }
-      });
+      const hasUncheckedAgreement = agreements.some((agreement) => !formData[`agreed_${agreement.id}`]);
+      if (hasUncheckedAgreement) {
+        newErrors.agreements_all = t('auth.agreementRequired', 'You must agree to all required agreements');
+        isValid = false;
+      }
     }
 
     setErrors(newErrors);
@@ -384,6 +394,7 @@ const SignUpModal = ({ open, onClose, onSwitchToLogin }) => {
           email: '',
           password: '',
           confirmPassword: '',
+          agreements_all: '',
         });
         setSubmitError('');
         setSuccess(false);
@@ -430,6 +441,7 @@ const SignUpModal = ({ open, onClose, onSwitchToLogin }) => {
         email: '',
         password: '',
         confirmPassword: '',
+        agreements_all: '',
       };
 
       // Reset agreement errors
@@ -674,42 +686,44 @@ const SignUpModal = ({ open, onClose, onSwitchToLogin }) => {
               </Alert>
             )}
 
-            {Array.isArray(agreements) && agreements.map((agreement) => {
-              const fieldName = `agreed_${agreement.id}`;
-              return (
-                <Box key={agreement.id}>
-                  <FormControlLabel
-                    control={
-                      <Checkbox
-                        checked={formData[fieldName] || false}
-                        onChange={handleCheckboxChange}
-                        name={fieldName}
-                        color="primary"
-                        disabled={loading || success || agreementsLoading}
-                      />
-                    }
-                    label={
-                      <Typography variant="body2">
-                        {t('auth.agreeToThe', 'I agree to the')}{' '}
-                        <MuiLink
-                          href={`/agreement/${agreement.slug}`}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          onClick={(e) => e.stopPropagation()}
-                        >
-                          {agreement.name}
-                        </MuiLink>
-                      </Typography>
-                    }
-                  />
-                  {errors[fieldName] && (
-                    <Typography variant="caption" color="error" display="block">
-                      {errors[fieldName]}
+            {Array.isArray(agreements) && agreements.length > 0 && (
+              <Box>
+                <FormControlLabel
+                  control={
+                    <Checkbox
+                      checked={agreements.every((agreement) => formData[`agreed_${agreement.id}`] === true)}
+                      onChange={handleAllAgreementsChange}
+                      name="agreements_all"
+                      color="primary"
+                      disabled={loading || success || agreementsLoading}
+                    />
+                  }
+                  label={(
+                    <Typography variant="body2">
+                      {t('auth.agreeWith', 'I agree with')}{' '}
+                      {agreements.map((agreement, index) => (
+                        <React.Fragment key={agreement.id}>
+                          {index > 0 && ', '}
+                          <MuiLink
+                            href={`/agreement/${agreement.slug}`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            onClick={(e) => e.stopPropagation()}
+                          >
+                            {agreement.name}
+                          </MuiLink>
+                        </React.Fragment>
+                      ))}
                     </Typography>
                   )}
-                </Box>
-              );
-            })}
+                />
+                {errors.agreements_all && (
+                  <Typography variant="caption" color="error" display="block">
+                    {errors.agreements_all}
+                  </Typography>
+                )}
+              </Box>
+            )}
           </Box>
 
           <Button

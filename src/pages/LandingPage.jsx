@@ -1,4 +1,4 @@
-import React, { useRef, useState, useEffect } from 'react';
+import React, { useRef, useState, useEffect, useMemo } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import {
@@ -34,6 +34,7 @@ import {
 import CloseIcon from '@mui/icons-material/Close';
 import ArrowBackIosIcon from '@mui/icons-material/ArrowBackIos';
 import ArrowForwardIosIcon from '@mui/icons-material/ArrowForwardIos';
+import KeyboardArrowDownIcon from '@mui/icons-material/KeyboardArrowDown';
 import dayjs from 'dayjs';
 import axios from 'axios';
 import apiClient, { getPublicWelcome } from '../utils/api';
@@ -80,6 +81,13 @@ const areAllPricesZero = (prices) => {
   }
   const priceValues = Object.values(prices);
   return priceValues.length > 0 && priceValues.every(price => price === 0 || price === null || price === undefined);
+};
+
+const truncateText = (value, maxLength) => {
+  if (!value || typeof value !== 'string') return '';
+  const normalized = value.trim();
+  if (normalized.length <= maxLength) return normalized;
+  return `${normalized.slice(0, maxLength).trimEnd()}...`;
 };
 
 /**
@@ -175,6 +183,8 @@ const LandingPage = () => {
   const imagesToShow = isMobile ? 1 : 3;
   const showArrows = reviewMediaIds.length > imagesToShow;
   const [sessionTypesCarouselIndex, setSessionTypesCarouselIndex] = useState(0);
+  const mobileServicesScrollRef = useRef(null);
+  const [mobileServicesAtBottom, setMobileServicesAtBottom] = useState(false);
   const educationRef = useRef(null);
 
   // Session types state
@@ -186,6 +196,43 @@ const LandingPage = () => {
   const [bookingDialogOpen, setBookingDialogOpen] = useState(false);
   const [selectedCurrency, setSelectedCurrency] = useState('Rubles');
   const [currencyMenuAnchor, setCurrencyMenuAnchor] = useState(null);
+
+  const getCompactSessionPrice = (sessionType) => {
+    if (sessionType.prices && areAllPricesZero(sessionType.prices)) {
+      return t('landing.booking.free');
+    }
+    if (sessionType.prices && sessionType.prices[selectedCurrency] !== undefined) {
+      return `${sessionType.prices[selectedCurrency]} ${getCurrencySymbol(selectedCurrency)}`;
+    }
+    if (sessionType.prices && Object.keys(sessionType.prices).length > 0) {
+      return `N/A ${getCurrencySymbol(selectedCurrency)}`;
+    }
+    if (sessionType.price !== undefined && sessionType.price !== null) {
+      return `$${sessionType.price}`;
+    }
+    return 'N/A';
+  };
+
+  const orderedSessionTypes = useMemo(() => {
+    if (!Array.isArray(sessionTypes) || sessionTypes.length === 0) {
+      return [];
+    }
+
+    const order = welcomeData?.extendedParameters?.sessionTypeDisplayOrder;
+    if (!Array.isArray(order) || order.length === 0) {
+      return sessionTypes;
+    }
+
+    const orderMap = new Map(order.map((id, index) => [String(id), index]));
+    return [...sessionTypes].sort((a, b) => {
+      const aId = String(a?.id || a?.sessionTypeId || '');
+      const bId = String(b?.id || b?.sessionTypeId || '');
+      const aIndex = orderMap.has(aId) ? orderMap.get(aId) : Number.POSITIVE_INFINITY;
+      const bIndex = orderMap.has(bId) ? orderMap.get(bId) : Number.POSITIVE_INFINITY;
+      if (aIndex !== bIndex) return aIndex - bIndex;
+      return 0;
+    });
+  }, [sessionTypes, welcomeData]);
 
   // Blog articles state
   const [blogArticles, setBlogArticles] = useState([]);
@@ -411,10 +458,6 @@ const LandingPage = () => {
 
         if (response.data && Array.isArray(response.data)) {
           setSessionTypes(response.data);
-          // Set first session type as default if available
-          if (response.data.length > 0) {
-            setSelectedSessionTypeId(response.data[0].id || response.data[0].sessionTypeId);
-          }
         } else {
           setSessionTypes([]);
         }
@@ -454,6 +497,20 @@ const LandingPage = () => {
       controller.abort();
     };
   }, []);
+
+  useEffect(() => {
+    if (orderedSessionTypes.length === 0) {
+      setSelectedSessionTypeId(null);
+      return;
+    }
+
+    setSelectedSessionTypeId((previousId) => {
+      if (previousId && orderedSessionTypes.some((st) => (st.id || st.sessionTypeId) === previousId)) {
+        return previousId;
+      }
+      return orderedSessionTypes[0].id || orderedSessionTypes[0].sessionTypeId;
+    });
+  }, [orderedSessionTypes]);
 
   // Fetch blog articles
   useEffect(() => {
@@ -1277,7 +1334,7 @@ const LandingPage = () => {
             <Alert severity="error" sx={{ mb: 2 }}>
               {sessionTypesError}
             </Alert>
-          ) : sessionTypes.length > 0 ? (
+          ) : orderedSessionTypes.length > 0 ? (
             <Box sx={{ position: 'relative', width: '100%' }}>
               {/* Currency Selector Line */}
               <Box
@@ -1340,133 +1397,86 @@ const LandingPage = () => {
                   </MenuItem>
                 </Menu>
               </Box>
-              <Box
-                sx={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  gap: 2,
-                  position: 'relative',
-                }}
-              >
-                {/* Left Arrow */}
-                {sessionTypes.length > 3 && (
-                  <IconButton
-                    onClick={() => {
-                      setSessionTypesCarouselIndex((prev) => Math.max(0, prev - 1));
+              {isMobile ? (
+                /* Mobile: single column; scrollable container when > 3 options */
+                <Box sx={{ position: 'relative', mt: 1 }}>
+                  <Box
+                    ref={mobileServicesScrollRef}
+                    onScroll={(e) => {
+                      const el = e.target;
+                      setMobileServicesAtBottom(
+                        Math.abs(el.scrollHeight - el.scrollTop - el.clientHeight) < 4
+                      );
                     }}
-                    disabled={sessionTypesCarouselIndex === 0}
-                    sx={{
-                      position: 'absolute',
-                      left: { xs: -10, md: -40 },
-                      zIndex: 2,
-                      bgcolor: 'white',
-                      boxShadow: 2,
-                      width: 40,
-                      height: 40,
-                      padding: 1,
-                      borderRadius: '50%',
-                      '&:hover': {
-                        bgcolor: 'grey.100',
-                      },
-                      '&.Mui-disabled': {
-                        bgcolor: 'grey.200',
-                        opacity: 0.5,
-                      },
-                    }}
+                    sx={
+                      orderedSessionTypes.length > 3
+                        ? {
+                            maxHeight: '480px',
+                            overflowY: 'auto',
+                            pr: 0.5,
+                            scrollbarWidth: 'thin',
+                          }
+                        : {}
+                    }
                   >
-                    <ArrowBackIosIcon sx={{ ml: 0.5, fontSize: 20 }} />
-                  </IconButton>
-                )}
-
-                {/* Session Types Container */}
-                <Box
-                  sx={{
-                    display: 'flex',
-                    gap: 3,
-                    overflow: 'hidden',
-                    width: '100%',
-                    justifyContent: 'center',
-                    maxWidth: { xs: '100%', md: '1200px' },
-                  }}
-                >
-                  <Grid container spacing={3} sx={{ mt: 2, width: '100%', display: 'flex' }}>
-                    {Array.from({ length: Math.min(3, sessionTypes.length) }).map((_, frameIndex) => {
-                      const sessionTypeIndex = sessionTypesCarouselIndex + frameIndex;
-                      const sessionType = sessionTypes[sessionTypeIndex];
-
-                      if (!sessionType) return null;
-
-                      return (
-                        <Grid item xs={12} md={4} key={sessionType.id || sessionType.sessionTypeId} sx={{ display: 'flex' }}>
-                          <Card
-                            sx={{
-                              width: '100%',
-                              minHeight: '230px',
-                              display: 'flex',
-                              flexDirection: 'column',
-                              transition: 'transform 0.2s ease-in-out, box-shadow 0.2s ease-in-out',
-                              '&:hover': {
-                                transform: 'translateY(-4px)',
-                                boxShadow: 4,
-                              },
-                            }}
-                          >
-                            <CardContent sx={{ flexGrow: 1, display: 'flex', flexDirection: 'column', p: 2.5 }}>
-                              <Box
-                                sx={{
-                                  display: 'flex',
-                                  justifyContent: 'space-between',
-                                  alignItems: 'flex-start',
-                                  mb: 1.5,
-                                }}
-                              >
+                    <Grid container spacing={1.25}>
+                      {orderedSessionTypes.map((sessionType) => (
+                        <Grid item xs={12} key={sessionType.id || sessionType.sessionTypeId} sx={{ display: 'flex' }}>
+                          <Card sx={{ width: '100%', display: 'flex', flexDirection: 'column' }}>
+                            <CardContent sx={{ flexGrow: 1, display: 'flex', flexDirection: 'column', p: 1.5, minHeight: 170, position: 'relative' }}>
+                              <Box sx={{ mb: 0.75, pr: 16 }}>
                                 <Typography
-                                  variant="subtitle1"
+                                  variant="body1"
                                   component="h3"
-                                  gutterBottom
-                                  sx={{
-                                    fontWeight: 600,
-                                    lineHeight: 1.4,
-                                    mb: 1,
-                                    mr: 1 // Add margin right to separate from Chip if needed, though they are flex-between
-                                  }}
+                                  sx={{ fontWeight: 600, lineHeight: 1.4 }}
                                 >
                                   {sessionType.name}
                                 </Typography>
+                              </Box>
+                              <Box
+                                sx={{
+                                  position: 'absolute',
+                                  bottom: 8,
+                                  right: 12,
+                                  display: 'flex',
+                                  flexDirection: 'row',
+                                  alignItems: 'flex-end',
+                                  gap: 0.5,
+                                  zIndex: 1,
+                                }}
+                              >
                                 <Chip
                                   label={`${sessionType.durationMinutes || 60} ${t('landing.booking.min')}`}
                                   size="small"
                                   color="primary"
                                   variant="outlined"
+                                  sx={{ flexShrink: 0, '& .MuiChip-label': { fontWeight: 700 } }}
+                                />
+                                <Chip
+                                  size="small"
+                                  variant="outlined"
+                                  color="primary"
+                                  label={`${t('pages.booking.price')}: ${getCompactSessionPrice(sessionType)}`}
+                                  sx={{ flexShrink: 0, '& .MuiChip-label': { fontWeight: 700 } }}
                                 />
                               </Box>
-
-                              <Box sx={{ mb: 1, mt: 'auto' }}>
-                                {sessionType.prices && areAllPricesZero(sessionType.prices) ? (
-                                  <Typography variant="h4" component="span" color="primary" sx={{ fontSize: '1.75rem' }}>
-                                    {t('landing.booking.free')}
-                                  </Typography>
-                                ) : sessionType.prices && sessionType.prices[selectedCurrency] ? (
-                                  <Typography variant="h4" component="span" color="primary" sx={{ fontSize: '1.75rem' }}>
-                                    {sessionType.prices[selectedCurrency]} {getCurrencySymbol(selectedCurrency)}
-                                  </Typography>
-                                ) : sessionType.prices && Object.keys(sessionType.prices).length > 0 ? (
-                                  <Typography variant="h6" component="span" color="text.secondary" sx={{ fontSize: '1rem' }}>
-                                    Price not available in {selectedCurrency}
-                                  </Typography>
-                                ) : sessionType.price ? (
-                                  <Typography variant="h4" component="span" color="primary" sx={{ fontSize: '1.75rem' }}>
-                                    ${sessionType.price}
-                                  </Typography>
-                                ) : (
-                                  <Typography variant="h6" component="span" color="text.secondary" sx={{ fontSize: '1rem' }}>
-                                    Price on request
-                                  </Typography>
-                                )}
+                              <Box sx={{ minHeight: 48, mb: 0.75, pr: 16 }}>
+                                <Typography
+                                  variant="body2"
+                                  color="text.secondary"
+                                  sx={{
+                                    lineHeight: 1.35,
+                                    display: '-webkit-box',
+                                    WebkitLineClamp: 2,
+                                    WebkitBoxOrient: 'vertical',
+                                    overflow: 'hidden',
+                                  }}
+                                >
+                                  {truncateText(sessionType.description, 150)}
+                                </Typography>
                               </Box>
                             </CardContent>
-                            <CardActions sx={{ p: 1.5, pt: 0 }}>
+                            <CardActions sx={{ p: 1.25, pt: 0.25 }}>
                               <Button
                                 variant="contained"
                                 fullWidth
@@ -1478,49 +1488,207 @@ const LandingPage = () => {
                                   setSelectedSessionType(sessionType);
                                   setBookingDialogOpen(true);
                                 }}
-                                sx={{ textTransform: 'none' }}
+                                sx={{ textTransform: 'none', py: 1 }}
                               >
                                 {t('landing.services.bookNow')}
                               </Button>
                             </CardActions>
                           </Card>
                         </Grid>
-                      );
-                    })}
-                  </Grid>
+                      ))}
+                    </Grid>
+                  </Box>
+                  {/* Bottom fade gradient — visible when list is scrollable and not at the end */}
+                  {orderedSessionTypes.length > 3 && !mobileServicesAtBottom && (
+                    <Box
+                      sx={{
+                        position: 'absolute',
+                        bottom: 0,
+                        left: 0,
+                        right: 0,
+                        height: 72,
+                        background: 'linear-gradient(to bottom, transparent 0%, rgba(240,247,247,0.85) 60%, #F0F7F7 100%)',
+                        pointerEvents: 'none',
+                        display: 'flex',
+                        justifyContent: 'center',
+                        alignItems: 'flex-end',
+                        pb: 0.5,
+                        borderRadius: '0 0 4px 4px',
+                      }}
+                    >
+                      <KeyboardArrowDownIcon sx={{ color: 'text.secondary', opacity: 0.6, fontSize: 22 }} />
+                    </Box>
+                  )}
                 </Box>
+              ) : (
+                /* Desktop: carousel showing 3 cards at a time with arrows */
+                <Box
+                  sx={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: 2,
+                    position: 'relative',
+                  }}
+                >
+                  {/* Left Arrow */}
+                  {orderedSessionTypes.length > 3 && (
+                    <IconButton
+                      onClick={() => {
+                        setSessionTypesCarouselIndex((prev) => Math.max(0, prev - 1));
+                      }}
+                      disabled={sessionTypesCarouselIndex === 0}
+                      sx={{
+                        position: 'absolute',
+                        left: -40,
+                        zIndex: 2,
+                        bgcolor: 'white',
+                        boxShadow: 2,
+                        width: 40,
+                        height: 40,
+                        padding: 1,
+                        borderRadius: '50%',
+                        '&:hover': { bgcolor: 'grey.100' },
+                        '&.Mui-disabled': { bgcolor: 'grey.200', opacity: 0.5 },
+                      }}
+                    >
+                      <ArrowBackIosIcon sx={{ ml: 0.5, fontSize: 20 }} />
+                    </IconButton>
+                  )}
 
-                {/* Right Arrow */}
-                {sessionTypes.length > 3 && (
-                  <IconButton
-                    onClick={() => {
-                      const maxIndex = sessionTypes.length - 3;
-                      setSessionTypesCarouselIndex((prev) => Math.min(maxIndex, prev + 1));
-                    }}
-                    disabled={sessionTypesCarouselIndex >= sessionTypes.length - 3}
+                  {/* Session Types Container */}
+                  <Box
                     sx={{
-                      position: 'absolute',
-                      right: { xs: -10, md: -40 },
-                      zIndex: 2,
-                      bgcolor: 'white',
-                      boxShadow: 2,
-                      width: 40,
-                      height: 40,
-                      padding: 1,
-                      borderRadius: '50%',
-                      '&:hover': {
-                        bgcolor: 'grey.100',
-                      },
-                      '&.Mui-disabled': {
-                        bgcolor: 'grey.200',
-                        opacity: 0.5,
-                      },
+                      display: 'flex',
+                      gap: 3,
+                      overflow: 'hidden',
+                      width: '100%',
+                      justifyContent: 'center',
+                      maxWidth: '1200px',
                     }}
                   >
-                    <ArrowForwardIosIcon sx={{ fontSize: 20 }} />
-                  </IconButton>
-                )}
-              </Box>
+                    <Grid container spacing={3} sx={{ mt: 2, width: '100%', display: 'flex' }}>
+                      {Array.from({ length: Math.min(3, orderedSessionTypes.length) }).map((_, frameIndex) => {
+                        const sessionTypeIndex = sessionTypesCarouselIndex + frameIndex;
+                        const sessionType = orderedSessionTypes[sessionTypeIndex];
+
+                        if (!sessionType) return null;
+
+                        return (
+                          <Grid item xs={12} md={4} key={sessionType.id || sessionType.sessionTypeId} sx={{ display: 'flex' }}>
+                            <Card
+                              sx={{
+                                width: '100%',
+                                minHeight: '230px',
+                                display: 'flex',
+                                flexDirection: 'column',
+                                transition: 'transform 0.2s ease-in-out, box-shadow 0.2s ease-in-out',
+                                '&:hover': {
+                                  transform: 'translateY(-4px)',
+                                  boxShadow: 4,
+                                },
+                              }}
+                            >
+                              <CardContent sx={{ flexGrow: 1, display: 'flex', flexDirection: 'column', p: 2.5 }}>
+                                <Box
+                                  sx={{
+                                    display: 'flex',
+                                    justifyContent: 'space-between',
+                                    alignItems: 'flex-start',
+                                    mb: 1.5,
+                                  }}
+                                >
+                                  <Typography
+                                    variant="subtitle1"
+                                    component="h3"
+                                    gutterBottom
+                                    sx={{ fontWeight: 600, lineHeight: 1.4, mb: 1, mr: 1 }}
+                                  >
+                                    {sessionType.name}
+                                  </Typography>
+                                  <Chip
+                                    label={`${sessionType.durationMinutes || 60} ${t('landing.booking.min')}`}
+                                    size="small"
+                                    color="primary"
+                                    variant="outlined"
+                                  />
+                                </Box>
+
+                                <Box sx={{ mb: 1, mt: 'auto' }}>
+                                  {sessionType.prices && areAllPricesZero(sessionType.prices) ? (
+                                    <Typography variant="h4" component="span" color="primary" sx={{ fontSize: '1.75rem' }}>
+                                      {t('landing.booking.free')}
+                                    </Typography>
+                                  ) : sessionType.prices && sessionType.prices[selectedCurrency] ? (
+                                    <Typography variant="h4" component="span" color="primary" sx={{ fontSize: '1.75rem' }}>
+                                      {sessionType.prices[selectedCurrency]} {getCurrencySymbol(selectedCurrency)}
+                                    </Typography>
+                                  ) : sessionType.prices && Object.keys(sessionType.prices).length > 0 ? (
+                                    <Typography variant="h6" component="span" color="text.secondary" sx={{ fontSize: '1rem' }}>
+                                      Price not available in {selectedCurrency}
+                                    </Typography>
+                                  ) : sessionType.price ? (
+                                    <Typography variant="h4" component="span" color="primary" sx={{ fontSize: '1.75rem' }}>
+                                      ${sessionType.price}
+                                    </Typography>
+                                  ) : (
+                                    <Typography variant="h6" component="span" color="text.secondary" sx={{ fontSize: '1rem' }}>
+                                      Price on request
+                                    </Typography>
+                                  )}
+                                </Box>
+                              </CardContent>
+                              <CardActions sx={{ p: 1.5, pt: 0 }}>
+                                <Button
+                                  variant="contained"
+                                  fullWidth
+                                  color="primary"
+                                  size="medium"
+                                  onClick={() => {
+                                    const sessionTypeId = sessionType.id || sessionType.sessionTypeId;
+                                    setSelectedSessionTypeId(sessionTypeId);
+                                    setSelectedSessionType(sessionType);
+                                    setBookingDialogOpen(true);
+                                  }}
+                                  sx={{ textTransform: 'none' }}
+                                >
+                                  {t('landing.services.bookNow')}
+                                </Button>
+                              </CardActions>
+                            </Card>
+                          </Grid>
+                        );
+                      })}
+                    </Grid>
+                  </Box>
+
+                  {/* Right Arrow */}
+                  {orderedSessionTypes.length > 3 && (
+                    <IconButton
+                      onClick={() => {
+                        const maxIndex = orderedSessionTypes.length - 3;
+                        setSessionTypesCarouselIndex((prev) => Math.min(maxIndex, prev + 1));
+                      }}
+                      disabled={sessionTypesCarouselIndex >= orderedSessionTypes.length - 3}
+                      sx={{
+                        position: 'absolute',
+                        right: -40,
+                        zIndex: 2,
+                        bgcolor: 'white',
+                        boxShadow: 2,
+                        width: 40,
+                        height: 40,
+                        padding: 1,
+                        borderRadius: '50%',
+                        '&:hover': { bgcolor: 'grey.100' },
+                        '&.Mui-disabled': { bgcolor: 'grey.200', opacity: 0.5 },
+                      }}
+                    >
+                      <ArrowForwardIosIcon sx={{ fontSize: 20 }} />
+                    </IconButton>
+                  )}
+                </Box>
+              )}
             </Box>
           ) : (
             <Alert severity="info" sx={{ mt: 2 }}>

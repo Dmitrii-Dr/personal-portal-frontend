@@ -57,12 +57,19 @@ import 'dayjs/locale/ru';
 // Configure dayjs to start week on Monday
 dayjs.extend(updateLocale);
 dayjs.extend(localeData);
+dayjs.updateLocale('en-gb', { weekStart: 1 });
+dayjs.updateLocale('ru', { weekStart: 1 });
 dayjs.locale('en-gb'); // Use en-gb locale which starts week on Monday
 
 const SessionsConfigurationPage = () => {
   const { t, i18n: i18nInstance } = useTranslation();
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
+  const dateAdapterLocale = i18nInstance.language?.startsWith('ru') ? 'ru' : 'en-gb';
+  useEffect(() => {
+    dayjs.locale(dateAdapterLocale);
+  }, [dateAdapterLocale]);
+
 
   // Session types state
   const [sessionTypes, setSessionTypes] = useState([]);
@@ -94,6 +101,8 @@ const SessionsConfigurationPage = () => {
   const [selectedSessionTypeId, setSelectedSessionTypeId] = useState(null);
   const [selectedTimezone, setSelectedTimezone] = useState(null);
   const [userTimezone, setUserTimezone] = useState(null);
+  const [homePageExtendedParameters, setHomePageExtendedParameters] = useState({});
+  const [savingOrder, setSavingOrder] = useState(false);
   const hasFetchedSessionTypesRef = useRef(false);
 
   // Available Slots Scroll state
@@ -106,6 +115,68 @@ const SessionsConfigurationPage = () => {
   const [timezones, setTimezones] = useState([]);
   const [timezonesLoading, setTimezonesLoading] = useState(true);
 
+  const getSessionTypeId = (sessionType) => String(sessionType?.id || sessionType?.sessionTypeId || '');
+
+  const sortSessionTypesByDisplayOrder = (types, displayOrder) => {
+    if (!Array.isArray(types)) return [];
+    if (!Array.isArray(displayOrder) || displayOrder.length === 0) return types;
+
+    const orderMap = new Map(displayOrder.map((id, index) => [String(id), index]));
+    return [...types].sort((a, b) => {
+      const aIndex = orderMap.has(getSessionTypeId(a)) ? orderMap.get(getSessionTypeId(a)) : Number.POSITIVE_INFINITY;
+      const bIndex = orderMap.has(getSessionTypeId(b)) ? orderMap.get(getSessionTypeId(b)) : Number.POSITIVE_INFINITY;
+      if (aIndex !== bIndex) return aIndex - bIndex;
+      return 0;
+    });
+  };
+
+  const persistSessionTypeOrder = async (orderedSessionTypes) => {
+    const sessionTypeDisplayOrder = orderedSessionTypes
+      .map((sessionType) => getSessionTypeId(sessionType))
+      .filter(Boolean);
+
+    const extendedParameters = {
+      ...(homePageExtendedParameters || {}),
+      sessionTypeDisplayOrder,
+    };
+
+    const response = await fetchWithAuth('/api/v1/admin/home', {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ extendedParameters }),
+    });
+
+    if (!response.ok) {
+      throw new Error(t('admin.sessionConfiguration.failedToSave'));
+    }
+
+    setHomePageExtendedParameters(extendedParameters);
+  };
+
+  const handleMoveSessionType = async (index, direction) => {
+    if (savingOrder) return;
+    const targetIndex = index + direction;
+    if (targetIndex < 0 || targetIndex >= sessionTypes.length) return;
+
+    const previousSessionTypes = sessionTypes;
+    const reorderedSessionTypes = [...sessionTypes];
+    [reorderedSessionTypes[index], reorderedSessionTypes[targetIndex]] = [reorderedSessionTypes[targetIndex], reorderedSessionTypes[index]];
+
+    setSessionTypes(reorderedSessionTypes);
+    setSavingOrder(true);
+    try {
+      await persistSessionTypeOrder(reorderedSessionTypes);
+    } catch (err) {
+      console.error('Error saving session type order:', err);
+      setError(err.message || t('admin.sessionConfiguration.failedToSave'));
+      setSessionTypes(previousSessionTypes);
+    } finally {
+      setSavingOrder(false);
+    }
+  };
+
   // Fetch session types (admin endpoint returns all session types, active and inactive)
   useEffect(() => {
     // Prevent duplicate calls in React StrictMode
@@ -117,17 +188,33 @@ const SessionsConfigurationPage = () => {
     const fetchSessionTypes = async () => {
       setLoadingSessionTypes(true);
       try {
-        const response = await fetchWithAuth('/api/v1/admin/session/type/all');
-        if (response.ok) {
-          const data = await response.json();
-          setSessionTypes(Array.isArray(data) ? data : []);
+        const [sessionTypesResponse, welcomeResult] = await Promise.allSettled([
+          fetchWithAuth('/api/v1/admin/session/type/all'),
+          apiClient.get('/api/v1/public/welcome', { timeout: 10000 }),
+        ]);
+
+        const welcomeExtendedParameters =
+          welcomeResult.status === 'fulfilled'
+            ? (welcomeResult.value?.data?.extendedParameters || {})
+            : {};
+        const savedOrder = Array.isArray(welcomeExtendedParameters.sessionTypeDisplayOrder)
+          ? welcomeExtendedParameters.sessionTypeDisplayOrder.map((id) => String(id))
+          : [];
+
+        setHomePageExtendedParameters(welcomeExtendedParameters);
+
+        if (sessionTypesResponse.status === 'fulfilled' && sessionTypesResponse.value.ok) {
+          const data = await sessionTypesResponse.value.json();
+          const normalizedData = Array.isArray(data) ? data : [];
+          const orderedSessionTypes = sortSessionTypesByDisplayOrder(normalizedData, savedOrder);
+          setSessionTypes(orderedSessionTypes);
           // Filter to only active session types for the available slots selector
-          const activeSessionTypes = Array.isArray(data) ? data.filter(st => st.active !== false) : [];
+          const activeSessionTypes = orderedSessionTypes.filter(st => st.active !== false);
           if (activeSessionTypes.length > 0) {
             setSelectedSessionTypeId(activeSessionTypes[0].id || activeSessionTypes[0].sessionTypeId || null);
-          } else if (data.length > 0) {
+          } else if (orderedSessionTypes.length > 0) {
             // Fallback to first session type if no active ones
-            setSelectedSessionTypeId(data[0].id || data[0].sessionTypeId || null);
+            setSelectedSessionTypeId(orderedSessionTypes[0].id || orderedSessionTypes[0].sessionTypeId || null);
           } else {
             // No session types available
             setSelectedSessionTypeId(null);
@@ -423,9 +510,14 @@ const SessionsConfigurationPage = () => {
       const refreshResponse = await fetchWithAuth('/api/v1/admin/session/type/all');
       if (refreshResponse.ok) {
         const data = await refreshResponse.json();
-        setSessionTypes(Array.isArray(data) ? data : []);
+        const normalizedData = Array.isArray(data) ? data : [];
+        const orderedSessionTypes = sortSessionTypesByDisplayOrder(
+          normalizedData,
+          homePageExtendedParameters?.sessionTypeDisplayOrder
+        );
+        setSessionTypes(orderedSessionTypes);
         // Update selected session type if needed
-        const activeSessionTypes = Array.isArray(data) ? data.filter(st => st.active !== false) : [];
+        const activeSessionTypes = orderedSessionTypes.filter(st => st.active !== false);
         if (activeSessionTypes.length > 0 && !activeSessionTypes.find(st => (st.id || st.sessionTypeId) === selectedSessionTypeId)) {
           setSelectedSessionTypeId(activeSessionTypes[0].id || activeSessionTypes[0].sessionTypeId || null);
         } else if (activeSessionTypes.length === 0) {
@@ -470,9 +562,14 @@ const SessionsConfigurationPage = () => {
       const refreshResponse = await fetchWithAuth('/api/v1/admin/session/type/all');
       if (refreshResponse.ok) {
         const data = await refreshResponse.json();
-        setSessionTypes(Array.isArray(data) ? data : []);
+        const normalizedData = Array.isArray(data) ? data : [];
+        const orderedSessionTypes = sortSessionTypesByDisplayOrder(
+          normalizedData,
+          homePageExtendedParameters?.sessionTypeDisplayOrder
+        );
+        setSessionTypes(orderedSessionTypes);
         // Update selected session type if needed
-        const activeSessionTypes = Array.isArray(data) ? data.filter(st => st.active !== false) : [];
+        const activeSessionTypes = orderedSessionTypes.filter(st => st.active !== false);
         if (activeSessionTypes.length > 0 && !activeSessionTypes.find(st => (st.id || st.sessionTypeId) === selectedSessionTypeId)) {
           setSelectedSessionTypeId(activeSessionTypes[0].id || activeSessionTypes[0].sessionTypeId || null);
         } else if (activeSessionTypes.length === 0) {
@@ -546,7 +643,7 @@ const SessionsConfigurationPage = () => {
                     </Box>
                   ) : sessionTypes.length > 0 ? (
                     <List>
-                      {sessionTypes.map((sessionType) => (
+                      {sessionTypes.map((sessionType, index) => (
                         <ListItem
                           key={sessionType.id || sessionType.sessionTypeId}
                           sx={{
@@ -591,10 +688,34 @@ const SessionsConfigurationPage = () => {
                             }
                           />
                           <ListItemSecondaryAction>
+                            <Tooltip title={t('admin.sessionConfiguration.moveUp')}>
+                              <span>
+                                <IconButton
+                                  edge="end"
+                                  onClick={() => handleMoveSessionType(index, -1)}
+                                  disabled={savingOrder || index === 0}
+                                  sx={{ mr: 0.5 }}
+                                >
+                                  <KeyboardArrowUpIcon />
+                                </IconButton>
+                              </span>
+                            </Tooltip>
+                            <Tooltip title={t('admin.sessionConfiguration.moveDown')}>
+                              <span>
+                                <IconButton
+                                  edge="end"
+                                  onClick={() => handleMoveSessionType(index, 1)}
+                                  disabled={savingOrder || index === sessionTypes.length - 1}
+                                  sx={{ mr: 0.5 }}
+                                >
+                                  <KeyboardArrowDownIcon />
+                                </IconButton>
+                              </span>
+                            </Tooltip>
                             <IconButton
                               edge="end"
                               onClick={() => handleOpenSessionTypeDialog(sessionType)}
-                              sx={{ mr: 1 }}
+                              sx={{ mr: 0.5 }}
                             >
                               <EditIcon />
                             </IconButton>
@@ -698,7 +819,7 @@ const SessionsConfigurationPage = () => {
 
                   <Grid container spacing={2}>
                     <Grid item xs={12} md={6}>
-                      <LocalizationProvider dateAdapter={AdapterDayjs} adapterLocale={i18nInstance.language === 'ru' ? 'ru' : 'en-gb'}>
+                      <LocalizationProvider dateAdapter={AdapterDayjs} adapterLocale={dateAdapterLocale}>
                         <DateCalendar
                           value={selectedDate}
                           onChange={(newDate) => setSelectedDate(newDate)}

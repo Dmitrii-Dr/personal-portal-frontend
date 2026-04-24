@@ -122,16 +122,51 @@ const PastSessions = () => {
     try {
       const data = await fetchUserSettings();
       if (data && data.timezone) {
-        setUserTimezone(extractTimezoneOffset(data.timezone));
+        setUserTimezone(data.timezone);
       } else {
         const browserTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
-        setUserTimezone(getOffsetFromTimezone(browserTimezone));
+        setUserTimezone(browserTimezone);
       }
     } catch (err) {
       console.warn('Error fetching user timezone:', err);
       const browserTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
-      setUserTimezone(getOffsetFromTimezone(browserTimezone));
+      setUserTimezone(browserTimezone);
     }
+  };
+
+  const isOffsetTimezone = (tz) => typeof tz === 'string' && /^[+-]\d{2}:\d{2}$/.test(tz);
+  const resolveUserTimezone = () => {
+    if (!userTimezone) return null;
+    if (typeof userTimezone === 'object') {
+      if (userTimezone.gmtOffset) {
+        return userTimezone.gmtOffset === 'Z' ? '+00:00' : userTimezone.gmtOffset;
+      }
+      return null;
+    }
+    if (userTimezone === 'Z' || userTimezone === 'UTC') return '+00:00';
+    return userTimezone;
+  };
+
+  const convertUtcToUserTimezone = (instantString) => {
+    const timezoneValue = resolveUserTimezone();
+    if (!timezoneValue) {
+      return dayjs(instantString);
+    }
+    if (isOffsetTimezone(timezoneValue)) {
+      return dayjs.utc(instantString).utcOffset(timezoneValue);
+    }
+    return dayjs.utc(instantString).tz(timezoneValue);
+  };
+
+  const convertLocalDateToUserTimezone = (date, keepLocalTime = false) => {
+    const timezoneValue = resolveUserTimezone();
+    if (!timezoneValue) {
+      return dayjs(date);
+    }
+    if (isOffsetTimezone(timezoneValue)) {
+      return dayjs(date).utcOffset(timezoneValue, keepLocalTime);
+    }
+    return dayjs(date).tz(timezoneValue, keepLocalTime);
   };
 
   // Get currency symbol for display
@@ -177,7 +212,7 @@ const PastSessions = () => {
       fetchUserTimezone();
     } else {
       const browserTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
-      setUserTimezone(getOffsetFromTimezone(browserTimezone));
+      setUserTimezone(browserTimezone);
     }
   }, []);
 
@@ -201,8 +236,7 @@ const PastSessions = () => {
         }
 
         try {
-          const bookingUtc = dayjs.utc(booking.startTimeInstant);
-          const bookingInTimezone = bookingUtc.utcOffset(userTimezone);
+          const bookingInTimezone = convertUtcToUserTimezone(booking.startTimeInstant);
           const bookingDateStr = bookingInTimezone.format('YYYY-MM-DD');
 
           return bookingDateStr >= actualStartStr && bookingDateStr <= actualEndStr;
@@ -224,9 +258,9 @@ const PastSessions = () => {
     setTotalPages(Math.ceil(totalFiltered / size));
   };
 
-  const getNowInUserTimezone = () => (userTimezone ? dayjs().utcOffset(userTimezone) : dayjs());
+  const getNowInUserTimezone = () => convertLocalDateToUserTimezone(dayjs());
   const normalizeDateInUserTimezone = (date) => (
-    userTimezone ? dayjs(date).utcOffset(userTimezone, true) : dayjs(date)
+    convertLocalDateToUserTimezone(date, true)
   );
 
   // Handle date selection from calendar
@@ -438,15 +472,7 @@ const PastSessions = () => {
     if (!instantString) return 'N/A';
     const locale = i18n.language === 'ru' ? 'ru' : 'en-gb';
     try {
-      let localTime;
-      if (userTimezone) {
-        // Convert UTC time to admin's timezone using offset
-        // userTimezone is an offset string (e.g. "+03:00"), so we use utcOffset
-        localTime = dayjs.utc(instantString).utcOffset(userTimezone);
-      } else {
-        // Fallback to browser timezone if admin timezone not loaded yet
-        localTime = dayjs(instantString);
-      }
+      const localTime = convertUtcToUserTimezone(instantString);
       if (locale === 'ru') {
         const day = localTime.format('D');
         const monthGenitive = monthsGenitive[localTime.month()];
@@ -980,6 +1006,51 @@ const AdminDashboard = () => {
   const [bookingError, setBookingError] = useState(null);
   const [successMessage, setSuccessMessage] = useState(null);
   const [userTimezone, setUserTimezone] = useState(null);
+  const countryCodes = [
+    { key: 'US:+1', code: '+1', label: 'US (+1)', flag: '🇺🇸' },
+    { key: 'CA:+1', code: '+1', label: 'CA (+1)', flag: '🇨🇦' },
+    { key: 'UK:+44', code: '+44', label: 'UK (+44)', flag: '🇬🇧' },
+    { key: 'DE:+49', code: '+49', label: 'DE (+49)', flag: '🇩🇪' },
+    { key: 'FR:+33', code: '+33', label: 'FR (+33)', flag: '🇫🇷' },
+    { key: 'ES:+34', code: '+34', label: 'ES (+34)', flag: '🇪🇸' },
+    { key: 'IT:+39', code: '+39', label: 'IT (+39)', flag: '🇮🇹' },
+    { key: 'NL:+31', code: '+31', label: 'NL (+31)', flag: '🇳🇱' },
+    { key: 'SE:+46', code: '+46', label: 'SE (+46)', flag: '🇸🇪' },
+    { key: 'NO:+47', code: '+47', label: 'NO (+47)', flag: '🇳🇴' },
+    { key: 'DK:+45', code: '+45', label: 'DK (+45)', flag: '🇩🇰' },
+    { key: 'FI:+358', code: '+358', label: 'FI (+358)', flag: '🇫🇮' },
+    { key: 'PL:+48', code: '+48', label: 'PL (+48)', flag: '🇵🇱' },
+    { key: 'UA:+380', code: '+380', label: 'UA (+380)', flag: '🇺🇦' },
+    { key: 'RU:+7', code: '+7', label: 'RU (+7)', flag: '🇷🇺' },
+    { key: 'KZ:+7', code: '+7', label: 'KZ (+7)', flag: '🇰🇿' },
+    { key: 'TR:+90', code: '+90', label: 'TR (+90)', flag: '🇹🇷' },
+    { key: 'IL:+972', code: '+972', label: 'IL (+972)', flag: '🇮🇱' },
+    { key: 'AE:+971', code: '+971', label: 'AE (+971)', flag: '🇦🇪' },
+    { key: 'SA:+966', code: '+966', label: 'SA (+966)', flag: '🇸🇦' },
+    { key: 'IN:+91', code: '+91', label: 'IN (+91)', flag: '🇮🇳' },
+    { key: 'PK:+92', code: '+92', label: 'PK (+92)', flag: '🇵🇰' },
+    { key: 'BD:+880', code: '+880', label: 'BD (+880)', flag: '🇧🇩' },
+    { key: 'CN:+86', code: '+86', label: 'CN (+86)', flag: '🇨🇳' },
+    { key: 'JP:+81', code: '+81', label: 'JP (+81)', flag: '🇯🇵' },
+    { key: 'KR:+82', code: '+82', label: 'KR (+82)', flag: '🇰🇷' },
+    { key: 'SG:+65', code: '+65', label: 'SG (+65)', flag: '🇸🇬' },
+    { key: 'MY:+60', code: '+60', label: 'MY (+60)', flag: '🇲🇾' },
+    { key: 'TH:+66', code: '+66', label: 'TH (+66)', flag: '🇹🇭' },
+    { key: 'VN:+84', code: '+84', label: 'VN (+84)', flag: '🇻🇳' },
+    { key: 'AU:+61', code: '+61', label: 'AU (+61)', flag: '🇦🇺' },
+    { key: 'NZ:+64', code: '+64', label: 'NZ (+64)', flag: '🇳🇿' },
+    { key: 'ZA:+27', code: '+27', label: 'ZA (+27)', flag: '🇿🇦' },
+    { key: 'BR:+55', code: '+55', label: 'BR (+55)', flag: '🇧🇷' },
+    { key: 'MX:+52', code: '+52', label: 'MX (+52)', flag: '🇲🇽' },
+    { key: 'AR:+54', code: '+54', label: 'AR (+54)', flag: '🇦🇷' },
+    { key: 'CL:+56', code: '+56', label: 'CL (+56)', flag: '🇨🇱' },
+  ];
+  const sortedCountryCodes = [...countryCodes].sort((a, b) => {
+    const aNum = parseInt(a.code.replace('+', ''), 10);
+    const bNum = parseInt(b.code.replace('+', ''), 10);
+    if (aNum !== bNum) return aNum - bNum;
+    return a.label.localeCompare(b.label);
+  });
   const bookingsRefreshKeyRef = useRef(0);
   const [showCustomTimePicker, setShowCustomTimePicker] = useState(false);
   const [customStartTime, setCustomStartTime] = useState(null);
@@ -1001,6 +1072,8 @@ const AdminDashboard = () => {
     email: '',
     firstName: '',
     lastName: '',
+    countryCode: 'US:+1',
+    phone: '',
     timezone: Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC',
     emailNotificationEnabled: false,
   });
@@ -1079,7 +1152,7 @@ const AdminDashboard = () => {
     const first = user.firstName || '';
     const last = user.lastName || '';
     const name = `${last} ${first}`.trim();
-    return name || user.email || user.id;
+    return name || user.phoneNumber || user.email || user.id;
   };
 
   const handleUsersChange = (e) => {
@@ -1644,6 +1717,8 @@ const AdminDashboard = () => {
       email: '',
       firstName: '',
       lastName: '',
+      countryCode: 'US:+1',
+      phone: '',
       timezone: '+00:00', // Default to UTC offset
       emailNotificationEnabled: false,
     });
@@ -1657,21 +1732,26 @@ const AdminDashboard = () => {
       email: '',
       firstName: '',
       lastName: '',
+      countryCode: 'US:+1',
+      phone: '',
       timezone: Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC',
       emailNotificationEnabled: false,
     });
     setCreateClientError(null);
   };
 
+  const validatePhoneNumber = (phoneNumber) => /^\d{10}$/.test(phoneNumber);
+
   const handleCreateClientSubmit = async () => {
     // Validate form
-    if (!newClientData.email.trim()) {
-      setCreateClientError(t('admin.dashboard.emailRequired'));
+    if (!newClientData.phone.trim()) {
+      setCreateClientError(t('admin.dashboard.phoneRequired'));
       return;
     }
 
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!emailRegex.test(newClientData.email.trim())) {
+    const normalizedEmail = newClientData.email.trim();
+    if (normalizedEmail && !emailRegex.test(normalizedEmail)) {
       setCreateClientError(t('admin.dashboard.emailInvalid'));
       return;
     }
@@ -1696,17 +1776,25 @@ const AdminDashboard = () => {
       return;
     }
 
+    if (!validatePhoneNumber(newClientData.phone.trim())) {
+      setCreateClientError(t('auth.phoneNumberInvalid'));
+      return;
+    }
+
     setCreatingClient(true);
     setCreateClientError(null);
 
     try {
+      const selectedCountry = countryCodes.find((country) => country.key === newClientData.countryCode);
+      const dialingCode = selectedCountry ? selectedCountry.code : '';
       // Create user via admin API - CreateUserAdminRequest
       const payload = {
-        email: newClientData.email.trim(),
+        email: normalizedEmail || undefined,
         firstName: newClientData.firstName.trim() || undefined,
         lastName: newClientData.lastName.trim() || undefined,
+        phoneNumber: `${dialingCode}${newClientData.phone.trim()}` || undefined,
         timezoneId: findTimezoneIdByOffset(newClientData.timezone.trim(), timezones),
-        emailNotificationEnabled: newClientData.emailNotificationEnabled || false,
+        emailNotificationEnabled: normalizedEmail ? newClientData.emailNotificationEnabled || false : false,
       };
 
       const response = await fetchWithAuth('/api/v1/admin/user/registry', {
@@ -2916,10 +3004,14 @@ const AdminDashboard = () => {
                   type="email"
                   value={newClientData.email}
                   onChange={(e) => {
-                    setNewClientData((prev) => ({ ...prev, email: e.target.value }));
+                    const emailValue = e.target.value;
+                    setNewClientData((prev) => ({
+                      ...prev,
+                      email: emailValue,
+                      emailNotificationEnabled: emailValue.trim() ? prev.emailNotificationEnabled : false,
+                    }));
                     setCreateClientError(null);
                   }}
-                  required
                   disabled={creatingClient}
                   error={!!createClientError && createClientError.includes('email')}
                 />
@@ -2949,6 +3041,65 @@ const AdminDashboard = () => {
                   disabled={creatingClient}
                   inputProps={{ maxLength: 100 }}
                 />
+              </Grid>
+
+              <Grid item xs={12}>
+                <Box
+                  sx={{
+                    display: 'flex',
+                    gap: 2,
+                    flexDirection: 'row',
+                  }}
+                >
+                  <TextField
+                    select
+                    label={t('auth.countryCode')}
+                    value={newClientData.countryCode}
+                    onChange={(e) => {
+                      setNewClientData((prev) => ({ ...prev, countryCode: e.target.value }));
+                      setCreateClientError(null);
+                    }}
+                    disabled={creatingClient}
+                    variant="outlined"
+                    sx={{
+                      flex: { xs: '0 0 130px', sm: '0 0 200px' },
+                      minWidth: { xs: 120, sm: 180 },
+                    }}
+                    SelectProps={{
+                      renderValue: (selected) => {
+                        const match = countryCodes.find((country) => country.key === selected);
+                        return match ? `${match.flag} ${match.label}` : selected;
+                      },
+                      MenuProps: {
+                        disablePortal: true,
+                        anchorOrigin: { vertical: 'bottom', horizontal: 'left' },
+                        transformOrigin: { vertical: 'top', horizontal: 'left' },
+                        PaperProps: { sx: { maxHeight: 320 } },
+                      },
+                    }}
+                  >
+                    {sortedCountryCodes.map((option) => (
+                      <MenuItem key={option.key} value={option.key}>
+                        {option.flag} {option.label}
+                      </MenuItem>
+                    ))}
+                  </TextField>
+                  <TextField
+                    fullWidth
+                    label={t('admin.dashboard.phoneLabel')}
+                    type="tel"
+                    value={newClientData.phone}
+                    onChange={(e) => {
+                      const sanitizedPhone = e.target.value.replace(/\D/g, '').slice(0, 10);
+                      setNewClientData((prev) => ({ ...prev, phone: sanitizedPhone }));
+                      setCreateClientError(null);
+                    }}
+                    disabled={creatingClient}
+                    placeholder="5551234567"
+                    inputProps={{ maxLength: 10 }}
+                    required
+                  />
+                </Box>
               </Grid>
 
               <Grid item xs={12}>
@@ -2986,7 +3137,7 @@ const AdminDashboard = () => {
                       onChange={(e) => {
                         setNewClientData((prev) => ({ ...prev, emailNotificationEnabled: e.target.checked }));
                       }}
-                      disabled={creatingClient}
+                      disabled={creatingClient || !newClientData.email.trim()}
                     />
                   }
                   label={t('pages.profile.emailNotifications')}
@@ -3006,7 +3157,7 @@ const AdminDashboard = () => {
               onClick={handleCreateClientSubmit}
               variant="contained"
               sx={{ textTransform: 'none' }}
-              disabled={creatingClient || !newClientData.email.trim()}
+              disabled={creatingClient || !newClientData.phone.trim()}
             >
               {creatingClient ? (
                 <>
