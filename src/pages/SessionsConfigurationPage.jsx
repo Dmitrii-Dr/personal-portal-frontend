@@ -79,6 +79,7 @@ const SessionsConfigurationPage = () => {
   const [sessionTypeForm, setSessionTypeForm] = useState({
     name: '',
     description: '',
+    shortDescription: '',
     durationMinutes: 60,
     bufferMinutes: 0,
     active: true,
@@ -397,6 +398,7 @@ const SessionsConfigurationPage = () => {
       setSessionTypeForm({
         name: sessionType.name || '',
         description: sessionType.description || '',
+        shortDescription: sessionType.shortDescription || '',
         durationMinutes: sessionType.durationMinutes || 60,
         bufferMinutes: sessionType.bufferMinutes || 0,
         active: sessionType.active !== undefined ? sessionType.active : true,
@@ -407,6 +409,7 @@ const SessionsConfigurationPage = () => {
       setSessionTypeForm({
         name: '',
         description: '',
+        shortDescription: '',
         durationMinutes: 60,
         bufferMinutes: 0,
         active: true,
@@ -466,6 +469,10 @@ const SessionsConfigurationPage = () => {
         setError(t('admin.sessionConfiguration.descriptionTooLong'));
         return;
       }
+      if (sessionTypeForm.shortDescription && sessionTypeForm.shortDescription.length > 150) {
+        setError(t('admin.sessionConfiguration.shortDescriptionTooLong'));
+        return;
+      }
       if (sessionTypeForm.durationMinutes < 1) {
         setError(t('admin.sessionConfiguration.durationMustBePositive'));
         return;
@@ -483,6 +490,7 @@ const SessionsConfigurationPage = () => {
       const requestBody = {
         name: sessionTypeForm.name,
         description: sessionTypeForm.description,
+        shortDescription: sessionTypeForm.shortDescription,
         durationMinutes: sessionTypeForm.durationMinutes,
         bufferMinutes: sessionTypeForm.bufferMinutes || 0,
         prices: prices, // Always include prices with all currencies
@@ -972,6 +980,17 @@ const SessionsConfigurationPage = () => {
             margin="normal"
             inputProps={{ maxLength: 2000 }}
             helperText={`${(sessionTypeForm.description || '').length}/2000 ${t('common.characters')}`}
+          />
+          <TextField
+            fullWidth
+            label={t('admin.sessionConfiguration.shortDescription')}
+            multiline
+            rows={2}
+            value={sessionTypeForm.shortDescription || ''}
+            onChange={(e) => setSessionTypeForm({ ...sessionTypeForm, shortDescription: e.target.value })}
+            margin="normal"
+            inputProps={{ maxLength: 150 }}
+            helperText={`${(sessionTypeForm.shortDescription || '').length}/150 ${t('common.characters')}`}
           />
           <TextField
             fullWidth

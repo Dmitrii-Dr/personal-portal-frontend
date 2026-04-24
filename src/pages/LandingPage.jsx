@@ -1490,7 +1490,26 @@ const LandingPage = () => {
                     <Grid container spacing={1.25}>
                       {orderedSessionTypes.map((sessionType) => (
                         <Grid item xs={12} key={sessionType.id || sessionType.sessionTypeId} sx={{ display: 'flex' }}>
-                          <Card sx={{ width: '100%', display: 'flex', flexDirection: 'column' }}>
+                          <Card
+                            sx={{
+                              width: '100%',
+                              display: 'flex',
+                              flexDirection: 'column',
+                              borderRadius: 3,
+                              border: '1px solid',
+                              borderColor: 'rgba(44, 95, 95, 0.14)',
+                              boxShadow: '0 8px 22px rgba(44, 95, 95, 0.12), 0 2px 8px rgba(0, 0, 0, 0.06)',
+                              transition: 'transform 0.2s ease-in-out, box-shadow 0.2s ease-in-out',
+                              '&:hover': {
+                                transform: 'translateY(-3px)',
+                                boxShadow: '0 14px 30px rgba(44, 95, 95, 0.16), 0 4px 12px rgba(0, 0, 0, 0.08)',
+                              },
+                              '&:active': {
+                                transform: 'translateY(-2px)',
+                                boxShadow: '0 12px 26px rgba(44, 95, 95, 0.15), 0 3px 10px rgba(0, 0, 0, 0.08)',
+                              },
+                            }}
+                          >
                             <CardContent
                               sx={{
                                 flexGrow: 1,
@@ -1505,6 +1524,7 @@ const LandingPage = () => {
                                   variant="body1"
                                   component="h3"
                                   sx={{
+                                    pl: 0.5,
                                     fontWeight: 600,
                                     lineHeight: 1.35,
                                     fontSize: {
@@ -1519,43 +1539,46 @@ const LandingPage = () => {
                                   {truncateText(sessionType.name, 100)}
                                 </Typography>
                               </Box>
-                              <Box sx={{ minHeight: 48, mb: 0.75 }}>
-                                <Typography
-                                  variant="body2"
-                                  color="text.secondary"
-                                  sx={{
-                                    lineHeight: 1.35,
-                                    fontSize: {
-                                      xs: truncateText(sessionType.description, 100).length > 85
-                                        ? 'clamp(0.8rem, 2.6vw, 0.9rem)'
-                                        : 'clamp(0.86rem, 3vw, 0.96rem)',
-                                      sm: '0.875rem',
-                                    },
-                                    overflowWrap: 'anywhere',
-                                  }}
-                                >
-                                  {truncateText(sessionType.description, 100)}
-                                </Typography>
-                              </Box>
+                              {sessionType.shortDescription ? (
+                                <Box sx={{ minHeight: 48, mb: 0.75 }}>
+                                  <Typography
+                                    variant="body2"
+                                    color="text.secondary"
+                                    sx={{
+                                      pl: 0.5,
+                                      lineHeight: 1.35,
+                                      fontSize: {
+                                        xs: sessionType.shortDescription.length > 85
+                                          ? 'clamp(0.8rem, 2.6vw, 0.9rem)'
+                                          : 'clamp(0.86rem, 3vw, 0.96rem)',
+                                        sm: '0.875rem',
+                                      },
+                                      overflowWrap: 'anywhere',
+                                    }}
+                                  >
+                                    {sessionType.shortDescription}
+                                  </Typography>
+                                </Box>
+                              ) : null}
                             </CardContent>
                             <CardActions
                               disableSpacing
                               sx={{ p: 1.25, pt: 0.25, flexDirection: 'column', alignItems: 'stretch', gap: 0.75 }}
                             >
-                              <Box sx={{ width: '100%', display: 'flex', flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'flex-end', gap: 0.5 }}>
+                              <Box sx={{ width: '100%', display: 'flex', flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'flex-end', gap: 0.75, pr: 1 }}>
                                 <Chip
                                   label={`${sessionType.durationMinutes || 60} ${t('landing.booking.min')}`}
-                                  size="small"
+                                  size="medium"
                                   color="primary"
                                   variant="outlined"
-                                  sx={{ flexShrink: 0, '& .MuiChip-label': { fontWeight: 700 } }}
+                                  sx={{ flexShrink: 0, '& .MuiChip-label': { fontWeight: 700, fontSize: '0.9rem' } }}
                                 />
                                 <Chip
-                                  size="small"
+                                  size="medium"
                                   variant="outlined"
                                   color="primary"
                                   label={getCompactSessionPrice(sessionType)}
-                                  sx={{ flexShrink: 0, mr: 0.5, '& .MuiChip-label': { fontWeight: 700 } }}
+                                  sx={{ flexShrink: 0, '& .MuiChip-label': { fontWeight: 700, fontSize: '0.9rem' } }}
                                 />
                               </Box>
                               <Button
@@ -1630,10 +1653,18 @@ const LandingPage = () => {
                           display: 'flex',
                           flexDirection: 'column',
                           scrollSnapAlign: 'start',
+                          borderRadius: 3,
+                          border: '1px solid',
+                          borderColor: 'rgba(44, 95, 95, 0.14)',
+                          boxShadow: '0 8px 22px rgba(44, 95, 95, 0.12), 0 2px 8px rgba(0, 0, 0, 0.06)',
                           transition: 'transform 0.2s ease-in-out, box-shadow 0.2s ease-in-out',
                           '&:hover': {
                             transform: 'translateY(-4px)',
-                            boxShadow: 4,
+                            boxShadow: '0 16px 34px rgba(44, 95, 95, 0.17), 0 4px 12px rgba(0, 0, 0, 0.09)',
+                          },
+                          '&:active': {
+                            transform: 'translateY(-2px)',
+                            boxShadow: '0 12px 26px rgba(44, 95, 95, 0.15), 0 3px 10px rgba(0, 0, 0, 0.08)',
                           },
                         }}
                       >
@@ -1643,6 +1674,7 @@ const LandingPage = () => {
                                 variant="body1"
                                 component="h3"
                                 sx={{
+                                  pl: 0.5,
                                   fontWeight: 600,
                                   lineHeight: 1.35,
                                   fontSize: {
@@ -1659,42 +1691,45 @@ const LandingPage = () => {
                                 {truncateText(sessionType.name, 100)}
                               </Typography>
                             </Box>
-                            <Box sx={{ minHeight: 48, mb: 0.75 }}>
-                              <Typography
-                                variant="body2"
-                                color="text.secondary"
-                                sx={{
-                                  lineHeight: 1.35,
-                                  fontSize: {
-                                    xs: truncateText(sessionType.description, 100).length > 85
-                                      ? 'clamp(0.8rem, 2.6vw, 0.9rem)'
-                                      : 'clamp(0.86rem, 3vw, 0.96rem)',
-                                    sm: truncateText(sessionType.description, 100).length > 85
-                                      ? 'clamp(0.82rem, 1.2vw, 0.92rem)'
-                                      : 'clamp(0.9rem, 1.5vw, 1rem)',
-                                  },
-                                  overflowWrap: 'anywhere',
-                                }}
-                              >
-                                {truncateText(sessionType.description, 100)}
-                              </Typography>
-                            </Box>
+                            {sessionType.shortDescription ? (
+                              <Box sx={{ minHeight: 48, mb: 0.75 }}>
+                                <Typography
+                                  variant="body2"
+                                  color="text.secondary"
+                                  sx={{
+                                    pl: 0.5,
+                                    lineHeight: 1.35,
+                                    fontSize: {
+                                      xs: sessionType.shortDescription.length > 85
+                                        ? 'clamp(0.8rem, 2.6vw, 0.9rem)'
+                                        : 'clamp(0.86rem, 3vw, 0.96rem)',
+                                      sm: sessionType.shortDescription.length > 85
+                                        ? 'clamp(0.82rem, 1.2vw, 0.92rem)'
+                                        : 'clamp(0.9rem, 1.5vw, 1rem)',
+                                    },
+                                    overflowWrap: 'anywhere',
+                                  }}
+                                >
+                                  {sessionType.shortDescription}
+                                </Typography>
+                              </Box>
+                            ) : null}
                           </CardContent>
                           <CardActions disableSpacing sx={{ p: 1.5, pt: 0, flexDirection: 'column', alignItems: 'stretch', gap: 0.75 }}>
-                            <Box sx={{ width: '100%', display: 'flex', flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'flex-end', gap: 0.5 }}>
+                            <Box sx={{ width: '100%', display: 'flex', flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'flex-end', gap: 0.75, pr: 1 }}>
                               <Chip
                                 label={`${sessionType.durationMinutes || 60} ${t('landing.booking.min')}`}
-                                size="small"
+                                size="medium"
                                 color="primary"
                                 variant="outlined"
-                                sx={{ flexShrink: 0, '& .MuiChip-label': { fontWeight: 700 } }}
+                                sx={{ flexShrink: 0, '& .MuiChip-label': { fontWeight: 700, fontSize: '0.9rem' } }}
                               />
                               <Chip
-                                size="small"
+                                size="medium"
                                 variant="outlined"
                                 color="primary"
                                 label={getCompactSessionPrice(sessionType)}
-                                sx={{ flexShrink: 0, mr: 0.5, '& .MuiChip-label': { fontWeight: 700 } }}
+                                sx={{ flexShrink: 0, '& .MuiChip-label': { fontWeight: 700, fontSize: '0.9rem' } }}
                               />
                             </Box>
                             <Button
@@ -1917,10 +1952,19 @@ const LandingPage = () => {
                               height: '100%',
                               display: 'flex',
                               flexDirection: 'column',
+                              bgcolor: '#F0F7F7',
+                              borderRadius: 3,
+                              border: '1px solid',
+                              borderColor: 'rgba(44, 95, 95, 0.14)',
+                              boxShadow: '0 8px 22px rgba(44, 95, 95, 0.11), 0 2px 8px rgba(0, 0, 0, 0.05)',
                               transition: 'transform 0.2s ease-in-out, box-shadow 0.2s ease-in-out',
                               '&:hover': {
                                 transform: 'translateY(-4px)',
-                                boxShadow: 4,
+                                boxShadow: '0 16px 34px rgba(44, 95, 95, 0.15), 0 4px 12px rgba(0, 0, 0, 0.08)',
+                              },
+                              '&:active': {
+                                transform: 'translateY(-2px)',
+                                boxShadow: '0 12px 26px rgba(44, 95, 95, 0.14), 0 3px 10px rgba(0, 0, 0, 0.07)',
                               },
                             }}
                           >
