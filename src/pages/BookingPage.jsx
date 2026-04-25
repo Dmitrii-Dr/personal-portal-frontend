@@ -120,6 +120,7 @@ const BookingPage = ({ sessionTypeId: propSessionTypeId, hideMyBookings = false 
 
   const [hasToken, setHasToken] = useState(false);
   const [loginRequiredDialogOpen, setLoginRequiredDialogOpen] = useState(false);
+  const [bookingLimitDialogOpen, setBookingLimitDialogOpen] = useState(false);
   const [updateDialogOpen, setUpdateDialogOpen] = useState(false);
 
   const [confirmUpdateDialogOpen, setConfirmUpdateDialogOpen] = useState(false);
@@ -157,6 +158,14 @@ const BookingPage = ({ sessionTypeId: propSessionTypeId, hideMyBookings = false 
   const [bookingSettings, setBookingSettings] = useState(null);
 
   const PENDING_BOOKING_KEY = 'pending_booking';
+  const pendingApprovalCount = groupedBookings?.PENDING_APPROVAL?.length || 0;
+  const maxPendingBookings = bookingSettings?.maxPendingBookings ?? null;
+  const isPendingLimitReached = Boolean(
+    hasToken &&
+    typeof maxPendingBookings === 'number' &&
+    maxPendingBookings > 0 &&
+    pendingApprovalCount >= maxPendingBookings
+  );
 
   // Format date to YYYY-MM-DD for API
   const formatDateForAPI = (date) => {
@@ -756,8 +765,21 @@ const BookingPage = ({ sessionTypeId: propSessionTypeId, hideMyBookings = false 
     clearAllCache();
   };
 
+  const handleBookingLimitDialogClose = () => {
+    setBookingLimitDialogOpen(false);
+  };
+
+  const openBookingLimitDialog = useCallback(() => {
+    setBookingError(null);
+    setBookingLimitDialogOpen(true);
+  }, []);
+
   // Handle slot selection
   const handleSlotClick = (slot) => {
+    if (isPendingLimitReached) {
+      openBookingLimitDialog();
+      return;
+    }
     setSelectedSlot(slot);
     setDialogSlot(slot); // Store for dialog display
     setClientMessage(''); // Reset client message
@@ -1076,6 +1098,12 @@ const BookingPage = ({ sessionTypeId: propSessionTypeId, hideMyBookings = false 
       return;
     }
 
+    if (isPendingLimitReached) {
+      handleDialogClose();
+      openBookingLimitDialog();
+      return;
+    }
+
     // Check if user is logged in - DO NOT call API without token
     if (!hasToken || !getToken()) {
       // Get the timezone ID for the current timezone
@@ -1142,9 +1170,14 @@ const BookingPage = ({ sessionTypeId: propSessionTypeId, hideMyBookings = false 
     } catch (err) {
       console.error('Error creating booking:', err);
       let errorMessage = t('pages.booking.bookingFailed');
+      const isPendingLimitError = err.response?.data?.code === 'PEC-421';
 
       // Check for 400 or 500 errors and show user-friendly message
-      if (err.response && (err.response.status === 400 || err.response.status >= 500)) {
+      if (isPendingLimitError) {
+        handleDialogClose();
+        openBookingLimitDialog();
+        errorMessage = t('pages.booking.pendingBookingsLimitReached');
+      } else if (err.response && (err.response.status === 400 || err.response.status >= 500)) {
         errorMessage = t('pages.booking.bookingErrorRetry');
         // Invalidate cache to refresh slots
         const dateString = formatDateForAPI(selectedDate);
@@ -1193,6 +1226,12 @@ const BookingPage = ({ sessionTypeId: propSessionTypeId, hideMyBookings = false 
     try {
       const pendingBooking = JSON.parse(pendingBookingStr);
 
+      if (isPendingLimitReached) {
+        sessionStorage.removeItem(PENDING_BOOKING_KEY);
+        openBookingLimitDialog();
+        return;
+      }
+
       const payload = {
         sessionTypeId: pendingBooking.sessionTypeId,
         startTimeInstant: pendingBooking.startTimeInstant,
@@ -1235,11 +1274,17 @@ const BookingPage = ({ sessionTypeId: propSessionTypeId, hideMyBookings = false 
       const isUnverified =
         err.response?.status === 403 &&
         err.response?.data?.code === 'PEC-412';
+      const isPendingLimitError = err.response?.data?.code === 'PEC-421';
 
       if (isUnverified) {
         // Reset the attempted flag so completePendingBooking runs again after verification
         pendingBookingAttempted.current = false;
         return;
+      }
+
+      if (isPendingLimitError) {
+        setBookingError(t('pages.booking.pendingBookingsLimitReached'));
+        openBookingLimitDialog();
       }
 
       // Remove pending booking on any other error to prevent infinite retries
@@ -1251,7 +1296,7 @@ const BookingPage = ({ sessionTypeId: propSessionTypeId, hideMyBookings = false 
     } finally {
       setSubmittingBooking(false);
     }
-  }, [hasToken, t, fetchBookings, fetchAvailableSlots]);
+  }, [hasToken, t, fetchBookings, fetchAvailableSlots, isPendingLimitReached, openBookingLimitDialog]);
 
   // Check for pending booking when user logs in
   useEffect(() => {
@@ -2038,6 +2083,14 @@ const BookingPage = ({ sessionTypeId: propSessionTypeId, hideMyBookings = false 
                   )
                 )}
 
+                {isPendingLimitReached && (
+                  <Alert severity="warning" sx={{ mb: 2 }}>
+                    {t('pages.booking.pendingBookingsLimitWarning', {
+                      count: maxPendingBookings,
+                    })}
+                  </Alert>
+                )}
+
                 {error && (
                   <Alert severity="error" sx={{ mb: 2 }}>
                     {error}
@@ -2318,6 +2371,14 @@ const BookingPage = ({ sessionTypeId: propSessionTypeId, hideMyBookings = false 
                     )
                   )}
 
+                  {isPendingLimitReached && (
+                    <Alert severity="warning" sx={{ mb: 2 }}>
+                      {t('pages.booking.pendingBookingsLimitWarning', {
+                        count: maxPendingBookings,
+                      })}
+                    </Alert>
+                  )}
+
                   {error && (
                     <Alert severity="error" sx={{ mb: 2 }}>
                       {error}
@@ -2536,6 +2597,71 @@ const BookingPage = ({ sessionTypeId: propSessionTypeId, hideMyBookings = false 
               ) : (
                 t('pages.booking.logInAndConfirm')
               )}
+            </Button>
+          </DialogActions>
+        </Dialog>
+
+        {/* Booking Limit Dialog */}
+        <Dialog
+          open={bookingLimitDialogOpen}
+          onClose={handleBookingLimitDialogClose}
+          maxWidth="sm"
+          fullWidth
+          fullScreen={isSmallScreen}
+          PaperProps={{
+            sx: isSmallScreen
+              ? {
+                m: 0,
+                width: '100%',
+                maxWidth: '100%',
+                borderRadius: 0,
+              }
+              : {},
+          }}
+        >
+          <DialogTitle sx={{ m: 0, p: 2, pr: 6 }}>
+            {t('pages.booking.pendingBookingsLimitDialogTitle')}
+            <IconButton
+              aria-label="close"
+              onClick={handleBookingLimitDialogClose}
+              sx={{
+                position: 'absolute',
+                right: 8,
+                top: 8,
+                color: (theme) => theme.palette.grey[500],
+              }}
+            >
+              <CloseIcon />
+            </IconButton>
+          </DialogTitle>
+          <DialogContent>
+            <DialogContentText>
+              {t('pages.booking.pendingBookingsLimitDialogMessage', {
+                count: maxPendingBookings,
+              })}
+            </DialogContentText>
+          </DialogContent>
+          <DialogActions sx={{ px: 3, pb: 2, gap: 1.5 }}>
+            <Button
+              onClick={handleBookingLimitDialogClose}
+              variant="outlined"
+              fullWidth
+              sx={{ textTransform: 'none', py: 1 }}
+            >
+              {t('common.cancel')}
+            </Button>
+            <Button
+              onClick={() => {
+                handleBookingLimitDialogClose();
+                setNewBookingDialogOpen(false);
+                setOpenDialog(false);
+                navigate('/booking');
+              }}
+              variant="contained"
+              fullWidth
+              sx={{ textTransform: 'none', py: 1 }}
+            >
+              {t('pages.booking.manageBookings')}
             </Button>
           </DialogActions>
         </Dialog>

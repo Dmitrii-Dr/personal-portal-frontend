@@ -4,6 +4,7 @@
     "PEC-412": "Your account is not yet verified. Please enter the code sent to your email.",
     "PEC-413": "Invalid or expired verification code. Please try again or request a new code.",
     "PEC-414": "Too many code requests. Please wait a moment before requesting a new code.",
+    "PEC-421": "You have reached the maximum number of pending bookings. Please update or cancel an existing booking request.",
     "PEC-500": "An unexpected error occurred. Please try again later.",
     "fallback": "Something went wrong. Please try again."
 }

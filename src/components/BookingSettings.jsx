@@ -40,6 +40,7 @@ const BookingSettings = () => {
     bookingFirstSlotInterval: 10,
     bookingCancelationInterval: 0,
     bookingUpdatingInterval: 0,
+    maxPendingBookings: 3,
     defaultTimezone: 'UTC',
     roundBookingSuggestions: false,
   });
@@ -71,6 +72,7 @@ const BookingSettings = () => {
         bookingFirstSlotInterval: data.bookingFirstSlotInterval || 10,
         bookingCancelationInterval: data.bookingCancelationInterval || 0,
         bookingUpdatingInterval: data.bookingUpdatingInterval || 0,
+        maxPendingBookings: data.maxPendingBookings || 3,
         defaultTimezone: extractTimezoneOffset(data.defaultTimezone) || '+00:00',
         roundBookingSuggestions: data.roundBookingSuggestions || false,
       });
@@ -162,6 +164,7 @@ const BookingSettings = () => {
         bookingFirstSlotInterval: settings.bookingFirstSlotInterval || 10,
         bookingCancelationInterval: settings.bookingCancelationInterval || 0,
         bookingUpdatingInterval: settings.bookingUpdatingInterval || 0,
+        maxPendingBookings: settings.maxPendingBookings || 3,
         defaultTimezone: extractTimezoneOffset(settings.defaultTimezone) || '+00:00',
         roundBookingSuggestions: settings.roundBookingSuggestions || false,
       });
@@ -186,6 +189,10 @@ const BookingSettings = () => {
 
     if (formData.bookingUpdatingInterval < 0) {
       errors.bookingUpdatingInterval = t('admin.sessionConfiguration.bookingSettings.mustBeGreaterThanOrEqual');
+    }
+
+    if (formData.maxPendingBookings < 1) {
+      errors.maxPendingBookings = t('admin.sessionConfiguration.bookingSettings.mustBeGreaterThanOrEqual1');
     }
 
     if (!formData.defaultTimezone || formData.defaultTimezone.trim() === '') {
@@ -216,6 +223,7 @@ const BookingSettings = () => {
           bookingFirstSlotInterval: formData.bookingFirstSlotInterval,
           bookingCancelationInterval: formData.bookingCancelationInterval,
           bookingUpdatingInterval: formData.bookingUpdatingInterval,
+          maxPendingBookings: formData.maxPendingBookings,
           defaultTimezoneId: findTimezoneIdByOffset(formData.defaultTimezone, timezones),
           roundBookingSuggestions: formData.roundBookingSuggestions,
         }),
@@ -343,6 +351,14 @@ const BookingSettings = () => {
           </Grid>
           <Grid item xs={12} md={6}>
             <Typography variant="body2" color="text.secondary">
+              {t('admin.sessionConfiguration.bookingSettings.maxPendingBookings')}
+            </Typography>
+            <Typography variant="body1" gutterBottom>
+              {settings?.maxPendingBookings ?? 'N/A'}
+            </Typography>
+          </Grid>
+          <Grid item xs={12} md={6}>
+            <Typography variant="body2" color="text.secondary">
               {t('admin.sessionConfiguration.bookingSettings.defaultTimezone')}
             </Typography>
             <Typography variant="body1" gutterBottom>
@@ -422,6 +438,22 @@ const BookingSettings = () => {
                 t('admin.sessionConfiguration.bookingSettings.bookingUpdatingIntervalHelper')
               }
               inputProps={{ min: 0 }}
+              required
+            />
+          </Grid>
+          <Grid item xs={12} md={6}>
+            <TextField
+              fullWidth
+              label={t('admin.sessionConfiguration.bookingSettings.maxPendingBookingsLabel')}
+              type="number"
+              value={formData.maxPendingBookings}
+              onChange={handleChange('maxPendingBookings')}
+              error={!!formErrors.maxPendingBookings}
+              helperText={
+                formErrors.maxPendingBookings ||
+                t('admin.sessionConfiguration.bookingSettings.maxPendingBookingsHelper')
+              }
+              inputProps={{ min: 1 }}
               required
             />
           </Grid>
