@@ -15,8 +15,10 @@ import AdminProfilePage from './pages/AdminProfilePage';
 import AdminHomePage from './pages/AdminHomePage';
 import AdminGalleryPage from './pages/AdminGalleryPage';
 import AdminObservabilityPage from './pages/AdminObservabilityPage';
+import AdminClientsPage from './pages/AdminClientsPage';
 import AboutMePage from './pages/AboutMePage';
 import MaintenancePage from './pages/MaintenancePage';
+import AccountLockedPage from './pages/AccountLockedPage';
 import SessionsConfigurationPage from './pages/SessionsConfigurationPage';
 import ResetPasswordPage from './pages/ResetPasswordPage';
 import AccountVerificationPage from './pages/AccountVerificationPage';
@@ -46,6 +48,7 @@ import {
 } from '@mui/material';
 import { Link } from 'react-router-dom';
 import { setToken, fetchWithAuth, getRolesFromToken, getPublicWelcome } from './utils/api';
+import { getApiErrorMessage } from './utils/apiErrors';
 import { fetchTimezones } from './utils/timezoneService';
 import axios from 'axios';
 import dayjs from 'dayjs';
@@ -520,8 +523,12 @@ const LoginPage = () => {
 
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({}));
+        if (errorData.code === 'PEC-422') {
+          navigate('/account-locked', { replace: true });
+          return;
+        }
         throw new Error(
-          errorData.message ||
+          getApiErrorMessage(errorData.code, errorData.message) ||
           `Login failed: ${response.status} ${response.statusText}`
         );
       }
@@ -712,6 +719,14 @@ function AppInner() {
     return () => window.removeEventListener('account-not-verified', handler);
   }, [navigate]);
 
+  useEffect(() => {
+    const handler = () => {
+      navigate('/account-locked', { replace: true });
+    };
+    window.addEventListener('account-locked', handler);
+    return () => window.removeEventListener('account-locked', handler);
+  }, [navigate]);
+
   return (
     <>
       <UrlLanguageSync />
@@ -727,6 +742,7 @@ function AppInner() {
             {/* Email-friendly URL: same as opening / and scrolling to #contact */}
             <Route path="/contacts" element={<Navigate to="/#contact" replace />} />
             <Route path="/maintenance" element={<MaintenancePage />} />
+            <Route path="/account-locked" element={<AccountLockedPage />} />
             <Route path="/reset-password" element={<ResetPasswordPage />} />
             {/* /admin is the admin login page — keep public */}
             <Route path="/admin" element={<AdminPage />} />
@@ -750,6 +766,7 @@ function AppInner() {
                     <Route path="blog" element={<AdminBlogPage />} />
                     <Route path="gallery" element={<AdminGalleryPage />} />
                     <Route path="profile" element={<AdminProfilePage />} />
+                    <Route path="clients" element={<AdminClientsPage />} />
                     <Route path="observability" element={<AdminObservabilityPage />} />
                     <Route path="session/configuration" element={<SessionsConfigurationPage />} />
                     <Route path="*" element={<Navigate to="/admin/dashboard" replace />} />

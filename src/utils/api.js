@@ -96,6 +96,15 @@ export const isTokenExpired = (token) => {
 // Concurrent calls are deduplicated — only one HTTP request is ever in flight.
 let _refreshPromise = null;
 
+const ACCOUNT_LOCKED_CODE = 'PEC-422';
+
+const dispatchAccountLocked = () => {
+  removeToken();
+  if (window.location.pathname !== '/account-locked') {
+    window.dispatchEvent(new Event('account-locked'));
+  }
+};
+
 export const refreshAccessToken = () => {
   // Anonymous user — no session hints, skip entirely.
   if (!hasSessionHint()) return Promise.resolve(null);
@@ -116,6 +125,14 @@ export const refreshAccessToken = () => {
         credentials: 'same-origin',
         headers,
       });
+
+      if (response.status === 403) {
+        const body = await response.clone().json().catch(() => ({}));
+        if (body?.code === ACCOUNT_LOCKED_CODE) {
+          dispatchAccountLocked();
+          return null;
+        }
+      }
 
       if (response.status === 401 || response.status === 403) {
         // Refresh token expired / invalid — end the session.
@@ -262,6 +279,19 @@ apiClient.interceptors.response.use(
       }
     }
 
+    // Account locked — end the session and show the locked account page
+    if (error.response?.status === 403) {
+      try {
+        const body = error.response?.data;
+        if (body?.code === ACCOUNT_LOCKED_CODE) {
+          dispatchAccountLocked();
+          return Promise.reject(error);
+        }
+      } catch (_) {
+        // ignore parse errors
+      }
+    }
+
     // Account not verified — redirect to verification page from anywhere
     if (error.response?.status === 403) {
       try {
@@ -347,6 +377,18 @@ export const fetchWithAuth = async (url, options = {}) => {
     }
   }
 
+  if (response.status === 403) {
+    try {
+      const body = await response.clone().json();
+      if (body?.code === ACCOUNT_LOCKED_CODE) {
+        dispatchAccountLocked();
+        return response;
+      }
+    } catch (_) {
+      // ignore parse errors
+    }
+  }
+
   // Transparent 401 refresh for plain-fetch callers
   if (response.status === 401) {
     const newToken = await refreshAccessToken();
@@ -372,6 +414,40 @@ export const fetchAdminGroupedBookings = async (status = null) => {
     timeout: 10000,
   });
   return response.data;
+};
+
+export const fetchAdminUsers = async () => {
+  const response = await apiClient.get('/api/v1/admin/users', {
+    timeout: 10000,
+  });
+  return response.data;
+};
+
+export const updateAdminUser = async (userId, payload) => {
+  const response = await apiClient.patch(`/api/v1/admin/users/${userId}`, payload, {
+    timeout: 10000,
+  });
+  return response.data;
+};
+
+export const fetchAdminUserSettings = async (userId) => {
+  const response = await apiClient.get(`/api/v1/admin/users/${userId}/settings`, {
+    timeout: 10000,
+  });
+  return response.data;
+};
+
+export const updateAdminUserSettings = async (userId, payload) => {
+  const response = await apiClient.put(`/api/v1/admin/users/${userId}/settings`, payload, {
+    timeout: 10000,
+  });
+  return response.data;
+};
+
+export const deleteAdminUser = async (userId) => {
+  await apiClient.delete(`/api/v1/admin/users/${userId}`, {
+    timeout: 10000,
+  });
 };
 
 // ─── User profile (with simple in-request dedup) ─────────────────────────────

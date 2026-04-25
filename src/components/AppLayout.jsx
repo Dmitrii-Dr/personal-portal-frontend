@@ -608,10 +608,11 @@ const AppLayout = ({ children }) => {
               spacing={{ xs: 1, sm: 2, md: 3 }}
               alignItems="center"
               sx={{
-                position: 'absolute',
-                left: '50%',
-                top: '50%',
-                transform: 'translate(-50%, -50%)',
+                '& .MuiButton-root': {
+                  height: 44,
+                  minHeight: 44,
+                  whiteSpace: 'nowrap',
+                },
               }}
             >
               {/* Admin Navigation Links */}
@@ -696,6 +697,26 @@ const AppLayout = ({ children }) => {
                     }}
                   >
                     {t('navigation.sessions')}
+                  </Button>
+                  <Button
+                    component={Link}
+                    to="/admin/clients"
+                    color="inherit"
+                    sx={{
+                      textTransform: 'none',
+                      fontWeight: 500,
+                      fontSize: { xs: '0.875rem', sm: '0.9375rem', md: '1rem' },
+                      px: { xs: 1, sm: 1.5 },
+                      py: 1,
+                      borderRadius: 1,
+                      transition: 'all 0.2s ease-in-out',
+                      '&:hover': {
+                        bgcolor: 'rgba(255, 255, 255, 0.1)',
+                        transform: 'translateY(-1px)',
+                      },
+                    }}
+                  >
+                    {t('navigation.myClients')}
                   </Button>
                   <Button
                     component={Link}
@@ -1217,6 +1238,11 @@ const AppLayout = ({ children }) => {
                       <ListItem disablePadding>
                         <ListItemButton onClick={() => navigate('/admin/session/configuration')}>
                           <ListItemText primary={t('navigation.sessions')} />
+                        </ListItemButton>
+                      </ListItem>
+                      <ListItem disablePadding>
+                        <ListItemButton onClick={() => navigate('/admin/clients')}>
+                          <ListItemText primary={t('navigation.myClients')} />
                         </ListItemButton>
                       </ListItem>
                       <ListItem disablePadding>

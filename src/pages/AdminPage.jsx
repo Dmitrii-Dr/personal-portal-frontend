@@ -11,6 +11,7 @@ import {
   CircularProgress,
 } from '@mui/material';
 import { getToken, setToken, hasAdminRole, hasSessionHint, refreshAccessToken } from '../utils/api';
+import { getApiErrorMessage } from '../utils/apiErrors';
 
 const AdminPage = () => {
   const navigate = useNavigate();
@@ -122,8 +123,12 @@ const AdminPage = () => {
 
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({}));
+        if (errorData.code === 'PEC-422') {
+          navigate('/account-locked', { replace: true });
+          return;
+        }
         throw new Error(
-          errorData.message ||
+          getApiErrorMessage(errorData.code, errorData.message) ||
           `Login failed: ${response.status} ${response.statusText}`
         );
       }
