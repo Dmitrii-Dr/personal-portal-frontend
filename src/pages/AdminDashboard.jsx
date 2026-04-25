@@ -67,8 +67,10 @@ import apiClient from '../utils/api';
 import { fetchWithAuth, getToken, fetchUserSettings } from '../utils/api';
 import { getCachedSlots, setCachedSlots } from '../utils/bookingSlotCache';
 import { fetchTimezones, sortTimezonesByOffset, getOffsetFromTimezone, extractTimezoneOffset, findTimezoneIdByOffset } from '../utils/timezoneService';
+import { fetchAvailableDays } from '../utils/availableDaysService';
 import CreateTagForm from '../components/CreateTagForm';
 import BookingsManagement from '../components/BookingsManagement';
+import DayWithAvailabilityDot from '../components/DayWithAvailabilityDot';
 
 const monthsGenitive = 'Января_Февраля_Марта_Апреля_Мая_Июня_Июля_Августа_Сентября_Октября_Ноября_Декабря'.split('_');
 
@@ -998,6 +1000,7 @@ const AdminDashboard = () => {
   const [selectedClientId, setSelectedClientId] = useState('');
   const [bookingSelectedDate, setBookingSelectedDate] = useState(dayjs());
   const [bookingAvailableSlots, setBookingAvailableSlots] = useState([]);
+  const [bookingAvailableDays, setBookingAvailableDays] = useState(null);
   const [loadingBookingSlots, setLoadingBookingSlots] = useState(false);
   const [bookingSlotsError, setBookingSlotsError] = useState(null);
   const [selectedBookingSlot, setSelectedBookingSlot] = useState(null);
@@ -1446,6 +1449,35 @@ const AdminDashboard = () => {
       controller.abort();
     };
   }, [selectedSessionTypeId, bookingSelectedDate, userTimezone]);
+
+  useEffect(() => {
+    if (!selectedSessionTypeId || !userTimezone) {
+      setBookingAvailableDays(null);
+      return;
+    }
+
+    let isMounted = true;
+    const loadBookingAvailableDays = async () => {
+      try {
+        const days = await fetchAvailableDays(selectedSessionTypeId, userTimezone, timezones);
+        if (!isMounted) {
+          return;
+        }
+        setBookingAvailableDays(Array.isArray(days) ? days : []);
+      } catch (err) {
+        if (!isMounted) {
+          return;
+        }
+        console.error('Error fetching admin available days:', err);
+        setBookingAvailableDays([]);
+      }
+    };
+
+    loadBookingAvailableDays();
+    return () => {
+      isMounted = false;
+    };
+  }, [selectedSessionTypeId, userTimezone, timezones]);
 
   const handleBookingDateChange = (newDate) => {
     setBookingSelectedDate(newDate);
@@ -2337,6 +2369,8 @@ const AdminDashboard = () => {
                     value={bookingSelectedDate}
                     onChange={handleBookingDateChange}
                     minDate={dayjs()}
+                    slots={{ day: DayWithAvailabilityDot }}
+                    slotProps={{ day: { availableDays: bookingAvailableDays } }}
                     sx={{ width: '100%' }}
                     disabled={!selectedSessionTypeId || !selectedClientId}
                   />

@@ -1,13 +1,14 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
-import { fetchWithAuth } from '../utils/api';
-import apiClient from '../utils/api';
+import apiClient, { fetchWithAuth, getPublicWelcome } from '../utils/api';
 import { getCachedSlots, setCachedSlots } from '../utils/bookingSlotCache';
 import { fetchTimezones, sortTimezonesByOffset, getOffsetFromTimezone, extractTimezoneOffset, findTimezoneIdByOffset } from '../utils/timezoneService';
+import { fetchAvailableDays } from '../utils/availableDaysService';
 import AvailabilityRuleComponent from '../components/AvailabilityRuleComponent';
 import AvailabilityOverrideComponent from '../components/AvailabilityOverrideComponent';
 import BookingSettings from '../components/BookingSettings';
 import UserAgreementsSection from '../components/UserAgreementsSection';
+import DayWithAvailabilityDot from '../components/DayWithAvailabilityDot';
 import {
   Box,
   Typography,
@@ -97,6 +98,7 @@ const SessionsConfigurationPage = () => {
   // Available slots state
   const [selectedDate, setSelectedDate] = useState(dayjs());
   const [availableSlots, setAvailableSlots] = useState([]);
+  const [availableDays, setAvailableDays] = useState(null);
   const [loadingSlots, setLoadingSlots] = useState(false);
   const [slotsError, setSlotsError] = useState(null);
   const [selectedSessionTypeId, setSelectedSessionTypeId] = useState(null);
@@ -191,12 +193,12 @@ const SessionsConfigurationPage = () => {
       try {
         const [sessionTypesResponse, welcomeResult] = await Promise.allSettled([
           fetchWithAuth('/api/v1/admin/session/type/all'),
-          apiClient.get('/api/v1/public/welcome', { timeout: 10000 }),
+          getPublicWelcome({ timeout: 10000 }),
         ]);
 
         const welcomeExtendedParameters =
           welcomeResult.status === 'fulfilled'
-            ? (welcomeResult.value?.data?.extendedParameters || {})
+            ? (welcomeResult.value?.extendedParameters || {})
             : {};
         const savedOrder = Array.isArray(welcomeExtendedParameters.sessionTypeDisplayOrder)
           ? welcomeExtendedParameters.sessionTypeDisplayOrder.map((id) => String(id))
@@ -311,6 +313,35 @@ const SessionsConfigurationPage = () => {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedDate, selectedSessionTypeId, selectedTimezone]);
+
+  useEffect(() => {
+    if (!selectedSessionTypeId || !selectedTimezone) {
+      setAvailableDays(null);
+      return;
+    }
+
+    let isMounted = true;
+    const loadAvailableDays = async () => {
+      try {
+        const days = await fetchAvailableDays(selectedSessionTypeId, selectedTimezone, timezones);
+        if (!isMounted) {
+          return;
+        }
+        setAvailableDays(Array.isArray(days) ? days : []);
+      } catch (err) {
+        if (!isMounted) {
+          return;
+        }
+        console.error('Error fetching preview available days:', err);
+        setAvailableDays([]);
+      }
+    };
+
+    loadAvailableDays();
+    return () => {
+      isMounted = false;
+    };
+  }, [selectedSessionTypeId, selectedTimezone, timezones]);
 
   // Fetch available slots
   const fetchAvailableSlots = async (date) => {
@@ -832,6 +863,9 @@ const SessionsConfigurationPage = () => {
                           value={selectedDate}
                           onChange={(newDate) => setSelectedDate(newDate)}
                           minDate={dayjs()}
+                          shouldDisableDate={(day) => availableDays !== null && !availableDays.includes(day.format('YYYY-MM-DD'))}
+                          slots={{ day: DayWithAvailabilityDot }}
+                          slotProps={{ day: { availableDays } }}
                           firstDayOfWeek={1}
                         />
                       </LocalizationProvider>

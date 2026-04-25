@@ -13,6 +13,8 @@ import 'dayjs/locale/ru';
 import apiClient, { fetchWithAuth, getToken, fetchUserSettings as fetchUserSettingsCached, hasAdminRole } from '../utils/api';
 import { getCachedSlots, setCachedSlots, invalidateCache, clearAllCache } from '../utils/bookingSlotCache';
 import { fetchTimezones, sortTimezonesByOffset, getOffsetFromTimezone, extractTimezoneOffset, findTimezoneIdByOffset } from '../utils/timezoneService';
+import { fetchAvailableDays, fetchAvailableDaysForBooking } from '../utils/availableDaysService';
+import DayWithAvailabilityDot from '../components/DayWithAvailabilityDot';
 
 // Configure dayjs to start week on Monday
 dayjs.extend(utc);
@@ -79,6 +81,7 @@ const BookingPage = ({ sessionTypeId: propSessionTypeId, hideMyBookings = false 
   const isSmallScreen = useMediaQuery(theme.breakpoints.down('md'));
   const [selectedDate, setSelectedDate] = useState(dayjs());
   const [availableSlots, setAvailableSlots] = useState([]);
+  const [availableDays, setAvailableDays] = useState(null);
   const [loading, setLoading] = useState(false); // Don't fetch on mount, only when dialog opens
   const [error, setError] = useState(null);
   const [openDialog, setOpenDialog] = useState(false);
@@ -123,6 +126,7 @@ const BookingPage = ({ sessionTypeId: propSessionTypeId, hideMyBookings = false 
   const [bookingToUpdate, setBookingToUpdate] = useState(null);
   const [updateSelectedDate, setUpdateSelectedDate] = useState(dayjs());
   const [updateAvailableSlots, setUpdateAvailableSlots] = useState([]);
+  const [updateAvailableDays, setUpdateAvailableDays] = useState(null);
   const [updateLoadingSlots, setUpdateLoadingSlots] = useState(false);
   const [updateSlotError, setUpdateSlotError] = useState(null);
   const [updateSelectedSlot, setUpdateSelectedSlot] = useState(null);
@@ -308,6 +312,56 @@ const BookingPage = ({ sessionTypeId: propSessionTypeId, hideMyBookings = false 
     // Default to Moscow (+03:00) for anonymous users
     return '+03:00';
   };
+
+  const isDayDisabled = (day, days) => {
+    if (days === null) {
+      return false;
+    }
+    return !days.includes(day.format('YYYY-MM-DD'));
+  };
+
+  const loadAvailableDays = useCallback(async () => {
+    if (!sessionTypeId) {
+      setAvailableDays(null);
+      return;
+    }
+
+    const timezone = getCurrentTimezone();
+    const timezoneId = findTimezoneIdByOffset(timezone, timezones);
+    if (!timezoneId) {
+      setAvailableDays(null);
+      return;
+    }
+
+    try {
+      const days = await fetchAvailableDays(sessionTypeId, timezone, timezones);
+      setAvailableDays(Array.isArray(days) ? days : []);
+    } catch (err) {
+      console.error('Error fetching available days:', err);
+      setAvailableDays([]);
+    }
+  }, [sessionTypeId, userTimezone, selectedTimezone, timezones]);
+
+  const loadUpdateAvailableDays = useCallback(async () => {
+    if (!bookingToUpdate?.id || !userTimezone) {
+      setUpdateAvailableDays(null);
+      return;
+    }
+
+    const timezoneId = findTimezoneIdByOffset(userTimezone, timezones);
+    if (!timezoneId) {
+      setUpdateAvailableDays(null);
+      return;
+    }
+
+    try {
+      const days = await fetchAvailableDaysForBooking(bookingToUpdate.id, timezoneId);
+      setUpdateAvailableDays(Array.isArray(days) ? days : []);
+    } catch (err) {
+      console.error('Error fetching update available days:', err);
+      setUpdateAvailableDays([]);
+    }
+  }, [bookingToUpdate?.id, userTimezone, timezones]);
 
   // Fetch available slots for a given date
   const fetchAvailableSlots = useCallback(async (date) => {
@@ -640,6 +694,15 @@ const BookingPage = ({ sessionTypeId: propSessionTypeId, hideMyBookings = false 
     }
   }, [newBookingDialogOpen, hideMyBookings, propSessionTypeId, selectedDate, sessionTypeId, userTimezone, selectedTimezone, hasToken]);
 
+  useEffect(() => {
+    const shouldShowForm = newBookingDialogOpen || (hideMyBookings && propSessionTypeId);
+    if (!shouldShowForm || !sessionTypeId) {
+      setAvailableDays(null);
+      return;
+    }
+    loadAvailableDays();
+  }, [newBookingDialogOpen, hideMyBookings, propSessionTypeId, sessionTypeId, userTimezone, selectedTimezone, timezones, loadAvailableDays]);
+
   // Update scroll indicators when slots change
   useEffect(() => {
     if (slotsScrollRef.current && availableSlots.length > 4) {
@@ -671,6 +734,14 @@ const BookingPage = ({ sessionTypeId: propSessionTypeId, hideMyBookings = false 
 
     fetchUpdateSlots(updateSelectedDate, bookingToUpdate.id);
   }, [bookingToUpdate?.id, updateSelectedDate, userTimezone]);
+
+  useEffect(() => {
+    if (!bookingToUpdate?.id || !userTimezone) {
+      setUpdateAvailableDays(null);
+      return;
+    }
+    loadUpdateAvailableDays();
+  }, [bookingToUpdate?.id, userTimezone, timezones, loadUpdateAvailableDays]);
 
 
   // Handle date selection
@@ -1901,6 +1972,9 @@ const BookingPage = ({ sessionTypeId: propSessionTypeId, hideMyBookings = false 
                     value={selectedDate}
                     onChange={handleDateChange}
                     minDate={dayjs()}
+                    shouldDisableDate={(day) => isDayDisabled(day, availableDays)}
+                    slots={{ day: DayWithAvailabilityDot }}
+                    slotProps={{ day: { availableDays } }}
                     sx={{ width: '100%' }}
                     firstDayOfWeek={1}
                   />
@@ -2178,6 +2252,9 @@ const BookingPage = ({ sessionTypeId: propSessionTypeId, hideMyBookings = false 
                       value={selectedDate}
                       onChange={handleDateChange}
                       minDate={dayjs()}
+                      shouldDisableDate={(day) => isDayDisabled(day, availableDays)}
+                      slots={{ day: DayWithAvailabilityDot }}
+                      slotProps={{ day: { availableDays } }}
                       sx={{ width: '100%' }}
                       firstDayOfWeek={1}
                     />
@@ -2708,6 +2785,9 @@ const BookingPage = ({ sessionTypeId: propSessionTypeId, hideMyBookings = false 
                         value={updateSelectedDate}
                         onChange={handleUpdateDateChange}
                         minDate={dayjs()}
+                        shouldDisableDate={(day) => isDayDisabled(day, updateAvailableDays)}
+                        slots={{ day: DayWithAvailabilityDot }}
+                        slotProps={{ day: { availableDays: updateAvailableDays } }}
                         sx={{ width: '100%' }}
                       />
                     </Box>

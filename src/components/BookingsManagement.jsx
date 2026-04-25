@@ -10,6 +10,8 @@ import 'dayjs/locale/ru';
 import { fetchAdminGroupedBookings, fetchWithAuth, getToken, fetchUserSettings } from '../utils/api';
 import apiClient from '../utils/api';
 import { getCachedSlots, setCachedSlots, invalidateCache, clearAllCache } from '../utils/bookingSlotCache';
+import { fetchAvailableDaysForBooking } from '../utils/availableDaysService';
+import DayWithAvailabilityDot from './DayWithAvailabilityDot';
 
 // Extend dayjs with timezone support
 dayjs.extend(utc);
@@ -113,6 +115,7 @@ const BookingsManagement = () => {
   const [bookingToReschedule, setBookingToReschedule] = useState(null);
   const [rescheduleSelectedDate, setRescheduleSelectedDate] = useState(dayjs());
   const [rescheduleAvailableSlots, setRescheduleAvailableSlots] = useState([]);
+  const [rescheduleAvailableDays, setRescheduleAvailableDays] = useState(null);
   const [confirmRescheduleDialogOpen, setConfirmRescheduleDialogOpen] = useState(false);
   const [rescheduleLoadingSlots, setRescheduleLoadingSlots] = useState(false);
   const [rescheduleSlotError, setRescheduleSlotError] = useState(null);
@@ -581,6 +584,35 @@ const BookingsManagement = () => {
       controller.abort();
     };
   }, [bookingToReschedule?.id, rescheduleSelectedDate, userTimezone]);
+
+  useEffect(() => {
+    if (!bookingToReschedule?.id || !userTimezone?.id) {
+      setRescheduleAvailableDays(null);
+      return;
+    }
+
+    let isMounted = true;
+    const loadRescheduleAvailableDays = async () => {
+      try {
+        const days = await fetchAvailableDaysForBooking(bookingToReschedule.id, userTimezone.id);
+        if (!isMounted) {
+          return;
+        }
+        setRescheduleAvailableDays(Array.isArray(days) ? days : []);
+      } catch (err) {
+        if (!isMounted) {
+          return;
+        }
+        console.error('Error fetching reschedule available days:', err);
+        setRescheduleAvailableDays([]);
+      }
+    };
+
+    loadRescheduleAvailableDays();
+    return () => {
+      isMounted = false;
+    };
+  }, [bookingToReschedule?.id, userTimezone]);
 
   // Effect to handle scroll indicator initial state when slots are loaded
   useEffect(() => {
@@ -2021,6 +2053,8 @@ const BookingsManagement = () => {
                       <DateCalendar
                         value={rescheduleSelectedDate}
                         onChange={handleRescheduleDateChange}
+                        slots={{ day: DayWithAvailabilityDot }}
+                        slotProps={{ day: { availableDays: rescheduleAvailableDays } }}
                         sx={{ width: '100%' }}
                       />
                     </Box>
