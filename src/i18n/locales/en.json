@@ -543,6 +543,9 @@
       "reviewImages": "Review Images",
       "uploadReviewImage": "Upload Review Image",
       "noReviewImages": "No review images uploaded yet. Click \"Upload Review Image\" to add images.",
+      "educationImages": "Education Images",
+      "uploadEducationImages": "Upload Education Images",
+      "educationImagesHint": "This section is shown as a carousel. Recommended ratio: 4:3 or 3:2 landscape, at least 1200 px wide. Keep all photos close to the same ratio for smooth scrolling.",
       "blog": "BLOG",
       "blogDescription": "Select up to 3 articles to display in the Blog section on the landing page.",
       "article": "Article",
@@ -1030,7 +1033,8 @@
     },
     "education": {
       "title": "MY EDUCATION",
-      "alt": "Education"
+      "alt": "Education",
+      "carouselHint": "Scroll or use arrows"
     },
     "services": {
       "title": "SERVICES & PRICING",

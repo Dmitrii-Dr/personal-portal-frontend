@@ -8,6 +8,7 @@ const STORE_NAME = 'images';
 
 /** Plain-object record version for IndexedDB (Blob put is flaky on some mobile WebKit). */
 const STORED_IMAGE_V = 1;
+const IMAGE_CACHE_TTL_MS = 24 * 60 * 60 * 1000;
 
 // In-memory cache for current session (stores object URLs)
 const memoryCache = new Map();
@@ -66,6 +67,18 @@ const normalizeStoredEntryToBlob = (raw) => {
   return null;
 };
 
+const isStoredEntryExpired = (raw) => {
+  if (!(raw && typeof raw === 'object') || raw instanceof Blob) {
+    return true;
+  }
+
+  if (typeof raw.cachedAt !== 'number') {
+    return true;
+  }
+
+  return Date.now() - raw.cachedAt > IMAGE_CACHE_TTL_MS;
+};
+
 /**
  * Get blob from IndexedDB
  * @param {string} mediaId - The media ID
@@ -87,6 +100,16 @@ const getBlobFromDB = async (mediaId) => {
         reject(request.error);
       };
     });
+
+    if (raw != null && isStoredEntryExpired(raw)) {
+      try {
+        const transaction = db.transaction([STORE_NAME], 'readwrite');
+        transaction.objectStore(STORE_NAME).delete(mediaId);
+      } catch {
+        // ignore
+      }
+      return null;
+    }
 
     const blob = normalizeStoredEntryToBlob(raw);
     if (blob) return blob;
@@ -120,6 +143,7 @@ const storeBlobInDB = async (mediaId, blob) => {
       v: STORED_IMAGE_V,
       type: blob.type || 'application/octet-stream',
       buffer,
+      cachedAt: Date.now(),
     };
   } catch (error) {
     console.warn('IndexedDB image cache: could not read blob for storage:', error);

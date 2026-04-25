@@ -30,10 +30,9 @@ import {
   Tooltip,
   Link,
   Fade,
+  LinearProgress,
 } from '@mui/material';
 import CloseIcon from '@mui/icons-material/Close';
-import ArrowBackIosIcon from '@mui/icons-material/ArrowBackIos';
-import ArrowForwardIosIcon from '@mui/icons-material/ArrowForwardIos';
 import KeyboardArrowLeftRoundedIcon from '@mui/icons-material/KeyboardArrowLeftRounded';
 import KeyboardArrowRightRoundedIcon from '@mui/icons-material/KeyboardArrowRightRounded';
 import KeyboardArrowDownIcon from '@mui/icons-material/KeyboardArrowDown';
@@ -171,7 +170,11 @@ const LandingPage = () => {
   const [welcomeLeftImageUrl, setWelcomeLeftImageUrl] = useState(null);
   const [welcomeMobileImageUrl, setWelcomeMobileImageUrl] = useState(null);
   const [aboutImageUrl, setAboutImageUrl] = useState(null);
-  const [educationImageUrl, setEducationImageUrl] = useState(null);
+  const [educationMediaIds, setEducationMediaIds] = useState([]);
+  const [educationImageUrls, setEducationImageUrls] = useState([]);
+  const [loadingEducationImages, setLoadingEducationImages] = useState({});
+  const [failedEducationImages, setFailedEducationImages] = useState({});
+  const [educationCarouselIndex, setEducationCarouselIndex] = useState(0);
 
   // Hero frame background colours read from extendedParameters (with hardcoded fallbacks)
   const [heroLeftColour, setHeroLeftColour] = useState('#d6baab');
@@ -182,14 +185,86 @@ const LandingPage = () => {
   const [reviewImageUrls, setReviewImageUrls] = useState([]);
   const [loadingReviewImages, setLoadingReviewImages] = useState({});
   const [reviewCarouselIndex, setReviewCarouselIndex] = useState(0);
+  const [educationControlsVisible, setEducationControlsVisible] = useState(false);
+  const [reviewControlsVisible, setReviewControlsVisible] = useState(false);
   const imagesToShow = isMobile ? 1 : 3;
   const showArrows = reviewMediaIds.length > imagesToShow;
+  const reviewSlideWidthPercent = isMobile && showArrows ? 94 : 100;
+  const reviewSideInsetPercent = (100 - reviewSlideWidthPercent) / 2;
+  const maxReviewCarouselIndex = Math.max(0, reviewMediaIds.length - imagesToShow);
+  const canScrollReviewLeft = reviewCarouselIndex > 0;
+  const canScrollReviewRight = reviewCarouselIndex < maxReviewCarouselIndex;
+  const showEducationArrows = educationMediaIds.length > 1;
+  const educationImageUrl = educationImageUrls[educationCarouselIndex];
+  const isEducationImageLoading = Boolean(loadingEducationImages[educationCarouselIndex]);
+  const educationSlideWidthPercent = showEducationArrows ? 94 : 100;
+  const educationSideInsetPercent = (100 - educationSlideWidthPercent) / 2;
+  const canScrollEducationLeft = educationCarouselIndex > 0;
+  const canScrollEducationRight = educationCarouselIndex < educationMediaIds.length - 1;
   const mobileServicesScrollRef = useRef(null);
   const [mobileServicesAtBottom, setMobileServicesAtBottom] = useState(false);
   const desktopServicesScrollRef = useRef(null);
   const [desktopServicesCanScrollLeft, setDesktopServicesCanScrollLeft] = useState(false);
   const [desktopServicesCanScrollRight, setDesktopServicesCanScrollRight] = useState(false);
   const educationRef = useRef(null);
+  const educationCarouselRef = useRef(null);
+  const educationDragRef = useRef({ isDragging: false, startX: 0, scrollLeft: 0 });
+  const educationControlsHideTimeoutRef = useRef(null);
+  const reviewCarouselRef = useRef(null);
+  const reviewDragRef = useRef({ isDragging: false, startX: 0, scrollLeft: 0 });
+  const reviewControlsHideTimeoutRef = useRef(null);
+
+  const showEducationControls = useCallback(() => {
+    if (educationControlsHideTimeoutRef.current) {
+      clearTimeout(educationControlsHideTimeoutRef.current);
+      educationControlsHideTimeoutRef.current = null;
+    }
+    setEducationControlsVisible(true);
+  }, []);
+
+  const scheduleHideEducationControls = useCallback((delay = 500) => {
+    if (educationControlsHideTimeoutRef.current) {
+      clearTimeout(educationControlsHideTimeoutRef.current);
+    }
+    educationControlsHideTimeoutRef.current = setTimeout(() => {
+      setEducationControlsVisible(false);
+      educationControlsHideTimeoutRef.current = null;
+    }, delay);
+  }, []);
+
+  const isEducationSectionInViewport = useCallback(() => {
+    const section = educationRef.current;
+    if (!section) return false;
+    const rect = section.getBoundingClientRect();
+    const viewportHeight = window.innerHeight || document.documentElement.clientHeight;
+    return rect.bottom > 0 && rect.top < viewportHeight;
+  }, []);
+
+  const showReviewControls = useCallback(() => {
+    if (reviewControlsHideTimeoutRef.current) {
+      clearTimeout(reviewControlsHideTimeoutRef.current);
+      reviewControlsHideTimeoutRef.current = null;
+    }
+    setReviewControlsVisible(true);
+  }, []);
+
+  const scheduleHideReviewControls = useCallback((delay = 500) => {
+    if (reviewControlsHideTimeoutRef.current) {
+      clearTimeout(reviewControlsHideTimeoutRef.current);
+    }
+    reviewControlsHideTimeoutRef.current = setTimeout(() => {
+      setReviewControlsVisible(false);
+      reviewControlsHideTimeoutRef.current = null;
+    }, delay);
+  }, []);
+
+  const isReviewSectionInViewport = useCallback(() => {
+    const section = testimonialsRef.current;
+    if (!section) return false;
+    const rect = section.getBoundingClientRect();
+    const viewportHeight = window.innerHeight || document.documentElement.clientHeight;
+    return rect.bottom > 0 && rect.top < viewportHeight;
+  }, []);
 
   // Session types state
   const [sessionTypes, setSessionTypes] = useState([]);
@@ -341,14 +416,92 @@ const LandingPage = () => {
         setWelcomeMobileImageUrl(objectUrl);
       } else if (type === 'about') {
         setAboutImageUrl(objectUrl);
-      } else if (type === 'education') {
-        setEducationImageUrl(objectUrl);
       }
     } catch (err) {
       console.error(`Error loading image for ${type}:`, err);
       throw err;
     }
   };
+
+  const loadEducationImageAt = useCallback(async (index, mediaIds = educationMediaIds) => {
+    const mediaId = mediaIds[index];
+    if (!mediaId || failedEducationImages[index]) return;
+
+    setLoadingEducationImages(prev => ({ ...prev, [index]: true }));
+
+    try {
+      const url = await loadImageWithCache(mediaId);
+      setEducationImageUrls(prev => {
+        const nextUrls = [...prev];
+        nextUrls[index] = url;
+        return nextUrls;
+      });
+      setFailedEducationImages(prev => ({ ...prev, [index]: false }));
+    } catch (err) {
+      console.error(`Error loading education image ${mediaId}:`, err);
+      setFailedEducationImages(prev => ({ ...prev, [index]: true }));
+    } finally {
+      setLoadingEducationImages(prev => ({ ...prev, [index]: false }));
+    }
+  }, [educationMediaIds, failedEducationImages]);
+
+  const moveEducationCarousel = useCallback((direction) => {
+    const el = educationCarouselRef.current;
+    if (!el) return;
+
+    const firstSlide = el.querySelector('[data-education-slide="true"]');
+    const slideWidth = firstSlide?.getBoundingClientRect().width || el.clientWidth;
+    const styles = window.getComputedStyle(el);
+    const gap = parseFloat(styles.columnGap || styles.gap || '0') || 0;
+    el.scrollBy({ left: direction * (slideWidth + gap), behavior: 'smooth' });
+  }, [educationMediaIds.length]);
+
+  const updateEducationCarouselIndex = useCallback(() => {
+    const el = educationCarouselRef.current;
+    if (!el) return;
+
+    const firstSlide = el.querySelector('[data-education-slide="true"]');
+    const slideWidth = firstSlide?.getBoundingClientRect().width || el.clientWidth;
+    const styles = window.getComputedStyle(el);
+    const gap = parseFloat(styles.columnGap || styles.gap || '0') || 0;
+    const step = slideWidth + gap;
+    if (!step) return;
+
+    const nextIndex = Math.max(
+      0,
+      Math.min(educationMediaIds.length - 1, Math.round(el.scrollLeft / step))
+    );
+    setEducationCarouselIndex(nextIndex);
+  }, [educationMediaIds.length]);
+
+  const moveReviewCarousel = useCallback((direction) => {
+    const el = reviewCarouselRef.current;
+    if (!el) return;
+
+    const firstSlide = el.querySelector('[data-review-slide="true"]');
+    const slideWidth = firstSlide?.getBoundingClientRect().width || el.clientWidth;
+    const styles = window.getComputedStyle(el);
+    const gap = parseFloat(styles.columnGap || styles.gap || '0') || 0;
+    el.scrollBy({ left: direction * (slideWidth + gap), behavior: 'smooth' });
+  }, []);
+
+  const updateReviewCarouselIndex = useCallback(() => {
+    const el = reviewCarouselRef.current;
+    if (!el) return;
+
+    const firstSlide = el.querySelector('[data-review-slide="true"]');
+    const slideWidth = firstSlide?.getBoundingClientRect().width || el.clientWidth;
+    const styles = window.getComputedStyle(el);
+    const gap = parseFloat(styles.columnGap || styles.gap || '0') || 0;
+    const step = slideWidth + gap;
+    if (!step) return;
+
+    const nextIndex = Math.max(
+      0,
+      Math.min(maxReviewCarouselIndex, Math.round(el.scrollLeft / step))
+    );
+    setReviewCarouselIndex(nextIndex);
+  }, [maxReviewCarouselIndex]);
 
   // Fetch welcome data
   useEffect(() => {
@@ -401,10 +554,15 @@ const LandingPage = () => {
             console.error('Error loading about image:', err);
           });
         }
-        if (data.educationMediaId) {
-          loadImage(data.educationMediaId, 'education').catch(err => {
-            console.error('Error loading education image:', err);
-          });
+        const nextEducationMediaIds = Array.isArray(data.educationMediaIds)
+          ? data.educationMediaIds
+          : (data.educationMediaId ? [data.educationMediaId] : []);
+        if (nextEducationMediaIds.length > 0) {
+          setEducationMediaIds(nextEducationMediaIds);
+          setEducationImageUrls(new Array(nextEducationMediaIds.length).fill(null));
+          setFailedEducationImages({});
+          setEducationCarouselIndex(0);
+          loadEducationImageAt(0, nextEducationMediaIds);
         }
 
         // Store review media IDs for lazy loading
@@ -459,6 +617,124 @@ const LandingPage = () => {
       isMounted = false;
     };
   }, []);
+
+  // Lazy load the selected education carousel image only when it is requested.
+  useEffect(() => {
+    if (!educationMediaIds || educationMediaIds.length === 0) return;
+    if (
+      educationImageUrls[educationCarouselIndex] ||
+      loadingEducationImages[educationCarouselIndex] ||
+      failedEducationImages[educationCarouselIndex]
+    ) return;
+
+    loadEducationImageAt(educationCarouselIndex, educationMediaIds);
+  }, [
+    educationMediaIds,
+    educationImageUrls,
+    loadingEducationImages,
+    failedEducationImages,
+    educationCarouselIndex,
+    loadEducationImageAt,
+  ]);
+
+  useEffect(() => {
+    if (!educationMediaIds || educationMediaIds.length <= 1) return;
+
+    const adjacentIndexes = [educationCarouselIndex - 1, educationCarouselIndex + 1]
+      .filter(index => index >= 0 && index < educationMediaIds.length);
+
+    adjacentIndexes.forEach(index => {
+      if (!educationImageUrls[index] && !loadingEducationImages[index] && !failedEducationImages[index]) {
+        loadEducationImageAt(index, educationMediaIds);
+      }
+    });
+  }, [
+    educationMediaIds,
+    educationImageUrls,
+    loadingEducationImages,
+    failedEducationImages,
+    educationCarouselIndex,
+    loadEducationImageAt,
+  ]);
+
+  useEffect(() => {
+    setReviewCarouselIndex((prev) => Math.min(prev, maxReviewCarouselIndex));
+  }, [maxReviewCarouselIndex]);
+
+  useEffect(() => () => {
+    if (educationControlsHideTimeoutRef.current) {
+      clearTimeout(educationControlsHideTimeoutRef.current);
+    }
+    if (reviewControlsHideTimeoutRef.current) {
+      clearTimeout(reviewControlsHideTimeoutRef.current);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (!showEducationArrows) return undefined;
+
+    let rafId = null;
+    const onViewportInteraction = () => {
+      if (rafId) return;
+      rafId = window.requestAnimationFrame(() => {
+        rafId = null;
+        if (!isEducationSectionInViewport()) return;
+        showEducationControls();
+        scheduleHideEducationControls(650);
+      });
+    };
+
+    window.addEventListener('scroll', onViewportInteraction, { passive: true });
+    window.addEventListener('wheel', onViewportInteraction, { passive: true });
+    window.addEventListener('touchmove', onViewportInteraction, { passive: true });
+
+    return () => {
+      if (rafId) {
+        window.cancelAnimationFrame(rafId);
+      }
+      window.removeEventListener('scroll', onViewportInteraction);
+      window.removeEventListener('wheel', onViewportInteraction);
+      window.removeEventListener('touchmove', onViewportInteraction);
+    };
+  }, [
+    isEducationSectionInViewport,
+    scheduleHideEducationControls,
+    showEducationArrows,
+    showEducationControls,
+  ]);
+
+  useEffect(() => {
+    if (!showArrows) return undefined;
+
+    let rafId = null;
+    const onViewportInteraction = () => {
+      if (rafId) return;
+      rafId = window.requestAnimationFrame(() => {
+        rafId = null;
+        if (!isReviewSectionInViewport()) return;
+        showReviewControls();
+        scheduleHideReviewControls(650);
+      });
+    };
+
+    window.addEventListener('scroll', onViewportInteraction, { passive: true });
+    window.addEventListener('wheel', onViewportInteraction, { passive: true });
+    window.addEventListener('touchmove', onViewportInteraction, { passive: true });
+
+    return () => {
+      if (rafId) {
+        window.cancelAnimationFrame(rafId);
+      }
+      window.removeEventListener('scroll', onViewportInteraction);
+      window.removeEventListener('wheel', onViewportInteraction);
+      window.removeEventListener('touchmove', onViewportInteraction);
+    };
+  }, [
+    isReviewSectionInViewport,
+    scheduleHideReviewControls,
+    showArrows,
+    showReviewControls,
+  ]);
 
   // Lazy load review images based on carousel position
   useEffect(() => {
@@ -1077,7 +1353,7 @@ const LandingPage = () => {
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
-                  overflow: 'hidden',
+                  overflow: 'visible',
                 }}
               >
                 {aboutImageUrl ? (
@@ -1316,12 +1592,12 @@ const LandingPage = () => {
             </Grid>
 
             {/* Image column (right on md+; below text on xs) */}
-            <Grid item xs={12} md={6} sx={{ position: 'relative', height: { xs: '300px', md: '400px' }, order: { xs: 2, md: 2 } }}>
+            <Grid item xs={12} md={6} sx={{ position: 'relative', height: { xs: '400px', md: '600px' }, order: { xs: 2, md: 2 } }}>
               <Box
                 sx={{
                   width: '100%',
                   height: '100%',
-                  background: educationImageUrl ? 'transparent' : 'linear-gradient(135deg, #E3F2FD 0%, #BBDEFB 50%, #90CAF9 100%)',
+                  background: educationImageUrl ? '#F0F7F7' : 'linear-gradient(135deg, #E3F2FD 0%, #BBDEFB 50%, #90CAF9 100%)',
                   position: 'relative',
                   display: 'flex',
                   alignItems: 'center',
@@ -1329,17 +1605,125 @@ const LandingPage = () => {
                   overflow: 'hidden',
                 }}
               >
-                {educationImageUrl ? (
+                {educationMediaIds.length > 0 ? (
                   <Box
-                    component="img"
-                    src={educationImageUrl}
-                    alt="Education"
+                    ref={educationCarouselRef}
+                    onScroll={updateEducationCarouselIndex}
+                    onWheel={(event) => {
+                      if (!showEducationArrows) return;
+                      showEducationControls();
+                      if (Math.abs(event.deltaY) <= Math.abs(event.deltaX)) return;
+                      event.currentTarget.scrollBy({ left: event.deltaY, behavior: 'auto' });
+                      scheduleHideEducationControls(700);
+                    }}
+                    onPointerDown={(event) => {
+                      if (!showEducationArrows) return;
+                      showEducationControls();
+                      educationDragRef.current = {
+                        isDragging: true,
+                        startX: event.clientX,
+                        scrollLeft: event.currentTarget.scrollLeft,
+                      };
+                      event.currentTarget.setPointerCapture(event.pointerId);
+                    }}
+                    onPointerMove={(event) => {
+                      if (!educationDragRef.current.isDragging) return;
+                      showEducationControls();
+                      const deltaX = event.clientX - educationDragRef.current.startX;
+                      event.currentTarget.scrollLeft = educationDragRef.current.scrollLeft - deltaX;
+                    }}
+                    onPointerUp={(event) => {
+                      educationDragRef.current.isDragging = false;
+                      event.currentTarget.releasePointerCapture(event.pointerId);
+                      scheduleHideEducationControls(700);
+                    }}
+                    onPointerCancel={(event) => {
+                      educationDragRef.current.isDragging = false;
+                      event.currentTarget.releasePointerCapture(event.pointerId);
+                      scheduleHideEducationControls(700);
+                    }}
+                    onMouseEnter={() => {
+                      if (isMobile) return;
+                      showEducationControls();
+                    }}
+                    onMouseLeave={() => {
+                      if (isMobile) return;
+                      if (!educationDragRef.current.isDragging) {
+                        scheduleHideEducationControls(250);
+                      }
+                    }}
                     sx={{
+                      display: 'flex',
+                      gap: { xs: 0.75, md: 1 },
                       width: '100%',
                       height: '100%',
-                      objectFit: 'cover',
+                      overflowX: 'auto',
+                      overflowY: 'hidden',
+                      scrollBehavior: 'smooth',
+                      scrollSnapType: 'x proximity',
+                      px: showEducationArrows ? `${educationSideInsetPercent}%` : 0,
+                      boxSizing: 'border-box',
+                      cursor: showEducationArrows ? 'grab' : 'default',
+                      WebkitOverflowScrolling: 'touch',
+                      scrollbarWidth: 'none',
+                      '&::-webkit-scrollbar': {
+                        display: 'none',
+                      },
+                      '&:active': {
+                        cursor: showEducationArrows ? 'grabbing' : 'default',
+                      },
                     }}
-                  />
+                  >
+                    {educationMediaIds.map((mediaId, imageIndex) => {
+                      const imageUrl = educationImageUrls[imageIndex];
+                      const isLoading = loadingEducationImages[imageIndex];
+
+                      return (
+                        <Box
+                          key={mediaId}
+                          data-education-slide="true"
+                          sx={{
+                            width: `${educationSlideWidthPercent}%`,
+                            height: '100%',
+                            flex: '0 0 auto',
+                            ml: imageIndex === 0 && showEducationArrows ? `${educationSideInsetPercent}%` : 0,
+                            scrollSnapAlign: 'center',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            bgcolor: '#F0F7F7',
+                          }}
+                        >
+                          {imageUrl ? (
+                            <Box
+                              component="img"
+                              src={imageUrl}
+                              alt="Education"
+                              sx={{
+                                width: '100%',
+                                height: '100%',
+                                objectFit: 'contain',
+                              }}
+                            />
+                          ) : isLoading ? (
+                            <CircularProgress size={40} />
+                          ) : (
+                            <Avatar
+                              sx={{
+                                width: { xs: 150, sm: 200, md: 250 },
+                                height: { xs: 150, sm: 200, md: 250 },
+                                bgcolor: 'primary.main',
+                                fontSize: { xs: '3rem', md: '4rem' },
+                                fontWeight: 600,
+                              }}
+                            >
+                              E
+                            </Avatar>
+                          )}
+                        </Box>
+                      );
+                    })}
+                  </Box>
                 ) : (
                   <Avatar
                     sx={{
@@ -1352,6 +1736,136 @@ const LandingPage = () => {
                   >
                     E
                   </Avatar>
+                )}
+                {isEducationImageLoading && (
+                  <LinearProgress
+                    sx={{
+                      position: 'absolute',
+                      left: 0,
+                      right: 0,
+                      bottom: 0,
+                    }}
+                  />
+                )}
+                {showEducationArrows && (
+                  <>
+                    {canScrollEducationLeft && (
+                      <Box
+                        sx={{
+                          position: 'absolute',
+                          top: 0,
+                          bottom: 0,
+                          left: 0,
+                          width: `max(14px, ${educationSideInsetPercent}%)`,
+                          background: 'linear-gradient(to right, rgba(240,247,247,0.82) 0%, rgba(240,247,247,0.48) 55%, transparent 100%)',
+                          pointerEvents: 'none',
+                          opacity: educationControlsVisible ? 1 : 0.88,
+                          transition: 'opacity 0.2s ease',
+                          zIndex: 1,
+                        }}
+                      />
+                    )}
+                    {canScrollEducationRight && (
+                      <Box
+                        sx={{
+                          position: 'absolute',
+                          top: 0,
+                          bottom: 0,
+                          right: 0,
+                          width: `max(14px, ${educationSideInsetPercent}%)`,
+                          background: 'linear-gradient(to left, rgba(240,247,247,0.82) 0%, rgba(240,247,247,0.48) 55%, transparent 100%)',
+                          pointerEvents: 'none',
+                          opacity: educationControlsVisible ? 1 : 0.88,
+                          transition: 'opacity 0.2s ease',
+                          zIndex: 1,
+                        }}
+                      />
+                    )}
+                    <IconButton
+                      onClick={() => moveEducationCarousel(-1)}
+                      size="large"
+                      aria-label="scroll left"
+                      disabled={!canScrollEducationLeft}
+                      sx={{
+                        position: 'absolute',
+                        left: 8,
+                        top: '50%',
+                        width: 42,
+                        height: 42,
+                        transform: 'translateY(-50%)',
+                        zIndex: 2,
+                        bgcolor: canScrollEducationLeft ? 'rgba(44,95,95,0.68)' : 'rgba(255,255,255,0.12)',
+                        color: 'rgba(255,255,255,0.82)',
+                        border: '1px solid rgba(255,255,255,0.24)',
+                        backdropFilter: 'blur(3px)',
+                        boxShadow: canScrollEducationLeft ? '0 7px 18px rgba(0,0,0,0.28)' : 'none',
+                        opacity: educationControlsVisible ? 1 : 0,
+                        pointerEvents: educationControlsVisible ? 'auto' : 'none',
+                        '&:hover': {
+                          bgcolor: 'rgba(44,95,95,0.85)',
+                          color: '#fff',
+                          boxShadow: '0 8px 20px rgba(0,0,0,0.3)',
+                          transform: 'translateY(-50%) scale(1.06)',
+                        },
+                        '&:focus-visible': {
+                          outline: '3px solid',
+                          outlineColor: 'rgba(255,255,255,0.5)',
+                          outlineOffset: 2,
+                        },
+                        '&.Mui-disabled': {
+                          bgcolor: 'rgba(255,255,255,0.12)',
+                          color: 'rgba(255,255,255,0.35)',
+                          borderColor: 'rgba(255,255,255,0.18)',
+                          boxShadow: 'none',
+                        },
+                        transition: 'transform 0.18s ease, box-shadow 0.18s ease, opacity 0.2s ease',
+                      }}
+                    >
+                      <KeyboardArrowLeftRoundedIcon sx={{ fontSize: 28 }} />
+                    </IconButton>
+                    <IconButton
+                      onClick={() => moveEducationCarousel(1)}
+                      size="large"
+                      aria-label="scroll right"
+                      disabled={!canScrollEducationRight}
+                      sx={{
+                        position: 'absolute',
+                        right: 8,
+                        top: '50%',
+                        width: 42,
+                        height: 42,
+                        transform: 'translateY(-50%)',
+                        zIndex: 2,
+                        bgcolor: canScrollEducationRight ? 'rgba(44,95,95,0.68)' : 'rgba(255,255,255,0.12)',
+                        color: 'rgba(255,255,255,0.82)',
+                        border: '1px solid rgba(255,255,255,0.24)',
+                        backdropFilter: 'blur(3px)',
+                        boxShadow: canScrollEducationRight ? '0 7px 18px rgba(0,0,0,0.28)' : 'none',
+                        opacity: educationControlsVisible ? 1 : 0,
+                        pointerEvents: educationControlsVisible ? 'auto' : 'none',
+                        '&:hover': {
+                          bgcolor: 'rgba(44,95,95,0.85)',
+                          color: '#fff',
+                          boxShadow: '0 8px 20px rgba(0,0,0,0.3)',
+                          transform: 'translateY(-50%) scale(1.06)',
+                        },
+                        '&:focus-visible': {
+                          outline: '3px solid',
+                          outlineColor: 'rgba(255,255,255,0.5)',
+                          outlineOffset: 2,
+                        },
+                        '&.Mui-disabled': {
+                          bgcolor: 'rgba(255,255,255,0.12)',
+                          color: 'rgba(255,255,255,0.35)',
+                          borderColor: 'rgba(255,255,255,0.18)',
+                          boxShadow: 'none',
+                        },
+                        transition: 'transform 0.18s ease, box-shadow 0.18s ease, opacity 0.2s ease',
+                      }}
+                    >
+                      <KeyboardArrowRightRoundedIcon sx={{ fontSize: 28 }} />
+                    </IconButton>
+                  </>
                 )}
               </Box>
             </Grid>
@@ -2105,147 +2619,263 @@ const LandingPage = () => {
             {reviewMediaIds && reviewMediaIds.length > 0 && (
               <Box sx={{ position: 'relative', width: '100%' }}>
                 <Box
+                  ref={reviewCarouselRef}
+                  onScroll={updateReviewCarouselIndex}
+                  onWheel={(event) => {
+                    if (!showArrows) return;
+                    showReviewControls();
+                    if (Math.abs(event.deltaY) <= Math.abs(event.deltaX)) return;
+                    event.currentTarget.scrollBy({ left: event.deltaY, behavior: 'auto' });
+                    scheduleHideReviewControls(700);
+                  }}
+                  onPointerDown={(event) => {
+                    if (!showArrows) return;
+                    showReviewControls();
+                    reviewDragRef.current = {
+                      isDragging: true,
+                      startX: event.clientX,
+                      scrollLeft: event.currentTarget.scrollLeft,
+                    };
+                    event.currentTarget.setPointerCapture(event.pointerId);
+                  }}
+                  onPointerMove={(event) => {
+                    if (!reviewDragRef.current.isDragging) return;
+                    showReviewControls();
+                    const deltaX = event.clientX - reviewDragRef.current.startX;
+                    event.currentTarget.scrollLeft = reviewDragRef.current.scrollLeft - deltaX;
+                  }}
+                  onPointerUp={(event) => {
+                    reviewDragRef.current.isDragging = false;
+                    event.currentTarget.releasePointerCapture(event.pointerId);
+                    scheduleHideReviewControls(700);
+                  }}
+                  onPointerCancel={(event) => {
+                    reviewDragRef.current.isDragging = false;
+                    event.currentTarget.releasePointerCapture(event.pointerId);
+                    scheduleHideReviewControls(700);
+                  }}
+                  onMouseEnter={() => {
+                    if (isMobile) return;
+                    showReviewControls();
+                  }}
+                  onMouseLeave={() => {
+                    if (isMobile) return;
+                    if (!reviewDragRef.current.isDragging) {
+                      scheduleHideReviewControls(250);
+                    }
+                  }}
                   sx={{
                     display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
                     gap: 2,
-                    position: 'relative',
+                    overflowX: 'auto',
+                    overflowY: 'hidden',
+                    width: '100%',
+                    maxWidth: { xs: '100%', md: '1950px' },
+                    mx: 'auto',
+                    scrollBehavior: 'smooth',
+                    scrollSnapType: 'x proximity',
+                    px: showArrows ? `${reviewSideInsetPercent}%` : 0,
+                    boxSizing: 'border-box',
+                    cursor: showArrows ? 'grab' : 'default',
+                    WebkitOverflowScrolling: 'touch',
+                    scrollbarWidth: 'none',
+                    '&::-webkit-scrollbar': {
+                      display: 'none',
+                    },
+                    '&:active': {
+                      cursor: showArrows ? 'grabbing' : 'default',
+                    },
                   }}
                 >
-                  {/* Left Arrow */}
-                  {showArrows && (
-                    <IconButton
-                      onClick={() => {
-                        setReviewCarouselIndex((prev) => Math.max(0, prev - 1));
-                      }}
-                      disabled={reviewCarouselIndex === 0}
-                      sx={{
-                        position: 'absolute',
-                        left: { xs: -15, md: -50 },
-                        zIndex: 2,
-                        bgcolor: 'white',
-                        boxShadow: 2,
-                        width: 40,
-                        height: 40,
-                        padding: 1,
-                        borderRadius: '50%',
-                        '&:hover': {
-                          bgcolor: 'grey.100',
-                        },
-                        '&.Mui-disabled': {
-                          bgcolor: 'grey.200',
-                          opacity: 0.5,
-                        },
-                      }}
-                    >
-                      <ArrowBackIosIcon sx={{ ml: 0.5, fontSize: 20 }} />
-                    </IconButton>
-                  )}
+                  {reviewMediaIds.map((mediaId, imageIndex) => {
+                    const imageUrl = reviewImageUrls[imageIndex];
+                    const isLoading = loadingReviewImages[imageIndex];
 
-                  {/* Image Frames Container */}
-                  <Box
-                    sx={{
-                      display: 'flex',
-                      gap: 2,
-                      overflow: 'hidden',
-                      width: '100%',
-                      justifyContent: 'center',
-                      maxWidth: { xs: '100%', md: '1950px' },
-                    }}
-                  >
-                    {Array.from({ length: imagesToShow }).map((_, frameIndex) => {
-                      const imageIndex = reviewCarouselIndex + frameIndex;
-                      const imageUrl = reviewImageUrls[imageIndex];
-                      const isLoading = loadingReviewImages[imageIndex];
-                      const imageExists = imageIndex < reviewMediaIds.length;
-
-                      return (
-                        <Box
-                          key={frameIndex}
-                          sx={{
-                            flex: '1 1 0',
-                            minWidth: 0,
-                            maxWidth: { xs: '100%', sm: '650px' },
-                            aspectRatio: '4/3',
-                            position: 'relative',
-                            overflow: 'hidden',
-                            bgcolor: '#F0F7F7',
-                            border: '1px solid',
-                            borderColor: 'divider',
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                          }}
-                        >
-                          {imageUrl ? (
-                            <Box
-                              component="img"
-                              src={imageUrl}
-                              alt={`Review ${imageIndex + 1}`}
-                              sx={{
-                                width: '100%',
-                                height: '100%',
-                                objectFit: 'contain',
-                              }}
-                            />
-                          ) : isLoading ? (
+                    return (
+                      <Box
+                        key={mediaId || imageIndex}
+                        data-review-slide="true"
+                        sx={{
+                          width: isMobile
+                            ? `${reviewSlideWidthPercent}%`
+                            : `calc((100% - ${(imagesToShow - 1) * 16}px) / ${imagesToShow})`,
+                          flex: '0 0 auto',
+                          ml: isMobile && imageIndex === 0 && showArrows ? `${reviewSideInsetPercent}%` : 0,
+                          minWidth: 0,
+                          aspectRatio: '4/3',
+                          position: 'relative',
+                          overflow: 'hidden',
+                          bgcolor: '#F0F7F7',
+                          border: '1px solid',
+                          borderColor: 'divider',
+                          scrollSnapAlign: isMobile ? 'center' : 'start',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                        }}
+                      >
+                        {imageUrl ? (
+                          <Box
+                            component="img"
+                            src={imageUrl}
+                            alt={`Review ${imageIndex + 1}`}
+                            sx={{
+                              width: '100%',
+                              height: '100%',
+                              objectFit: 'contain',
+                            }}
+                          />
+                        ) : isLoading ? (
+                          <CircularProgress size={40} />
+                        ) : (
+                          <Box
+                            sx={{
+                              display: 'flex',
+                              flexDirection: 'column',
+                              alignItems: 'center',
+                              gap: 1,
+                            }}
+                          >
                             <CircularProgress size={40} />
-                          ) : imageExists ? (
-                            <Box
-                              sx={{
-                                display: 'flex',
-                                flexDirection: 'column',
-                                alignItems: 'center',
-                                gap: 1,
-                              }}
+                            <Typography
+                              variant="body2"
+                              color="text.secondary"
+                              sx={{ fontStyle: 'italic' }}
                             >
-                              <CircularProgress size={40} />
-                              <Typography
-                                variant="body2"
-                                color="text.secondary"
-                                sx={{ fontStyle: 'italic' }}
-                              >
-                                Loading...
-                              </Typography>
-                            </Box>
-                          ) : null}
-                        </Box>
-                      );
-                    })}
-                  </Box>
-
-                  {/* Right Arrow */}
-                  {showArrows && (
+                              Loading...
+                            </Typography>
+                          </Box>
+                        )}
+                      </Box>
+                    );
+                  })}
+                </Box>
+                {showArrows && (
+                  <>
+                    {canScrollReviewLeft && (
+                      <Box
+                        sx={{
+                          position: 'absolute',
+                          top: 0,
+                          bottom: 0,
+                          left: 0,
+                          width: { xs: `max(12px, ${reviewSideInsetPercent}%)`, md: 72 },
+                          background: {
+                            xs: 'linear-gradient(to right, rgba(240,247,247,0.8) 0%, rgba(240,247,247,0.45) 55%, transparent 100%)',
+                            md: 'linear-gradient(to right, rgba(240,247,247,0.96) 0%, rgba(240,247,247,0.68) 55%, transparent 100%)',
+                          },
+                          pointerEvents: 'none',
+                          opacity: reviewControlsVisible ? 1 : 0.88,
+                          transition: 'opacity 0.2s ease',
+                          zIndex: 1,
+                        }}
+                      />
+                    )}
+                    {canScrollReviewRight && (
+                      <Box
+                        sx={{
+                          position: 'absolute',
+                          top: 0,
+                          bottom: 0,
+                          right: 0,
+                          width: { xs: `max(12px, ${reviewSideInsetPercent}%)`, md: 72 },
+                          background: {
+                            xs: 'linear-gradient(to left, rgba(240,247,247,0.8) 0%, rgba(240,247,247,0.45) 55%, transparent 100%)',
+                            md: 'linear-gradient(to left, rgba(240,247,247,0.96) 0%, rgba(240,247,247,0.68) 55%, transparent 100%)',
+                          },
+                          pointerEvents: 'none',
+                          opacity: reviewControlsVisible ? 1 : 0.88,
+                          transition: 'opacity 0.2s ease',
+                          zIndex: 1,
+                        }}
+                      />
+                    )}
                     <IconButton
-                      onClick={() => {
-                        const maxIndex = reviewMediaIds.length - imagesToShow;
-                        setReviewCarouselIndex((prev) => Math.min(maxIndex, prev + 1));
-                      }}
-                      disabled={reviewCarouselIndex >= reviewMediaIds.length - imagesToShow}
+                      onClick={() => moveReviewCarousel(-1)}
+                      size="large"
+                      aria-label="scroll reviews left"
+                      disabled={!canScrollReviewLeft}
                       sx={{
                         position: 'absolute',
-                        right: { xs: -15, md: -50 },
+                        left: 8,
+                        top: '50%',
+                        width: 42,
+                        height: 42,
+                        transform: 'translateY(-50%)',
                         zIndex: 2,
-                        bgcolor: 'white',
-                        boxShadow: 2,
-                        width: 40,
-                        height: 40,
-                        padding: 1,
-                        borderRadius: '50%',
+                        bgcolor: canScrollReviewLeft ? 'rgba(44,95,95,0.68)' : 'rgba(255,255,255,0.12)',
+                        color: 'rgba(255,255,255,0.82)',
+                        border: '1px solid rgba(255,255,255,0.24)',
+                        backdropFilter: 'blur(3px)',
+                        boxShadow: canScrollReviewLeft ? '0 7px 18px rgba(0,0,0,0.28)' : 'none',
+                        opacity: reviewControlsVisible ? 1 : 0,
+                        pointerEvents: reviewControlsVisible ? 'auto' : 'none',
                         '&:hover': {
-                          bgcolor: 'grey.100',
+                          bgcolor: 'rgba(44,95,95,0.85)',
+                          color: '#fff',
+                          boxShadow: '0 8px 20px rgba(0,0,0,0.3)',
+                          transform: 'translateY(-50%) scale(1.06)',
+                        },
+                        '&:focus-visible': {
+                          outline: '3px solid',
+                          outlineColor: 'rgba(255,255,255,0.5)',
+                          outlineOffset: 2,
                         },
                         '&.Mui-disabled': {
-                          bgcolor: 'grey.200',
-                          opacity: 0.5,
+                          bgcolor: 'rgba(255,255,255,0.12)',
+                          color: 'rgba(255,255,255,0.35)',
+                          borderColor: 'rgba(255,255,255,0.18)',
+                          boxShadow: 'none',
                         },
+                        transition: 'transform 0.18s ease, box-shadow 0.18s ease, opacity 0.2s ease',
                       }}
                     >
-                      <ArrowForwardIosIcon sx={{ fontSize: 20 }} />
+                      <KeyboardArrowLeftRoundedIcon sx={{ fontSize: 28 }} />
                     </IconButton>
-                  )}
-                </Box>
+                    <IconButton
+                      onClick={() => moveReviewCarousel(1)}
+                      size="large"
+                      aria-label="scroll reviews right"
+                      disabled={!canScrollReviewRight}
+                      sx={{
+                        position: 'absolute',
+                        right: 8,
+                        top: '50%',
+                        width: 42,
+                        height: 42,
+                        transform: 'translateY(-50%)',
+                        zIndex: 2,
+                        bgcolor: canScrollReviewRight ? 'rgba(44,95,95,0.68)' : 'rgba(255,255,255,0.12)',
+                        color: 'rgba(255,255,255,0.82)',
+                        border: '1px solid rgba(255,255,255,0.24)',
+                        backdropFilter: 'blur(3px)',
+                        boxShadow: canScrollReviewRight ? '0 7px 18px rgba(0,0,0,0.28)' : 'none',
+                        opacity: reviewControlsVisible ? 1 : 0,
+                        pointerEvents: reviewControlsVisible ? 'auto' : 'none',
+                        '&:hover': {
+                          bgcolor: 'rgba(44,95,95,0.85)',
+                          color: '#fff',
+                          boxShadow: '0 8px 20px rgba(0,0,0,0.3)',
+                          transform: 'translateY(-50%) scale(1.06)',
+                        },
+                        '&:focus-visible': {
+                          outline: '3px solid',
+                          outlineColor: 'rgba(255,255,255,0.5)',
+                          outlineOffset: 2,
+                        },
+                        '&.Mui-disabled': {
+                          bgcolor: 'rgba(255,255,255,0.12)',
+                          color: 'rgba(255,255,255,0.35)',
+                          borderColor: 'rgba(255,255,255,0.18)',
+                          boxShadow: 'none',
+                        },
+                        transition: 'transform 0.18s ease, box-shadow 0.18s ease, opacity 0.2s ease',
+                      }}
+                    >
+                      <KeyboardArrowRightRoundedIcon sx={{ fontSize: 28 }} />
+                    </IconButton>
+                  </>
+                )}
               </Box>
             )}
           </Container>

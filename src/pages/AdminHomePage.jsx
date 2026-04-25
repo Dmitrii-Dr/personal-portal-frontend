@@ -38,6 +38,9 @@ import AddIcon from '@mui/icons-material/Add';
 import EditIcon from '@mui/icons-material/Edit';
 import PhotoLibraryIcon from '@mui/icons-material/PhotoLibrary';
 import CloseIcon from '@mui/icons-material/Close';
+import KeyboardArrowLeftRoundedIcon from '@mui/icons-material/KeyboardArrowLeftRounded';
+import KeyboardArrowRightRoundedIcon from '@mui/icons-material/KeyboardArrowRightRounded';
+import DragIndicatorIcon from '@mui/icons-material/DragIndicator';
 import { ContactPlatformIcon } from '../components/icons';
 
 const AdminHomePage = () => {
@@ -68,7 +71,7 @@ const AdminHomePage = () => {
   const [welcomeLeftMediaId, setWelcomeLeftMediaId] = useState(null);
   const [welcomeMobileMediaId, setWelcomeMobileMediaId] = useState(null);
   const [aboutMediaId, setAboutMediaId] = useState(null);
-  const [educationMediaId, setEducationMediaId] = useState(null);
+  const [educationMediaIds, setEducationMediaIds] = useState([]);
   const [reviewMediaIds, setReviewMediaIds] = useState([]);
 
   // Hero frame background colours (customisable, stored in extendedParameters)
@@ -96,8 +99,12 @@ const AdminHomePage = () => {
   const [welcomeLeftImageUrl, setWelcomeLeftImageUrl] = useState(null);
   const [welcomeMobileImageUrl, setWelcomeMobileImageUrl] = useState(null);
   const [aboutImageUrl, setAboutImageUrl] = useState(null);
-  const [educationImageUrl, setEducationImageUrl] = useState(null);
+  const [educationImageUrls, setEducationImageUrls] = useState([]);
   const [reviewImageUrls, setReviewImageUrls] = useState([]);
+  const [educationPreviewIndex, setEducationPreviewIndex] = useState(0);
+  const [draggedEducationIndex, setDraggedEducationIndex] = useState(null);
+  const [reviewPreviewIndex, setReviewPreviewIndex] = useState(0);
+  const [draggedReviewIndex, setDraggedReviewIndex] = useState(null);
 
   // Contact links state
   // Supported platforms: Telegram, LinkedIn, GitHub, Email, Phone, Instagram, Twitter, Facebook, YouTube, VK.com, WhatsApp, Website, B17
@@ -157,6 +164,7 @@ const AdminHomePage = () => {
   const [galleryThumbnailUrls, setGalleryThumbnailUrls] = useState({});
   const [galleryPage, setGalleryPage] = useState(0);
   const [galleryTotalPages, setGalleryTotalPages] = useState(1);
+  const [galleryTarget, setGalleryTarget] = useState('review');
 
 
 
@@ -180,7 +188,10 @@ const AdminHomePage = () => {
         setWelcomeLeftMediaId(data.welcomeLeftMediaId || null);
         setWelcomeMobileMediaId(data.welcomeMobileMediaId || null);
         setAboutMediaId(data.aboutMediaId || null);
-        setEducationMediaId(data.educationMediaId || null);
+        const nextEducationMediaIds = Array.isArray(data.educationMediaIds)
+          ? data.educationMediaIds
+          : (data.educationMediaId ? [data.educationMediaId] : []);
+        setEducationMediaIds(nextEducationMediaIds);
         setReviewMediaIds(data.reviewMediaIds || []);
         setWelcomeArticleIds(data.welcomeArticleIds || []);
 
@@ -236,10 +247,8 @@ const AdminHomePage = () => {
             console.error('Error loading about image:', err);
           });
         }
-        if (data.educationMediaId) {
-          loadImage(data.educationMediaId, 'education').catch(err => {
-            console.error('Error loading education image:', err);
-          });
+        if (nextEducationMediaIds.length > 0) {
+          loadEducationImages(nextEducationMediaIds);
         }
 
         // Load review images if reviewMediaIds exist
@@ -367,11 +376,27 @@ const AdminHomePage = () => {
         setWelcomeMobileImageUrl(objectUrl);
       } else if (type === 'about') {
         setAboutImageUrl(objectUrl);
-      } else if (type === 'education') {
-        setEducationImageUrl(objectUrl);
       }
     } catch (err) {
       console.error(`Error loading image for ${type}:`, err);
+    }
+  };
+
+  // Load multiple education images
+  const loadEducationImages = async (mediaIds) => {
+    if (!mediaIds || !Array.isArray(mediaIds) || mediaIds.length === 0) return;
+
+    try {
+      const imagePromises = mediaIds.map(mediaId =>
+        loadImageWithCache(mediaId).catch(err => {
+          console.error(`Error loading education image ${mediaId}:`, err);
+          return null;
+        })
+      );
+      const urls = await Promise.all(imagePromises);
+      setEducationImageUrls(urls);
+    } catch (err) {
+      console.error('Error loading education images:', err);
     }
   };
 
@@ -394,9 +419,90 @@ const AdminHomePage = () => {
   };
 
 
+  const handleEducationImagesUpload = async (files) => {
+    const imageFiles = Array.from(files || []);
+    if (imageFiles.length === 0) return;
+
+    if (imageFiles.some(file => !file.type.startsWith('image/'))) {
+      setError(t('admin.home.pleaseSelectImageFile'));
+      return;
+    }
+
+    setUploadingEducationImage(true);
+    try {
+      const uploadedMediaIds = [];
+
+      for (const file of imageFiles) {
+        const formData = new FormData();
+        formData.append('file', file);
+
+        const uploadResponse = await apiClient.post('/api/v1/admin/media/image', formData, {
+          headers: {
+            'Content-Type': 'multipart/form-data',
+          },
+        });
+
+        if (!uploadResponse.data || !uploadResponse.data.mediaId) {
+          throw new Error('Failed to upload image: No mediaId returned');
+        }
+
+        uploadedMediaIds.push(uploadResponse.data.mediaId);
+      }
+
+      const newEducationMediaIds = [...educationMediaIds, ...uploadedMediaIds];
+      setEducationMediaIds(newEducationMediaIds);
+
+      const uploadedUrls = await Promise.all(
+        uploadedMediaIds.map(mediaId =>
+          loadImageWithCache(mediaId).catch(err => {
+            console.error(`Error loading education image ${mediaId}:`, err);
+            return null;
+          })
+        )
+      );
+      setEducationImageUrls(prev => [...prev, ...uploadedUrls]);
+
+      const updatePayload = {
+        aboutMessage: aboutMeContent,
+        educationMessage: educationContent,
+        reviewMessage: reviewMessage,
+        welcomeRightMediaId: welcomeRightMediaId,
+        welcomeLeftMediaId: welcomeLeftMediaId,
+        welcomeMobileMediaId: welcomeMobileMediaId,
+        aboutMediaId: aboutMediaId,
+        educationMediaIds: newEducationMediaIds,
+        reviewMediaIds: reviewMediaIds,
+        welcomeArticleIds: welcomeArticleIds,
+        contact: formatContactForBackend(),
+      };
+
+      const updateResponse = await fetchWithAuth('/api/v1/admin/home', {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(updatePayload),
+      });
+
+      if (!updateResponse.ok) {
+        throw new Error(`Failed to update education images: ${updateResponse.status}`);
+      }
+    } catch (err) {
+      console.error('Error uploading education images:', err);
+      setError(err.message || 'Failed to upload education images');
+    } finally {
+      setUploadingEducationImage(false);
+    }
+  };
+
   // Handle image upload for a specific section
   const handleImageUpload = async (file, type) => {
     if (!file) return;
+
+    if (type === 'education') {
+      await handleEducationImagesUpload([file]);
+      return;
+    }
 
     // Validate file type
     if (!file.type.startsWith('image/')) {
@@ -445,8 +551,6 @@ const AdminHomePage = () => {
         setWelcomeMobileMediaId(mediaId);
       } else if (type === 'about') {
         setAboutMediaId(mediaId);
-      } else if (type === 'education') {
-        setEducationMediaId(mediaId);
       } else if (type === 'review') {
         // Add to review media IDs array
         const newReviewMediaIds = [...reviewMediaIds, mediaId];
@@ -455,6 +559,7 @@ const AdminHomePage = () => {
         // Load and display the new image
         const objectUrl = await loadImageWithCache(mediaId);
         setReviewImageUrls(prev => [...prev, objectUrl]);
+        setReviewPreviewIndex(newReviewMediaIds.length - 1);
 
         // Immediately update via PUT request
         const updatePayload = {
@@ -465,7 +570,7 @@ const AdminHomePage = () => {
           welcomeLeftMediaId: welcomeLeftMediaId,
           welcomeMobileMediaId: welcomeMobileMediaId,
           aboutMediaId: aboutMediaId,
-          educationMediaId: educationMediaId,
+          educationMediaIds: educationMediaIds,
           reviewMediaIds: newReviewMediaIds,
           welcomeArticleIds: welcomeArticleIds,
           contact: formatContactForBackend(),
@@ -495,7 +600,7 @@ const AdminHomePage = () => {
         welcomeLeftMediaId: type === 'welcome-left' ? mediaId : welcomeLeftMediaId,
         welcomeMobileMediaId: type === 'welcome-mobile' ? mediaId : welcomeMobileMediaId,
         aboutMediaId: type === 'about' ? mediaId : aboutMediaId,
-        educationMediaId: type === 'education' ? mediaId : educationMediaId,
+        educationMediaIds: educationMediaIds,
         reviewMediaIds: reviewMediaIds,
         welcomeArticleIds: welcomeArticleIds,
         contact: formatContactForBackend(),
@@ -535,6 +640,111 @@ const AdminHomePage = () => {
     }
   };
 
+  // Handle deletion of an education image
+  const handleDeleteEducationImage = async (index) => {
+    try {
+      const newEducationMediaIds = educationMediaIds.filter((_, i) => i !== index);
+      const newEducationImageUrls = educationImageUrls.filter((_, i) => i !== index);
+
+      setEducationMediaIds(newEducationMediaIds);
+      setEducationImageUrls(newEducationImageUrls);
+
+      const updatePayload = {
+        aboutMessage: aboutMeContent,
+        educationMessage: educationContent,
+        reviewMessage: reviewMessage,
+        welcomeRightMediaId: welcomeRightMediaId,
+        welcomeLeftMediaId: welcomeLeftMediaId,
+        welcomeMobileMediaId: welcomeMobileMediaId,
+        aboutMediaId: aboutMediaId,
+        educationMediaIds: newEducationMediaIds,
+        reviewMediaIds: reviewMediaIds,
+        welcomeArticleIds: welcomeArticleIds,
+        contact: formatContactForBackend(),
+      };
+
+      const updateResponse = await fetchWithAuth('/api/v1/admin/home', {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(updatePayload),
+      });
+
+      if (!updateResponse.ok) {
+        throw new Error(`Failed to delete education image: ${updateResponse.status}`);
+      }
+    } catch (err) {
+      console.error('Error deleting education image:', err);
+      setError(err.message || 'Failed to delete education image');
+    }
+  };
+
+  const persistEducationMediaOrder = async (nextEducationMediaIds) => {
+    const updatePayload = {
+      aboutMessage: aboutMeContent,
+      educationMessage: educationContent,
+      reviewMessage: reviewMessage,
+      welcomeRightMediaId: welcomeRightMediaId,
+      welcomeLeftMediaId: welcomeLeftMediaId,
+      welcomeMobileMediaId: welcomeMobileMediaId,
+      aboutMediaId: aboutMediaId,
+      educationMediaIds: nextEducationMediaIds,
+      reviewMediaIds: reviewMediaIds,
+      welcomeArticleIds: welcomeArticleIds,
+      contact: formatContactForBackend(),
+    };
+
+    const updateResponse = await fetchWithAuth('/api/v1/admin/home', {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(updatePayload),
+    });
+
+    if (!updateResponse.ok) {
+      throw new Error(`Failed to save education image order: ${updateResponse.status}`);
+    }
+  };
+
+  const handleReorderEducationImage = async (fromIndex, toIndex) => {
+    if (
+      fromIndex === toIndex ||
+      fromIndex < 0 ||
+      toIndex < 0 ||
+      fromIndex >= educationMediaIds.length ||
+      toIndex >= educationMediaIds.length
+    ) {
+      return;
+    }
+
+    const previousMediaIds = educationMediaIds;
+    const previousImageUrls = educationImageUrls;
+
+    const nextEducationMediaIds = [...educationMediaIds];
+    const [movedMediaId] = nextEducationMediaIds.splice(fromIndex, 1);
+    nextEducationMediaIds.splice(toIndex, 0, movedMediaId);
+
+    const nextEducationImageUrls = [...educationImageUrls];
+    const [movedImageUrl] = nextEducationImageUrls.splice(fromIndex, 1);
+    nextEducationImageUrls.splice(toIndex, 0, movedImageUrl);
+
+    setEducationMediaIds(nextEducationMediaIds);
+    setEducationImageUrls(nextEducationImageUrls);
+    setEducationPreviewIndex(toIndex);
+
+    try {
+      await persistEducationMediaOrder(nextEducationMediaIds);
+    } catch (err) {
+      console.error('Error reordering education images:', err);
+      setEducationMediaIds(previousMediaIds);
+      setEducationImageUrls(previousImageUrls);
+      setEducationPreviewIndex(fromIndex);
+      setError(err.message || 'Failed to reorder education images');
+    }
+  };
+
   // Handle deletion of a review image
   const handleDeleteReviewImage = async (index) => {
     try {
@@ -543,6 +753,7 @@ const AdminHomePage = () => {
 
       setReviewMediaIds(newReviewMediaIds);
       setReviewImageUrls(newReviewImageUrls);
+      setReviewPreviewIndex((prev) => Math.min(prev, Math.max(0, newReviewImageUrls.length - 1)));
 
       // Update via PUT request
       const updatePayload = {
@@ -553,7 +764,7 @@ const AdminHomePage = () => {
         welcomeLeftMediaId: welcomeLeftMediaId,
         welcomeMobileMediaId: welcomeMobileMediaId,
         aboutMediaId: aboutMediaId,
-        educationMediaId: educationMediaId,
+        educationMediaIds: educationMediaIds,
         reviewMediaIds: newReviewMediaIds,
         welcomeArticleIds: welcomeArticleIds,
         contact: formatContactForBackend(),
@@ -573,6 +784,71 @@ const AdminHomePage = () => {
     } catch (err) {
       console.error('Error deleting review image:', err);
       setError(err.message || 'Failed to delete review image');
+    }
+  };
+
+  const persistReviewMediaOrder = async (nextReviewMediaIds) => {
+    const updatePayload = {
+      aboutMessage: aboutMeContent,
+      educationMessage: educationContent,
+      reviewMessage: reviewMessage,
+      welcomeRightMediaId: welcomeRightMediaId,
+      welcomeLeftMediaId: welcomeLeftMediaId,
+      welcomeMobileMediaId: welcomeMobileMediaId,
+      aboutMediaId: aboutMediaId,
+      educationMediaIds: educationMediaIds,
+      reviewMediaIds: nextReviewMediaIds,
+      welcomeArticleIds: welcomeArticleIds,
+      contact: formatContactForBackend(),
+    };
+
+    const updateResponse = await fetchWithAuth('/api/v1/admin/home', {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(updatePayload),
+    });
+
+    if (!updateResponse.ok) {
+      throw new Error(`Failed to save review image order: ${updateResponse.status}`);
+    }
+  };
+
+  const handleReorderReviewImage = async (fromIndex, toIndex) => {
+    if (
+      fromIndex === toIndex ||
+      fromIndex < 0 ||
+      toIndex < 0 ||
+      fromIndex >= reviewMediaIds.length ||
+      toIndex >= reviewMediaIds.length
+    ) {
+      return;
+    }
+
+    const previousMediaIds = reviewMediaIds;
+    const previousImageUrls = reviewImageUrls;
+
+    const nextReviewMediaIds = [...reviewMediaIds];
+    const [movedMediaId] = nextReviewMediaIds.splice(fromIndex, 1);
+    nextReviewMediaIds.splice(toIndex, 0, movedMediaId);
+
+    const nextReviewImageUrls = [...reviewImageUrls];
+    const [movedImageUrl] = nextReviewImageUrls.splice(fromIndex, 1);
+    nextReviewImageUrls.splice(toIndex, 0, movedImageUrl);
+
+    setReviewMediaIds(nextReviewMediaIds);
+    setReviewImageUrls(nextReviewImageUrls);
+    setReviewPreviewIndex(toIndex);
+
+    try {
+      await persistReviewMediaOrder(nextReviewMediaIds);
+    } catch (err) {
+      console.error('Error reordering review images:', err);
+      setReviewMediaIds(previousMediaIds);
+      setReviewImageUrls(previousImageUrls);
+      setReviewPreviewIndex(fromIndex);
+      setError(err.message || 'Failed to reorder review images');
     }
   };
 
@@ -643,7 +919,8 @@ const AdminHomePage = () => {
     }
   };
 
-  const handleOpenGallery = () => {
+  const handleOpenGallery = (target = 'review') => {
+    setGalleryTarget(target);
     setGalleryDialogOpen(true);
     setGalleryPage(0);
     setGalleryError(null);
@@ -664,13 +941,20 @@ const AdminHomePage = () => {
 
   const handleSelectGalleryImage = async (mediaId) => {
     try {
-      // Add the selected mediaId to reviewMediaIds
-      const newReviewMediaIds = [...reviewMediaIds, mediaId];
-      setReviewMediaIds(newReviewMediaIds);
-
-      // Load the image and add to reviewImageUrls
       const objectUrl = await loadImageWithCache(mediaId);
-      setReviewImageUrls((prev) => [...prev, objectUrl]);
+      const isEducationTarget = galleryTarget === 'education';
+      const nextEducationMediaIds = isEducationTarget ? [...educationMediaIds, mediaId] : educationMediaIds;
+      const nextReviewMediaIds = isEducationTarget ? reviewMediaIds : [...reviewMediaIds, mediaId];
+
+      if (isEducationTarget) {
+        setEducationMediaIds(nextEducationMediaIds);
+        setEducationImageUrls((prev) => [...prev, objectUrl]);
+        setEducationPreviewIndex(nextEducationMediaIds.length - 1);
+      } else {
+        setReviewMediaIds(nextReviewMediaIds);
+        setReviewImageUrls((prev) => [...prev, objectUrl]);
+        setReviewPreviewIndex(nextReviewMediaIds.length - 1);
+      }
 
       // Update via PUT request
       const updatePayload = {
@@ -681,8 +965,8 @@ const AdminHomePage = () => {
         welcomeLeftMediaId: welcomeLeftMediaId,
         welcomeMobileMediaId: welcomeMobileMediaId,
         aboutMediaId: aboutMediaId,
-        educationMediaId: educationMediaId,
-        reviewMediaIds: newReviewMediaIds,
+        educationMediaIds: nextEducationMediaIds,
+        reviewMediaIds: nextReviewMediaIds,
         welcomeArticleIds: welcomeArticleIds,
         contact: formatContactForBackend(),
       };
@@ -696,14 +980,14 @@ const AdminHomePage = () => {
       });
 
       if (!updateResponse.ok) {
-        throw new Error(`Failed to add review image: ${updateResponse.status}`);
+        throw new Error(`Failed to add ${isEducationTarget ? 'education' : 'review'} image: ${updateResponse.status}`);
       }
 
       // Close gallery dialog
       handleCloseGallery();
     } catch (err) {
       console.error('Error selecting gallery image:', err);
-      setError(err.message || 'Failed to add review image');
+      setError(err.message || `Failed to add ${galleryTarget === 'education' ? 'education' : 'review'} image`);
     }
   };
 
@@ -856,7 +1140,7 @@ const AdminHomePage = () => {
           welcomeLeftMediaId: welcomeLeftMediaId,
           welcomeMobileMediaId: welcomeMobileMediaId,
           aboutMediaId: aboutMediaId,
-          educationMediaId: educationMediaId,
+          educationMediaIds: educationMediaIds,
           reviewMediaIds: reviewMediaIds,
           welcomeArticleIds: welcomeArticleIds,
           isActive: isSiteActive,
@@ -911,6 +1195,22 @@ const AdminHomePage = () => {
       setSaving(false);
     }
   };
+
+  useEffect(() => {
+    if (educationImageUrls.length === 0) {
+      setEducationPreviewIndex(0);
+      return;
+    }
+    setEducationPreviewIndex((prev) => Math.min(prev, educationImageUrls.length - 1));
+  }, [educationImageUrls.length]);
+
+  useEffect(() => {
+    if (reviewImageUrls.length === 0) {
+      setReviewPreviewIndex(0);
+      return;
+    }
+    setReviewPreviewIndex((prev) => Math.min(prev, reviewImageUrls.length - 1));
+  }, [reviewImageUrls.length]);
 
 
   if (loading) {
@@ -1448,81 +1748,245 @@ const AdminHomePage = () => {
       >
         <Container maxWidth="lg">
           <Grid container spacing={0} sx={{ alignItems: 'center' }}>
-            {/* Left Column - Image */}
-            <Grid item xs={12} md={6} sx={{ position: 'relative', height: { xs: '300px', md: '400px' }, order: { xs: 2, md: 1 } }}>
-              <Box
-                sx={{
-                  width: '100%',
-                  height: '100%',
-                  background: educationImageUrl ? 'transparent' : 'linear-gradient(135deg, #E3F2FD 0%, #BBDEFB 50%, #90CAF9 100%)',
-                  position: 'relative',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  overflow: 'hidden',
-                  border: '2px dashed',
-                  borderColor: educationImageUrl ? 'transparent' : 'grey.300',
-                }}
-              >
-                {educationImageUrl ? (
-                  <Box sx={{ position: 'relative', width: '100%', height: '100%' }}>
-                    <Box
-                      component="img"
-                      src={educationImageUrl}
-                      alt="Education"
-                      sx={{
-                        width: '100%',
-                        height: '100%',
-                        objectFit: 'cover',
-                      }}
-                    />
-                  </Box>
-                ) : (
-                  <Avatar
-                    sx={{
-                      width: { xs: 150, sm: 200, md: 250 },
-                      height: { xs: 150, sm: 200, md: 250 },
-                      bgcolor: 'primary.main',
-                      fontSize: { xs: '3rem', md: '4rem' },
-                      fontWeight: 600,
-                    }}
-                  >
-                    E
-                  </Avatar>
-                )}
+            {/* Left Column - Images */}
+            <Grid item xs={12} md={6} sx={{ position: 'relative', order: { xs: 2, md: 1 } }}>
+              <Stack spacing={2}>
                 <Box
                   sx={{
-                    position: 'absolute',
-                    bottom: 16,
-                    right: 16,
+                    width: '100%',
+                    height: { xs: '300px', md: '400px' },
+                    background: educationImageUrls.length > 0 ? '#F0F7F7' : 'linear-gradient(135deg, #E3F2FD 0%, #BBDEFB 50%, #90CAF9 100%)',
+                    position: 'relative',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    overflow: 'hidden',
+                    border: '2px dashed',
+                    borderColor: educationImageUrls.length > 0 ? 'transparent' : 'grey.300',
                   }}
                 >
-                  <input
-                    accept="image/*"
-                    style={{ display: 'none' }}
-                    id="education-image-upload"
-                    type="file"
-                    onChange={(e) => {
-                      const file = e.target.files?.[0];
-                      if (file) {
-                        handleImageUpload(file, 'education');
-                      }
-                      e.target.value = '';
-                    }}
-                  />
-                  <label htmlFor="education-image-upload">
-                    <Button
-                      variant="contained"
-                      component="span"
-                      startIcon={uploadingEducationImage ? <CircularProgress size={20} /> : <CloudUploadIcon />}
-                      disabled={uploadingEducationImage}
-                      sx={{ textTransform: 'none' }}
+                  {educationImageUrls[educationPreviewIndex] ? (
+                    <Box sx={{ position: 'relative', width: '100%', height: '100%' }}>
+                      <Box
+                        component="img"
+                        src={educationImageUrls[educationPreviewIndex]}
+                        alt="Education"
+                        sx={{
+                          width: '100%',
+                          height: '100%',
+                          objectFit: 'contain',
+                        }}
+                      />
+                    </Box>
+                  ) : (
+                    <Avatar
+                      sx={{
+                        width: { xs: 150, sm: 200, md: 250 },
+                        height: { xs: 150, sm: 200, md: 250 },
+                        bgcolor: 'primary.main',
+                        fontSize: { xs: '3rem', md: '4rem' },
+                        fontWeight: 600,
+                      }}
                     >
-                      {uploadingEducationImage ? t('admin.home.uploading') : educationImageUrl ? t('admin.home.change') : t('admin.home.uploadImage')}
+                      E
+                    </Avatar>
+                  )}
+                  <Box
+                    sx={{
+                      position: 'absolute',
+                      bottom: 16,
+                      right: 16,
+                    }}
+                  >
+                    <input
+                      accept="image/*"
+                      style={{ display: 'none' }}
+                      id="education-image-upload"
+                      type="file"
+                      multiple
+                      onChange={(e) => {
+                        const files = Array.from(e.target.files || []);
+                        if (files.length > 0) {
+                          handleEducationImagesUpload(files);
+                        }
+                        e.target.value = '';
+                      }}
+                    />
+                    <label htmlFor="education-image-upload">
+                      <Button
+                        variant="contained"
+                        component="span"
+                        startIcon={uploadingEducationImage ? <CircularProgress size={20} /> : <CloudUploadIcon />}
+                        disabled={uploadingEducationImage}
+                        sx={{ textTransform: 'none' }}
+                      >
+                        {uploadingEducationImage ? t('admin.home.uploading') : t('admin.home.uploadEducationImages')}
+                      </Button>
+                    </label>
+                  </Box>
+                  <Box
+                    sx={{
+                      position: 'absolute',
+                      bottom: 16,
+                      left: 16,
+                    }}
+                  >
+                    <Button
+                      variant="outlined"
+                      startIcon={<PhotoLibraryIcon />}
+                      onClick={() => handleOpenGallery('education')}
+                      disabled={uploadingEducationImage}
+                      sx={{ textTransform: 'none', bgcolor: 'rgba(255,255,255,0.86)' }}
+                    >
+                      {t('admin.home.selectFromGallery')}
                     </Button>
-                  </label>
+                  </Box>
+                  {educationImageUrls.length > 1 && (
+                    <>
+                      <IconButton
+                        aria-label="Previous education photo"
+                        onClick={() => setEducationPreviewIndex((prev) => Math.max(0, prev - 1))}
+                        disabled={educationPreviewIndex === 0}
+                        sx={{
+                          position: 'absolute',
+                          left: 8,
+                          top: '50%',
+                          transform: 'translateY(-50%)',
+                          bgcolor: 'rgba(44,95,95,0.68)',
+                          color: 'rgba(255,255,255,0.9)',
+                          '&:hover': {
+                            bgcolor: 'rgba(44,95,95,0.85)',
+                          },
+                          '&.Mui-disabled': {
+                            bgcolor: 'rgba(255,255,255,0.2)',
+                            color: 'rgba(255,255,255,0.5)',
+                          },
+                        }}
+                      >
+                        <KeyboardArrowLeftRoundedIcon />
+                      </IconButton>
+                      <IconButton
+                        aria-label="Next education photo"
+                        onClick={() => setEducationPreviewIndex((prev) => Math.min(educationImageUrls.length - 1, prev + 1))}
+                        disabled={educationPreviewIndex >= educationImageUrls.length - 1}
+                        sx={{
+                          position: 'absolute',
+                          right: 8,
+                          top: '50%',
+                          transform: 'translateY(-50%)',
+                          bgcolor: 'rgba(44,95,95,0.68)',
+                          color: 'rgba(255,255,255,0.9)',
+                          '&:hover': {
+                            bgcolor: 'rgba(44,95,95,0.85)',
+                          },
+                          '&.Mui-disabled': {
+                            bgcolor: 'rgba(255,255,255,0.2)',
+                            color: 'rgba(255,255,255,0.5)',
+                          },
+                        }}
+                      >
+                        <KeyboardArrowRightRoundedIcon />
+                      </IconButton>
+                    </>
+                  )}
                 </Box>
-              </Box>
+                <Alert severity="info">{t('admin.home.educationImagesHint')}</Alert>
+                {educationImageUrls.length > 1 && (
+                  <Typography variant="body2" color="text.secondary">
+                    {t('admin.home.educationCarouselPosition', 'Photo {{current}} of {{total}}', {
+                      current: educationPreviewIndex + 1,
+                      total: educationImageUrls.length,
+                    })}
+                  </Typography>
+                )}
+                {educationImageUrls.length > 0 && (
+                  <Grid container spacing={2}>
+                    {educationImageUrls.map((imageUrl, index) => (
+                      <Grid item xs={6} sm={4} key={educationMediaIds[index] || index}>
+                        <Card
+                          draggable
+                          onDragStart={(event) => {
+                            setDraggedEducationIndex(index);
+                            event.dataTransfer.effectAllowed = 'move';
+                          }}
+                          onDragOver={(event) => {
+                            event.preventDefault();
+                            event.dataTransfer.dropEffect = 'move';
+                          }}
+                          onDrop={(event) => {
+                            event.preventDefault();
+                            if (draggedEducationIndex === null) return;
+                            handleReorderEducationImage(draggedEducationIndex, index);
+                            setDraggedEducationIndex(null);
+                          }}
+                          onDragEnd={() => setDraggedEducationIndex(null)}
+                          sx={{
+                            position: 'relative',
+                            cursor: 'grab',
+                            border: draggedEducationIndex === index ? '2px dashed' : '1px solid',
+                            borderColor: draggedEducationIndex === index ? 'primary.main' : 'divider',
+                          }}
+                        >
+                          {imageUrl ? (
+                            <CardMedia
+                              component="img"
+                              image={imageUrl}
+                              alt={`${t('admin.home.educationImages')} ${index + 1}`}
+                              sx={{ height: 120, objectFit: 'cover' }}
+                            />
+                          ) : (
+                            <Box
+                              sx={{
+                                height: 120,
+                                bgcolor: '#E3F2FD',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                              }}
+                            >
+                              <CircularProgress size={28} />
+                            </Box>
+                          )}
+                          <Box
+                            sx={{
+                              position: 'absolute',
+                              left: 8,
+                              top: 8,
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: 0.5,
+                              px: 0.75,
+                              py: 0.25,
+                              borderRadius: 1,
+                              bgcolor: 'rgba(0,0,0,0.58)',
+                              color: '#fff',
+                              fontSize: '0.75rem',
+                            }}
+                          >
+                            <DragIndicatorIcon sx={{ fontSize: 14 }} />
+                            {index + 1}
+                          </Box>
+                          <IconButton
+                            size="small"
+                            onClick={() => handleDeleteEducationImage(index)}
+                            sx={{
+                              position: 'absolute',
+                              top: 8,
+                              right: 8,
+                              bgcolor: 'rgba(255, 255, 255, 0.9)',
+                              '&:hover': {
+                                bgcolor: 'rgba(255, 255, 255, 1)',
+                              },
+                            }}
+                          >
+                            <DeleteIcon fontSize="small" />
+                          </IconButton>
+                        </Card>
+                      </Grid>
+                    ))}
+                  </Grid>
+                )}
+              </Stack>
             </Grid>
 
             {/* Right Column - Text Content */}
@@ -1635,76 +2099,241 @@ const AdminHomePage = () => {
               {t('admin.home.reviewImages')}
             </Typography>
 
-            {/* Upload Button */}
-            <Box sx={{ mb: 3, display: 'flex', gap: 2, alignItems: 'center' }}>
-              <input
-                accept="image/*"
-                style={{ display: 'none' }}
-                id="review-image-upload"
-                type="file"
-                onChange={(e) => {
-                  const file = e.target.files?.[0];
-                  if (file) {
-                    handleImageUpload(file, 'review');
-                  }
-                  e.target.value = '';
+            <Stack
+              spacing={2}
+              sx={{
+                width: '100%',
+                maxWidth: { xs: '100%', md: '50%' },
+              }}
+            >
+              <Box
+                sx={{
+                  width: '100%',
+                  aspectRatio: '1 / 1',
+                  background: reviewImageUrls.length > 0 ? '#F0F7F7' : 'linear-gradient(135deg, #E3F2FD 0%, #BBDEFB 50%, #90CAF9 100%)',
+                  position: 'relative',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  overflow: 'hidden',
+                  border: '2px dashed',
+                  borderColor: reviewImageUrls.length > 0 ? 'transparent' : 'grey.300',
                 }}
-              />
-              <label htmlFor="review-image-upload">
-                <Button
-                  variant="contained"
-                  component="span"
-                  startIcon={uploadingReviewImage ? <CircularProgress size={20} /> : <CloudUploadIcon />}
-                  disabled={uploadingReviewImage}
-                  sx={{ textTransform: 'none' }}
-                >
-                  {uploadingReviewImage ? t('admin.home.uploading') : t('admin.home.uploadReviewImage')}
-                </Button>
-              </label>
-              <Button
-                variant="outlined"
-                startIcon={<PhotoLibraryIcon />}
-                onClick={handleOpenGallery}
-                disabled={uploadingReviewImage}
-                sx={{ textTransform: 'none' }}
               >
-                {t('admin.home.selectFromGallery')}
-              </Button>
-            </Box>
-
-            {/* Display Uploaded Images */}
-            {reviewImageUrls.length > 0 && (
-              <Grid container spacing={2}>
-                {reviewImageUrls.map((imageUrl, index) => (
-                  <Grid item xs={12} sm={6} md={4} key={index}>
-                    <Card
+                {reviewImageUrls[reviewPreviewIndex] ? (
+                  <Box sx={{ position: 'relative', width: '100%', height: '100%' }}>
+                    <Box
+                      component="img"
+                      src={reviewImageUrls[reviewPreviewIndex]}
+                      alt={`${t('admin.home.reviewImages')} ${reviewPreviewIndex + 1}`}
                       sx={{
-                        position: 'relative',
+                        width: '100%',
                         height: '100%',
+                        objectFit: 'contain',
+                        objectPosition: 'center',
+                      }}
+                    />
+                  </Box>
+                ) : (
+                  <Box sx={{ textAlign: 'center' }}>
+                    <Avatar
+                      sx={{
+                        width: { xs: 150, sm: 200, md: 250 },
+                        height: { xs: 150, sm: 200, md: 250 },
+                        bgcolor: 'primary.main',
+                        fontSize: { xs: '3rem', md: '4rem' },
+                        fontWeight: 600,
+                        mx: 'auto',
+                        mb: 2,
                       }}
                     >
-                      <Box
-                        component="img"
-                        src={imageUrl}
-                        alt={`${t('admin.home.reviewImages')} ${index + 1}`}
-                        sx={{
-                          width: '100%',
-                          height: '200px',
-                          objectFit: 'contain',
-                          bgcolor: '#F0F7F7',
+                      R
+                    </Avatar>
+                    <Typography variant="body2" color="text.secondary">
+                      {t('admin.home.noReviewImages')}
+                    </Typography>
+                  </Box>
+                )}
+                <Box
+                  sx={{
+                    position: 'absolute',
+                    bottom: 16,
+                    right: 16,
+                  }}
+                >
+                  <input
+                    accept="image/*"
+                    style={{ display: 'none' }}
+                    id="review-image-upload"
+                    type="file"
+                    onChange={(e) => {
+                      const file = e.target.files?.[0];
+                      if (file) {
+                        handleImageUpload(file, 'review');
+                      }
+                      e.target.value = '';
+                    }}
+                  />
+                  <label htmlFor="review-image-upload">
+                    <Button
+                      variant="contained"
+                      component="span"
+                      startIcon={uploadingReviewImage ? <CircularProgress size={20} /> : <CloudUploadIcon />}
+                      disabled={uploadingReviewImage}
+                      sx={{ textTransform: 'none' }}
+                    >
+                      {uploadingReviewImage ? t('admin.home.uploading') : t('admin.home.uploadReviewImage')}
+                    </Button>
+                  </label>
+                </Box>
+                <Box
+                  sx={{
+                    position: 'absolute',
+                    bottom: 16,
+                    left: 16,
+                  }}
+                >
+                  <Button
+                    variant="outlined"
+                    startIcon={<PhotoLibraryIcon />}
+                    onClick={() => handleOpenGallery('review')}
+                    disabled={uploadingReviewImage}
+                    sx={{ textTransform: 'none', bgcolor: 'rgba(255,255,255,0.86)' }}
+                  >
+                    {t('admin.home.selectFromGallery')}
+                  </Button>
+                </Box>
+                {reviewImageUrls.length > 1 && (
+                  <>
+                    <IconButton
+                      aria-label="Previous review photo"
+                      onClick={() => setReviewPreviewIndex((prev) => Math.max(0, prev - 1))}
+                      disabled={reviewPreviewIndex === 0}
+                      sx={{
+                        position: 'absolute',
+                        left: 8,
+                        top: '50%',
+                        transform: 'translateY(-50%)',
+                        bgcolor: 'rgba(44,95,95,0.68)',
+                        color: 'rgba(255,255,255,0.9)',
+                        '&:hover': {
+                          bgcolor: 'rgba(44,95,95,0.85)',
+                        },
+                        '&.Mui-disabled': {
+                          bgcolor: 'rgba(255,255,255,0.2)',
+                          color: 'rgba(255,255,255,0.5)',
+                        },
+                      }}
+                    >
+                      <KeyboardArrowLeftRoundedIcon />
+                    </IconButton>
+                    <IconButton
+                      aria-label="Next review photo"
+                      onClick={() => setReviewPreviewIndex((prev) => Math.min(reviewImageUrls.length - 1, prev + 1))}
+                      disabled={reviewPreviewIndex >= reviewImageUrls.length - 1}
+                      sx={{
+                        position: 'absolute',
+                        right: 8,
+                        top: '50%',
+                        transform: 'translateY(-50%)',
+                        bgcolor: 'rgba(44,95,95,0.68)',
+                        color: 'rgba(255,255,255,0.9)',
+                        '&:hover': {
+                          bgcolor: 'rgba(44,95,95,0.85)',
+                        },
+                        '&.Mui-disabled': {
+                          bgcolor: 'rgba(255,255,255,0.2)',
+                          color: 'rgba(255,255,255,0.5)',
+                        },
+                      }}
+                    >
+                      <KeyboardArrowRightRoundedIcon />
+                    </IconButton>
+                  </>
+                )}
+              </Box>
+              {reviewImageUrls.length > 1 && (
+                <Typography variant="body2" color="text.secondary">
+                  {t('admin.home.reviewCarouselPosition', 'Photo {{current}} of {{total}}', {
+                    current: reviewPreviewIndex + 1,
+                    total: reviewImageUrls.length,
+                  })}
+                </Typography>
+              )}
+              {reviewImageUrls.length > 0 && (
+                <Grid container spacing={2}>
+                  {reviewImageUrls.map((imageUrl, index) => (
+                    <Grid item xs={6} sm={4} key={reviewMediaIds[index] || index}>
+                      <Card
+                        draggable
+                        onDragStart={(event) => {
+                          setDraggedReviewIndex(index);
+                          event.dataTransfer.effectAllowed = 'move';
                         }}
-                      />
-                      <Box
+                        onDragOver={(event) => {
+                          event.preventDefault();
+                          event.dataTransfer.dropEffect = 'move';
+                        }}
+                        onDrop={(event) => {
+                          event.preventDefault();
+                          if (draggedReviewIndex === null) return;
+                          handleReorderReviewImage(draggedReviewIndex, index);
+                          setDraggedReviewIndex(null);
+                        }}
+                        onDragEnd={() => setDraggedReviewIndex(null)}
                         sx={{
-                          position: 'absolute',
-                          top: 8,
-                          right: 8,
+                          position: 'relative',
+                          cursor: 'grab',
+                          border: draggedReviewIndex === index ? '2px dashed' : '1px solid',
+                          borderColor: draggedReviewIndex === index ? 'primary.main' : 'divider',
                         }}
                       >
+                        {imageUrl ? (
+                          <CardMedia
+                            component="img"
+                            image={imageUrl}
+                            alt={`${t('admin.home.reviewImages')} ${index + 1}`}
+                            sx={{ height: 120, objectFit: 'cover' }}
+                          />
+                        ) : (
+                          <Box
+                            sx={{
+                              height: 120,
+                              bgcolor: '#E3F2FD',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                            }}
+                          >
+                            <CircularProgress size={28} />
+                          </Box>
+                        )}
+                        <Box
+                          sx={{
+                            position: 'absolute',
+                            left: 8,
+                            top: 8,
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: 0.5,
+                            px: 0.75,
+                            py: 0.25,
+                            borderRadius: 1,
+                            bgcolor: 'rgba(0,0,0,0.58)',
+                            color: '#fff',
+                            fontSize: '0.75rem',
+                          }}
+                        >
+                          <DragIndicatorIcon sx={{ fontSize: 14 }} />
+                          {index + 1}
+                        </Box>
                         <IconButton
                           size="small"
                           onClick={() => handleDeleteReviewImage(index)}
                           sx={{
+                            position: 'absolute',
+                            top: 8,
+                            right: 8,
                             bgcolor: 'rgba(255, 255, 255, 0.9)',
                             '&:hover': {
                               bgcolor: 'rgba(255, 255, 255, 1)',
@@ -1713,29 +2342,12 @@ const AdminHomePage = () => {
                         >
                           <DeleteIcon fontSize="small" color="error" />
                         </IconButton>
-                      </Box>
-                    </Card>
-                  </Grid>
-                ))}
-              </Grid>
-            )}
-
-            {reviewImageUrls.length === 0 && (
-              <Box
-                sx={{
-                  p: 4,
-                  border: '2px dashed',
-                  borderColor: 'grey.300',
-                  borderRadius: 2,
-                  textAlign: 'center',
-                  bgcolor: 'grey.50',
-                }}
-              >
-                <Typography variant="body2" color="text.secondary">
-                  {t('admin.home.noReviewImages')}
-                </Typography>
-              </Box>
-            )}
+                      </Card>
+                    </Grid>
+                  ))}
+                </Grid>
+              )}
+            </Stack>
           </Box>
         </Container>
       </Box>
