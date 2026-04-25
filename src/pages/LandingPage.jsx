@@ -184,6 +184,7 @@ const LandingPage = () => {
   const [reviewMediaIds, setReviewMediaIds] = useState([]);
   const [reviewImageUrls, setReviewImageUrls] = useState([]);
   const [loadingReviewImages, setLoadingReviewImages] = useState({});
+  const reviewImageLoadRequestedRef = useRef(new Set());
   const [reviewCarouselIndex, setReviewCarouselIndex] = useState(0);
   const [educationControlsVisible, setEducationControlsVisible] = useState(false);
   const [reviewControlsVisible, setReviewControlsVisible] = useState(false);
@@ -528,32 +529,6 @@ const LandingPage = () => {
         setHeroButtonColour(ep.welcomeBookSessionButtonColourHex || '#ffffff');
         setHeroButtonTextColour(ep.welcomeBookSessionButtonTextColourHex || '#2C5F5F');
 
-        // Load hero images (block rendering until these are ready or error)
-        const heroLoaders = [];
-        if (data.welcomeRightMediaId) {
-          heroLoaders.push(loadImage(data.welcomeRightMediaId, 'welcome-right'));
-        }
-        if (data.welcomeLeftMediaId) {
-          heroLoaders.push(loadImage(data.welcomeLeftMediaId, 'welcome-left'));
-        }
-        if (data.welcomeMobileMediaId) {
-          heroLoaders.push(loadImage(data.welcomeMobileMediaId, 'welcome-mobile'));
-        }
-
-        if (heroLoaders.length > 0) {
-          await Promise.allSettled(heroLoaders);
-          if (isMounted) {
-            setHeroImagesReady(true);
-          }
-        } else if (isMounted) {
-          setHeroImagesReady(true);
-        }
-
-        if (data.aboutMediaId) {
-          loadImage(data.aboutMediaId, 'about').catch(err => {
-            console.error('Error loading about image:', err);
-          });
-        }
         const nextEducationMediaIds = Array.isArray(data.educationMediaIds)
           ? data.educationMediaIds
           : (data.educationMediaId ? [data.educationMediaId] : []);
@@ -562,7 +537,33 @@ const LandingPage = () => {
           setEducationImageUrls(new Array(nextEducationMediaIds.length).fill(null));
           setFailedEducationImages({});
           setEducationCarouselIndex(0);
-          loadEducationImageAt(0, nextEducationMediaIds);
+        }
+
+        // Load above-the-fold/facing images before revealing the landing page.
+        const facingLoaders = [];
+        if (data.welcomeRightMediaId) {
+          facingLoaders.push(loadImage(data.welcomeRightMediaId, 'welcome-right'));
+        }
+        if (data.welcomeLeftMediaId) {
+          facingLoaders.push(loadImage(data.welcomeLeftMediaId, 'welcome-left'));
+        }
+        if (data.welcomeMobileMediaId) {
+          facingLoaders.push(loadImage(data.welcomeMobileMediaId, 'welcome-mobile'));
+        }
+        if (data.aboutMediaId) {
+          facingLoaders.push(loadImage(data.aboutMediaId, 'about'));
+        }
+        if (nextEducationMediaIds.length > 0) {
+          facingLoaders.push(loadEducationImageAt(0, nextEducationMediaIds));
+        }
+
+        if (facingLoaders.length > 0) {
+          await Promise.allSettled(facingLoaders);
+          if (isMounted) {
+            setHeroImagesReady(true);
+          }
+        } else if (isMounted) {
+          setHeroImagesReady(true);
         }
 
         // Store review media IDs for lazy loading
@@ -638,22 +639,19 @@ const LandingPage = () => {
   ]);
 
   useEffect(() => {
-    if (!educationMediaIds || educationMediaIds.length <= 1) return;
+    if (!displayReady || !educationMediaIds || educationMediaIds.length <= 1) return;
 
-    const adjacentIndexes = [educationCarouselIndex - 1, educationCarouselIndex + 1]
-      .filter(index => index >= 0 && index < educationMediaIds.length);
-
-    adjacentIndexes.forEach(index => {
+    educationMediaIds.forEach((_, index) => {
       if (!educationImageUrls[index] && !loadingEducationImages[index] && !failedEducationImages[index]) {
         loadEducationImageAt(index, educationMediaIds);
       }
     });
   }, [
+    displayReady,
     educationMediaIds,
     educationImageUrls,
     loadingEducationImages,
     failedEducationImages,
-    educationCarouselIndex,
     loadEducationImageAt,
   ]);
 
@@ -736,52 +734,39 @@ const LandingPage = () => {
     showReviewControls,
   ]);
 
-  // Lazy load review images based on carousel position
+  // Continue loading review images in the background after the landing page opens.
   useEffect(() => {
-    if (!reviewMediaIds || reviewMediaIds.length === 0) return;
+    if (!displayReady || !reviewMediaIds || reviewMediaIds.length === 0) return;
 
-    const loadImageGroup = async (startIndex, endIndex) => {
-      for (let i = startIndex; i < endIndex && i < reviewMediaIds.length; i++) {
-        // Skip if already loaded or loading
-        if (reviewImageUrls[i] || loadingReviewImages[i]) continue;
+    reviewMediaIds.forEach((mediaId, i) => {
+      // Skip if already loaded or loading
+      if (!mediaId || reviewImageUrls[i] || loadingReviewImages[i] || reviewImageLoadRequestedRef.current.has(mediaId)) return;
 
-        const mediaId = reviewMediaIds[i];
+      // Mark as loading
+      reviewImageLoadRequestedRef.current.add(mediaId);
+      setLoadingReviewImages(prev => ({ ...prev, [i]: true }));
 
-        // Mark as loading
-        setLoadingReviewImages(prev => ({ ...prev, [i]: true }));
-
-        try {
-          const url = await loadImageWithCache(mediaId);
+      loadImageWithCache(mediaId)
+        .then(url => {
           setReviewImageUrls(prev => {
             const newUrls = [...prev];
             newUrls[i] = url;
             return newUrls;
           });
-        } catch (err) {
+        })
+        .catch(err => {
           console.error(`Error loading review image ${mediaId}:`, err);
           setReviewImageUrls(prev => {
             const newUrls = [...prev];
             newUrls[i] = null;
             return newUrls;
           });
-        } finally {
+        })
+        .finally(() => {
           setLoadingReviewImages(prev => ({ ...prev, [i]: false }));
-        }
-      }
-    };
-
-    // Load current visible group
-    const currentGroupStart = reviewCarouselIndex;
-    const currentGroupEnd = reviewCarouselIndex + imagesToShow;
-    loadImageGroup(currentGroupStart, currentGroupEnd);
-
-    // Preload next group
-    const nextGroupStart = currentGroupEnd;
-    const nextGroupEnd = nextGroupStart + imagesToShow;
-    if (nextGroupStart < reviewMediaIds.length) {
-      loadImageGroup(nextGroupStart, nextGroupEnd);
-    }
-  }, [reviewMediaIds, reviewCarouselIndex, imagesToShow]);
+        });
+    });
+  }, [displayReady, reviewMediaIds, reviewImageUrls, loadingReviewImages]);
 
   // Fetch session types
   useEffect(() => {

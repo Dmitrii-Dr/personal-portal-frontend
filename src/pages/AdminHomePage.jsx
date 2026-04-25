@@ -942,18 +942,54 @@ const AdminHomePage = () => {
   const handleSelectGalleryImage = async (mediaId) => {
     try {
       const objectUrl = await loadImageWithCache(mediaId);
+      const singleImageTargets = {
+        'welcome-left': {
+          mediaKey: 'welcomeLeftMediaId',
+          setMediaId: setWelcomeLeftMediaId,
+          setImageUrl: setWelcomeLeftImageUrl,
+        },
+        'welcome-right': {
+          mediaKey: 'welcomeRightMediaId',
+          setMediaId: setWelcomeRightMediaId,
+          setImageUrl: setWelcomeRightImageUrl,
+        },
+        'welcome-mobile': {
+          mediaKey: 'welcomeMobileMediaId',
+          setMediaId: setWelcomeMobileMediaId,
+          setImageUrl: setWelcomeMobileImageUrl,
+        },
+        about: {
+          mediaKey: 'aboutMediaId',
+          setMediaId: setAboutMediaId,
+          setImageUrl: setAboutImageUrl,
+        },
+      };
+      const singleImageTarget = singleImageTargets[galleryTarget];
       const isEducationTarget = galleryTarget === 'education';
+      const isReviewTarget = galleryTarget === 'review';
       const nextEducationMediaIds = isEducationTarget ? [...educationMediaIds, mediaId] : educationMediaIds;
-      const nextReviewMediaIds = isEducationTarget ? reviewMediaIds : [...reviewMediaIds, mediaId];
+      const nextReviewMediaIds = isReviewTarget ? [...reviewMediaIds, mediaId] : reviewMediaIds;
+      const nextSingleMediaIds = {
+        welcomeRightMediaId: welcomeRightMediaId,
+        welcomeLeftMediaId: welcomeLeftMediaId,
+        welcomeMobileMediaId: welcomeMobileMediaId,
+        aboutMediaId: aboutMediaId,
+      };
 
       if (isEducationTarget) {
         setEducationMediaIds(nextEducationMediaIds);
         setEducationImageUrls((prev) => [...prev, objectUrl]);
         setEducationPreviewIndex(nextEducationMediaIds.length - 1);
-      } else {
+      } else if (isReviewTarget) {
         setReviewMediaIds(nextReviewMediaIds);
         setReviewImageUrls((prev) => [...prev, objectUrl]);
         setReviewPreviewIndex(nextReviewMediaIds.length - 1);
+      } else if (singleImageTarget) {
+        nextSingleMediaIds[singleImageTarget.mediaKey] = mediaId;
+        singleImageTarget.setMediaId(mediaId);
+        singleImageTarget.setImageUrl(objectUrl);
+      } else {
+        throw new Error(`Unsupported gallery target: ${galleryTarget}`);
       }
 
       // Update via PUT request
@@ -961,10 +997,10 @@ const AdminHomePage = () => {
         aboutMessage: aboutMeContent,
         educationMessage: educationContent,
         reviewMessage: reviewMessage,
-        welcomeRightMediaId: welcomeRightMediaId,
-        welcomeLeftMediaId: welcomeLeftMediaId,
-        welcomeMobileMediaId: welcomeMobileMediaId,
-        aboutMediaId: aboutMediaId,
+        welcomeRightMediaId: nextSingleMediaIds.welcomeRightMediaId,
+        welcomeLeftMediaId: nextSingleMediaIds.welcomeLeftMediaId,
+        welcomeMobileMediaId: nextSingleMediaIds.welcomeMobileMediaId,
+        aboutMediaId: nextSingleMediaIds.aboutMediaId,
         educationMediaIds: nextEducationMediaIds,
         reviewMediaIds: nextReviewMediaIds,
         welcomeArticleIds: welcomeArticleIds,
@@ -980,14 +1016,14 @@ const AdminHomePage = () => {
       });
 
       if (!updateResponse.ok) {
-        throw new Error(`Failed to add ${isEducationTarget ? 'education' : 'review'} image: ${updateResponse.status}`);
+        throw new Error(`Failed to add ${galleryTarget} image: ${updateResponse.status}`);
       }
 
       // Close gallery dialog
       handleCloseGallery();
     } catch (err) {
       console.error('Error selecting gallery image:', err);
-      setError(err.message || `Failed to add ${galleryTarget === 'education' ? 'education' : 'review'} image`);
+      setError(err.message || `Failed to add ${galleryTarget} image`);
     }
   };
 
@@ -1407,8 +1443,8 @@ const AdminHomePage = () => {
                     )}
                   </Box>
 
-                  {/* Upload button */}
-                  <Box>
+                  {/* Upload and gallery buttons */}
+                  <Stack spacing={1}>
                     <input
                       accept="image/*"
                       style={{ display: 'none' }}
@@ -1436,7 +1472,17 @@ const AdminHomePage = () => {
                             : t('admin.home.uploadImage', 'Upload Photo')}
                       </Button>
                     </label>
-                  </Box>
+                    <Button
+                      variant="outlined"
+                      fullWidth
+                      startIcon={<PhotoLibraryIcon />}
+                      onClick={() => handleOpenGallery(card.id)}
+                      disabled={card.uploading}
+                      sx={{ textTransform: 'none' }}
+                    >
+                      {t('admin.home.selectFromGallery')}
+                    </Button>
+                  </Stack>
                 </Paper>
               </Grid>
             ))}
@@ -1731,6 +1777,23 @@ const AdminHomePage = () => {
                       {uploadingAboutImage ? t('admin.home.uploading') : aboutImageUrl ? t('admin.home.change') : t('admin.home.uploadImage')}
                     </Button>
                   </label>
+                </Box>
+                <Box
+                  sx={{
+                    position: 'absolute',
+                    bottom: 16,
+                    left: 16,
+                  }}
+                >
+                  <Button
+                    variant="outlined"
+                    startIcon={<PhotoLibraryIcon />}
+                    onClick={() => handleOpenGallery('about')}
+                    disabled={uploadingAboutImage}
+                    sx={{ textTransform: 'none', bgcolor: 'rgba(255,255,255,0.86)' }}
+                  >
+                    {t('admin.home.selectFromGallery')}
+                  </Button>
                 </Box>
               </Box>
             </Grid>
