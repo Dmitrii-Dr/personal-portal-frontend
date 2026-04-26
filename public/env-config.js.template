@@ -1,0 +1,3 @@
+window.__APP_CONFIG__ = {
+  FAVICON_LABEL_TEXT: "${FAVICON_LABEL_TEXT}",
+};

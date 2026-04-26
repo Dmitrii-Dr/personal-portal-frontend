@@ -5,6 +5,9 @@ import './i18n/i18n';
 
 /** Must match sessionStorage key in index.html <head> (portal-shell-skip). */
 const PORTAL_SHELL_BOOTED_SESSION_KEY = '__portalShellBooted';
+const FAVICON_LABEL_TEXT = window.__APP_CONFIG__?.FAVICON_LABEL_TEXT || "Professional's Portal";
+
+document.title = FAVICON_LABEL_TEXT;
 
 function dismissInitialAppLoader() {
   const el = document.getElementById('initial-app-loader');

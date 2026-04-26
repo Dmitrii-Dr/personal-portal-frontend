@@ -24,6 +24,8 @@
   <meta name="theme-color" content="#2C5F5F" />
 
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <script src="/env-config.js"></script>
+  <script type="module" src="/src/main.jsx"></script>
   <title>Professional's Portal</title>
   <style>
     html {
@@ -132,7 +134,12 @@
   <script>
     (function () {
       /* Only source for loader copy — React reads window.__portalLoadingLabel (see LandingPageLoader.jsx). */
-      var LOADING = { en: 'Loading…', ru: 'Готовим безопасное пространство...' };
+      var envLabel = (window.__APP_CONFIG__ && window.__APP_CONFIG__.FAVICON_LABEL_TEXT) || '';
+      if (envLabel) document.title = envLabel;
+      var LOADING = {
+        en: 'Loading…',
+        ru: 'Готовим безопасное пространство...'
+      };
       function getShellLang() {
         try {
           var q = new URLSearchParams(window.location.search).get('lang');
@@ -159,7 +166,6 @@
       }
     })();
   </script>
-  <script type="module" src="/src/main.jsx"></script>
 </body>
 
 </html>
